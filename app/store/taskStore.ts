@@ -1,6 +1,6 @@
 import { create } from "zustand"
 // import your real API if you have it here
-// import { OolshikApi } from "@/api/client"
+// import { OolshikApi } from "@/api"
 import { FLAGS } from "@/config/flags"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
 

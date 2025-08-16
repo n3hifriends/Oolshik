@@ -23,15 +23,21 @@ export type Task = {
   createdAt?: string // ISO
 }
 
+// widen createTask payload
+type CreateTaskPayload = {
+  voiceUrl: string
+  description?: string
+  lat: number
+  lng: number
+  radiusKm: number
+  createdById?: string
+  createdByName?: string
+  createdAt?: string
+}
+
 export const OolshikApi = {
   // Create Task
-  createTask: (payload: {
-    voiceUrl: string
-    description?: string
-    lat: number
-    lng: number
-    radiusKm: number
-  }) => api.post("/tasks", payload),
+  createTask: (payload: CreateTaskPayload) => api.post("/tasks", payload),
 
   // Nearby
   nearbyTasks: (lat: number, lng: number, radiusKm: number) =>

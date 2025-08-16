@@ -21,7 +21,16 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
   const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [attemptsCount, setAttemptsCount] = useState(0)
-  const { authEmail, setAuthEmail, setAuthToken, validationError } = useAuth()
+  const {
+    userId,
+    userName,
+    setUserId,
+    setUserName,
+    authEmail,
+    setAuthEmail,
+    setAuthToken,
+    validationError,
+  } = useAuth()
 
   const {
     themed,
@@ -51,6 +60,8 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
 
     // We'll mock this with a fake token.
     setAuthToken(String(Date.now()))
+    setUserName("Nitin")
+    setUserId("U-02")
   }
 
   const PasswordRightAccessory: ComponentType<TextFieldAccessoryProps> = useMemo(
