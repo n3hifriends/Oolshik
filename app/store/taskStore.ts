@@ -3,6 +3,7 @@ import { create } from "zustand"
 // import { OolshikApi } from "@/api"
 import { FLAGS } from "@/config/flags"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
+import { OolshikApi } from "@/api"
 
 type Task = {
   id: string
@@ -70,19 +71,19 @@ export const useTaskStore = create<State>((set, get) => ({
         tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "ASSIGNED" } : t)),
       }))
       return "OK"
+    } else {
+      // --- real API path (uncomment later) ---
+      const res = await OolshikApi.acceptTask(id)
+      if (res.ok) {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "ASSIGNED" } : t)),
+        }))
+        return "OK"
+      }
+      if (res.status === 409) return "ALREADY"
+      return "ALREADY"
+
+      return "OK"
     }
-
-    // --- real API path (uncomment later) ---
-    // const res = await OolshikApi.acceptTask(id)
-    // if (res.ok) {
-    //   set((s) => ({
-    //     tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "ASSIGNED" } : t)),
-    //   }))
-    //   return "OK"
-    // }
-    // if (res.status === 409) return "ALREADY"
-    // return "ALREADY"
-
-    return "OK"
   },
 }))

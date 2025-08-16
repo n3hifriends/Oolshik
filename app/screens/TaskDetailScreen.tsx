@@ -30,7 +30,7 @@ function minsAgo(iso?: string) {
   return hrs === 1 ? "1 hr ago" : `${hrs} hrs ago`
 }
 
-export default function TaskDetailScreen() {
+export default function TaskDetailScreen({ navigation }: any) {
   const { params } = useRoute<any>() as { params: RouteParams }
   const taskId = params?.id
 
@@ -130,8 +130,15 @@ export default function TaskDetailScreen() {
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
       {/* Header (fixed) */}
-      <View style={{ padding: 16 }}>
+      <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
         <Text preset="heading" text="Task Detail" />
+        {/* REPORT *** lightweight header action */}
+        <View style={{ marginLeft: "auto" }}>
+          <Button
+            text="Report"
+            onPress={() => navigation.navigate("OolshikReport", { taskId: current?.id })}
+          />
+        </View>
       </View>
 
       {/* Content */}
@@ -226,27 +233,37 @@ export default function TaskDetailScreen() {
         )}
       </View>
 
-      {/* Bottom fixed actions */}
+      {/* Bottom actions */}
       {current && (
-        <View style={{ position: "absolute", left: 16, right: 16, bottom: 16 }}>
+        <View
+          style={{
+            position: "absolute",
+            left: 16,
+            right: 16,
+            bottom: 16,
+            flexDirection: "row",
+            gap: spacing.sm,
+          }}
+        >
+          <Button
+            text="Report"
+            onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
+            style={{ flex: 1, paddingVertical: spacing.xs }}
+          />
           {current.status === "PENDING" ? (
             <Button
               text="Accept"
               onPress={onAccept}
-              style={{ width: "100%", paddingVertical: spacing.xs }}
+              style={{ flex: 2, paddingVertical: spacing.xs }}
             />
           ) : current.status === "ASSIGNED" ? (
             <Button
               text="Mark as Complete"
               onPress={onComplete}
-              style={{ width: "100%", paddingVertical: spacing.xs }}
+              style={{ flex: 2, paddingVertical: spacing.xs }}
             />
           ) : (
-            <Button
-              text="Completed"
-              disabled
-              style={{ width: "100%", paddingVertical: spacing.xs }}
-            />
+            <Button text="Completed" disabled style={{ flex: 2, paddingVertical: spacing.xs }} />
           )}
         </View>
       )}
