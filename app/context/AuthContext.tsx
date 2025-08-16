@@ -52,7 +52,6 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
 
   // 🔑 email validation logic preserved
   const validationError = useMemo(() => {
-    console.log("🚀 ~ AuthProvider ~ authEmail:", authEmail)
     if (!authEmail || authEmail.length === 0) return "can't be blank"
     if (authEmail.length < 6) return "must be at least 6 characters"
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authEmail)) return "must be a valid email address"

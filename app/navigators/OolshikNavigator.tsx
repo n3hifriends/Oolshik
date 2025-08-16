@@ -26,7 +26,7 @@ export function OolshikNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false, animation: "slide_from_right" }}
-      initialRouteName="OolshikOnboard"
+      initialRouteName="OolshikDetail"
     >
       <Stack.Screen name="OolshikOnboard" component={OnboardingConsentScreen} />
       <Stack.Screen name="OolshikHome" component={HomeFeedScreen} />

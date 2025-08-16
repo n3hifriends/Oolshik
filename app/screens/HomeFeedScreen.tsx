@@ -33,6 +33,9 @@ export default function HomeFeedScreen({ navigation }: any) {
         const res = await accept(t.id)
         if (res === "ALREADY") alert("Already assigned")
       }}
+      onPress={async () => {
+        navigation.navigate("OolshikDetail", { id: t.id })
+      }}
       createdByName={t.createdByName}
       createdAt={t.createdAt}
     />
