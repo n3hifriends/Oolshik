@@ -4,7 +4,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { Button } from "@/components/Button"
-import { OolshikApi } from "@/api/client"
+import { OolshikApi } from "@/api"
 
 export default function ReportScreen() {
   const [reason, setReason] = useState("")
