@@ -75,15 +75,15 @@ const AppStack = () => {
       {/* @demo remove-block-start */}
       {isAuthenticated ? (
         <>
-          {/* @demo remove-block-end */}
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          {/* @demo remove-block-start */}
-          {/* <Stack.Screen name="Demo" component={DemoNavigator} /> */}
           <Stack.Screen
             name="Oolshik"
             component={OolshikNavigator}
             options={{ headerShown: false }}
           />
+          {/* @demo remove-block-end */}
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
+          {/* @demo remove-block-start */}
+          {/* <Stack.Screen name="Demo" component={DemoNavigator} /> */}
         </>
       ) : (
         <>
