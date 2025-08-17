@@ -52,9 +52,9 @@ function styles(size: "md" | "lg", selected: boolean, disabled: boolean) {
 
   // neutral + selected palette (tweak to your theme if you expose tokens)
   const bg = selected ? "rgba(59,130,246,0.12)" : "#FFFFFF" // selected: soft primary tint
-  const bd = selected ? "#3B82F6" : "#E5E7EB" // border: primary vs. gray-200
+  const bd = selected ? "#BF360C" : "#E5E7EB" // border: primary vs. gray-200
   const fg = disabled ? "#9CA3AF" : selected ? "#1F2937" : "#374151" // text: dim if disabled
-  const dotBg = selected ? "#3B82F6" : "transparent"
+  const dotBg = selected ? "#FF6B2C" : "transparent"
 
   return StyleSheet.create({
     base: {
@@ -85,7 +85,7 @@ function styles(size: "md" | "lg", selected: boolean, disabled: boolean) {
       height: dot,
       borderRadius: 999,
       borderWidth: selected ? 0 : 1,
-      borderColor: selected ? "transparent" : "#D1D5DB",
+      borderColor: selected ? "transparent" : "#FF6B2C",
       backgroundColor: dotBg,
     },
     label: {

@@ -1,12 +1,10 @@
-import { ComponentType, FC, useEffect, useMemo, useRef, useState } from "react"
-// eslint-disable-next-line no-restricted-imports
-import { TextInput, TextStyle, ViewStyle } from "react-native"
+import { FC, useEffect, useMemo, useRef, useState } from "react"
+import { TextInput, TextStyle, View, ViewStyle, Pressable } from "react-native"
 
 import { Button } from "@/components/Button"
-import { PressableIcon } from "@/components/Icon"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
+import { TextField } from "@/components/TextField"
 import { useAuth } from "@/context/AuthContext"
 import type { AppStackScreenProps } from "@/navigators/AppNavigator"
 import type { ThemedStyle } from "@/theme/types"
@@ -14,149 +12,324 @@ import { useAppTheme } from "@/theme/context"
 
 interface LoginScreenProps extends AppStackScreenProps<"Login"> {}
 
+// A large, tap-to-focus 6-box OTP input optimized for accessibility
+function OtpBoxes({
+  value,
+  length = 6,
+  onChange,
+  editable,
+}: {
+  value: string
+  length?: number
+  onChange: (v: string) => void
+  editable: boolean
+}) {
+  const inputRef = useRef<TextInput>(null)
+  const { theme } = useAppTheme()
+  const { spacing, colors } = theme
+
+  const digits = Array.from({ length }).map((_, i) => value[i] ?? "")
+
+  return (
+    <Pressable
+      onPress={() => inputRef.current?.focus()}
+      accessibilityRole="button"
+      style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.sm }}
+    >
+      {digits.map((d, i) => (
+        <View
+          key={i}
+          style={{
+            width: 46,
+            height: 56,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.palette.neutral400,
+            backgroundColor: editable ? colors.palette.neutral100 : colors.palette.neutral200,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text text={d ? d : ""} weight="bold" style={{ fontSize: 20 }} />
+        </View>
+      ))}
+
+      {/* Hidden receiver */}
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={(t) => onChange(t.replace(/\D/g, "").slice(0, length))}
+        keyboardType="number-pad"
+        textContentType="oneTimeCode"
+        maxLength={length}
+        style={{ position: "absolute", opacity: 0, height: 0, width: 0 }}
+        editable={editable}
+      />
+    </Pressable>
+  )
+}
+
 export const LoginScreen: FC<LoginScreenProps> = () => {
-  const authPasswordInput = useRef<TextInput>(null)
+  // Mandatory phone & OTP
+  const [phone, setPhone] = useState("") // 10 digits (India-style), adjust as needed
+  const [otp, setOtp] = useState("")
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpVerified, setOtpVerified] = useState(false)
+  const [loading, setLoading] = useState<"send" | "verify" | null>(null)
+  const [resendIn, setResendIn] = useState(0)
+  const [showEmail, setShowEmail] = useState(false)
 
-  const [authPassword, setAuthPassword] = useState("")
-  const [isAuthPasswordHidden, setIsAuthPasswordHidden] = useState(true)
-  const [isSubmitted, setIsSubmitted] = useState(false)
-  const [attemptsCount, setAttemptsCount] = useState(0)
-  const {
-    userId,
-    userName,
-    setUserId,
-    setUserName,
-    authEmail,
-    setAuthEmail,
-    setAuthToken,
-    validationError,
-  } = useAuth()
+  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, validationError } =
+    useAuth()
 
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
+  const { themed, theme } = useAppTheme()
+  const { spacing, colors } = theme
 
+  // Clear email on mount (optional field)
   useEffect(() => {
-    // Here is where you could fetch credentials from keychain or storage
-    // and pre-fill the form fields.
-    setAuthEmail("ignite@infinite.red")
-    setAuthPassword("ign1teIsAwes0m3")
+    setAuthEmail("")
   }, [setAuthEmail])
 
-  const error = isSubmitted ? validationError : ""
+  // Validation
+  const phoneError = useMemo(() => {
+    const t = phone.replace(/\D/g, "")
+    if (t.length === 0) return "can't be blank"
+    if (t.length < 10) return "must be 10 digits"
+    return ""
+  }, [phone])
 
-  function login() {
-    setIsSubmitted(true)
-    setAttemptsCount(attemptsCount + 1)
-
-    if (validationError) return
-
-    // Make a request to your server to get an authentication token.
-    // If successful, reset the fields and set the token.
-    setIsSubmitted(false)
-    setAuthPassword("")
-    setAuthEmail("")
-
-    // We'll mock this with a fake token.
-    setAuthToken(String(Date.now()))
-    setUserName("Nitin")
-    setUserId("U-02")
+  // Mock services — replace with real API later
+  async function sendOtpMock(mobile: string) {
+    await new Promise((r) => setTimeout(r, 500))
+    return { ok: true }
+  }
+  async function verifyOtpMock(mobile: string, code: string) {
+    await new Promise((r) => setTimeout(r, 500))
+    return { ok: /^\d{6}$/.test(code) }
   }
 
-  const PasswordRightAccessory: ComponentType<TextFieldAccessoryProps> = useMemo(
-    () =>
-      function PasswordRightAccessory(props: TextFieldAccessoryProps) {
-        return (
-          <PressableIcon
-            icon={isAuthPasswordHidden ? "view" : "hidden"}
-            color={colors.palette.neutral800}
-            containerStyle={props.style}
-            size={20}
-            onPress={() => setIsAuthPasswordHidden(!isAuthPasswordHidden)}
-          />
-        )
-      },
-    [isAuthPasswordHidden, colors.palette.neutral800],
-  )
+  // Resend timer
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const id = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000)
+    return () => clearInterval(id)
+  }, [resendIn])
+
+  const onSendOtp = async () => {
+    if (phoneError) return
+    setLoading("send")
+    const res = await sendOtpMock(phone)
+    setLoading(null)
+    if (res.ok) {
+      setOtpSent(true)
+      setOtp("")
+      setOtpVerified(false)
+      setResendIn(30)
+    } else {
+      alert("Failed to send OTP")
+    }
+  }
+
+  const onVerifyOtp = async () => {
+    if (!otpSent) return
+    if (!/^\d{6}$/.test(otp)) return
+    setLoading("verify")
+    const res = await verifyOtpMock(phone, otp)
+    setLoading(null)
+    if (res.ok) setOtpVerified(true)
+    else alert("Invalid OTP")
+  }
+
+  // Auto-verify when 6 digits are entered
+  useEffect(() => {
+    if (otpSent && otp.length === 6 && !otpVerified && loading !== "verify") {
+      onVerifyOtp()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, otpSent])
+
+  const onContinue = () => {
+    if (phoneError || !otpVerified) return
+    // proceed to existing flow
+    setAuthToken(String(Date.now()))
+    setUserName("You")
+    setUserId("U-LOCAL-2")
+  }
 
   return (
     <Screen
-      preset="auto"
-      contentContainerStyle={themed($screenContentContainer)}
+      preset="scroll"
       safeAreaEdges={["top", "bottom"]}
+      contentContainerStyle={themed($container)}
     >
-      <Text testID="login-heading" tx="loginScreen:logIn" preset="heading" style={themed($logIn)} />
-      <Text tx="loginScreen:enterDetails" preset="subheading" style={themed($enterDetails)} />
-      {attemptsCount > 2 && (
-        <Text tx="loginScreen:hint" size="sm" weight="light" style={themed($hint)} />
-      )}
+      {/* Title */}
+      <Text preset="heading" text="Log in" style={themed($title)} />
 
-      <TextField
-        value={authEmail}
-        onChangeText={setAuthEmail}
-        containerStyle={themed($textField)}
-        autoCapitalize="none"
-        autoComplete="email"
-        autoCorrect={false}
-        keyboardType="email-address"
-        labelTx="loginScreen:emailFieldLabel"
-        placeholderTx="loginScreen:emailFieldPlaceholder"
-        helper={error}
-        status={error ? "error" : undefined}
-        onSubmitEditing={() => authPasswordInput.current?.focus()}
-      />
+      {/* STEP 1: Phone */}
+      <View style={themed($card)}>
+        <View style={themed($cardHeader)}>
+          <View style={themed($stepBadge)}>
+            <Text text="1" weight="bold" style={{ color: "white" }} />
+          </View>
+          <Text text="Verify your mobile" weight="bold" />
+          {otpVerified ? <Text text="✓" style={{ marginLeft: "auto", color: "#16A34A" }} /> : null}
+        </View>
 
-      <TextField
-        ref={authPasswordInput}
-        value={authPassword}
-        onChangeText={setAuthPassword}
-        containerStyle={themed($textField)}
-        autoCapitalize="none"
-        autoComplete="password"
-        autoCorrect={false}
-        secureTextEntry={isAuthPasswordHidden}
-        labelTx="loginScreen:passwordFieldLabel"
-        placeholderTx="loginScreen:passwordFieldPlaceholder"
-        onSubmitEditing={login}
-        RightAccessory={PasswordRightAccessory}
-      />
+        <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
+          <View style={themed($ccBadge)}>
+            <Text text="+91" weight="bold" style={{ color: colors.palette.neutral800 }} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <TextField
+              value={phone}
+              onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, 10))}
+              containerStyle={{ marginBottom: 0 }}
+              keyboardType="phone-pad"
+              placeholder="10-digit mobile"
+              status={phoneError ? "error" : undefined}
+              maxLength={10}
+              editable={!otpVerified}
+              inputWrapperStyle={themed($inputWrapperDense)}
+              inputStyle={{ height: 50, paddingVertical: 0 }}
+            />
+          </View>
+        </View>
+        {!!phoneError && (
+          <Text text={phoneError} size="xs" style={{ color: "#DC2626", marginTop: spacing.xs }} />
+        )}
 
-      <Button
-        testID="login-button"
-        tx="loginScreen:tapToLogIn"
-        style={themed($tapButton)}
-        preset="reversed"
-        onPress={login}
-      />
+        <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
+          <Button
+            text={
+              otpSent
+                ? resendIn > 0
+                  ? `Resend in ${resendIn}s`
+                  : loading === "send"
+                    ? "Sending…"
+                    : "Resend OTP"
+                : loading === "send"
+                  ? "Sending…"
+                  : "Send OTP"
+            }
+            onPress={onSendOtp}
+            disabled={!!phoneError || loading === "send" || (otpSent && resendIn > 0)}
+            style={{ flex: 1, paddingVertical: spacing.xs }}
+          />
+        </View>
+      </View>
+
+      {/* STEP 2: OTP */}
+      <View style={themed($card)}>
+        <View style={themed($cardHeader)}>
+          <View style={themed($stepBadge)}>
+            <Text text="2" weight="bold" style={{ color: "white" }} />
+          </View>
+          <Text text="Enter 6-digit code" weight="bold" />
+          {otpVerified ? (
+            <Text text="✓ Verified" style={{ marginLeft: "auto", color: "#16A34A" }} />
+          ) : null}
+        </View>
+
+        <OtpBoxes value={otp} onChange={setOtp} editable={otpSent && !otpVerified} />
+
+        {!otpVerified && (
+          <View style={{ marginTop: spacing.sm }}>
+            <Button
+              text={loading === "verify" ? "Verifying…" : "Verify"}
+              onPress={onVerifyOtp}
+              disabled={!otpSent || otp.length !== 6 || loading === "verify"}
+              style={{ paddingVertical: spacing.xs }}
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Optional Email (collapsed) */}
+      <View style={themed($card)}>
+        <Pressable onPress={() => setShowEmail((v) => !v)} style={themed($cardHeader)}>
+          <Text text="Email (optional)" weight="bold" />
+          <Text text={showEmail ? "–" : "+"} style={{ marginLeft: "auto" }} />
+        </Pressable>
+        {showEmail && (
+          <TextField
+            value={authEmail}
+            onChangeText={setAuthEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            placeholder="name@example.com"
+            helper={validationError}
+            status={validationError ? "error" : undefined}
+          />
+        )}
+      </View>
+
+      {/* Bottom fixed Continue */}
+      <View
+        style={{ position: "absolute", left: spacing.md, right: spacing.md, bottom: spacing.md }}
+      >
+        <Button
+          text="Continue"
+          onPress={onContinue}
+          disabled={!!phoneError || !otpVerified}
+          style={{ paddingVertical: spacing.sm }}
+        />
+      </View>
     </Screen>
   )
 }
 
-const $screenContentContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingVertical: spacing.xxl,
-  paddingHorizontal: spacing.lg,
+const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  padding: spacing.md,
+  paddingBottom: 96,
 })
 
-const $logIn: ThemedStyle<TextStyle> = ({ spacing }) => ({
-  marginBottom: spacing.sm,
-})
-
-const $enterDetails: ThemedStyle<TextStyle> = ({ spacing }) => ({
-  marginBottom: spacing.lg,
-})
-
-const $hint: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
-  color: colors.tint,
+const $title: ThemedStyle<TextStyle> = ({ spacing }) => ({
   marginBottom: spacing.md,
 })
 
-const $textField: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  marginBottom: spacing.lg,
+const $card: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  backgroundColor: colors.palette.neutral100,
+  borderColor: colors.palette.neutral300,
+  borderWidth: 1,
+  borderRadius: spacing.md,
+  padding: spacing.md,
+  marginBottom: spacing.md,
 })
 
-const $tapButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  marginTop: spacing.xs,
+const $cardHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  marginBottom: spacing.md,
+})
+
+const $stepBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  backgroundColor: colors.palette.primary500,
+  alignItems: "center",
+  justifyContent: "center",
+})
+
+const $ccBadge: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  paddingHorizontal: spacing.sm,
+  height: 50,
+  borderRadius: spacing.sm,
+  borderWidth: 1,
+  borderColor: colors.palette.neutral300,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: colors.palette.neutral100,
+})
+
+const $inputWrapperDense: ThemedStyle<ViewStyle> = () => ({
+  height: 50,
+  minHeight: 50,
+  alignItems: "center",
+  paddingVertical: 0,
 })
 
 // @demo remove-file
