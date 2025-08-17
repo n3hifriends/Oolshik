@@ -1,6 +1,19 @@
 <resources>
-  <color name="splashscreen_background">#191015</color>
-  <color name="iconBackground">#ffffff</color>
-  <color name="colorPrimary">#023c69</color>
-  <color name="colorPrimaryDark">#191015</color>
+    <!-- Splash / Launch Screen background -->
+    <color name="splashscreen_background">#FF6B2C</color> <!-- Vibrant orange -->
+
+    <!-- Icon background (kept white for contrast) -->
+    <color name="iconBackground">#FFFFFF</color>
+
+    <!-- Primary brand color (deep orange tone from your icon) -->
+    <color name="colorPrimary">#E65100</color> <!-- Deep orange -->
+
+    <!-- Darker variant for status bar / dark surfaces -->
+    <color name="colorPrimaryDark">#BF360C</color> <!-- Dark burnt orange -->
+
+    <!-- Accent / secondary (lighter orange for highlights) -->
+    <color name="colorAccent">#FF8A50</color>
+
+    <!-- Neutral background (light gray for cards if needed) -->
+    <color name="colorSurface">#FAFAFA</color>
 </resources>
