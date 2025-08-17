@@ -37,7 +37,6 @@ react {
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
     // nodeExecutableAndArgs = ["node"]
-
     //
     //   The path to the CLI configuration file. Default is empty.
     // bundleConfig = file(../rn-cli.config.js)
