@@ -20,7 +20,7 @@ import { useAppTheme } from "@/theme/context"
 
 import { DemoNavigator, DemoTabParamList } from "./DemoNavigator" // @demo remove-current-line
 import { navigationRef, useBackButtonHandler } from "./navigationUtilities"
-
+import { OolshikNavigator } from "@/navigators/OolshikNavigator"
 /**
  * This type allows TypeScript to know what routes are defined in this navigator
  * as well as what properties (if any) they might take when navigating to them.
@@ -36,6 +36,7 @@ export type AppStackParamList = {
   Demo: NavigatorScreenParams<DemoTabParamList> // @demo remove-current-line
   // 🔥 Your screens go here
   // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
+  Oolshik: undefined
 }
 
 /**
@@ -69,15 +70,20 @@ const AppStack = () => {
           backgroundColor: colors.background,
         },
       }}
-      initialRouteName={isAuthenticated ? "Welcome" : "Login"} // @demo remove-current-line
+      initialRouteName={isAuthenticated ? "Oolshik" : "Login"} // @demo remove-current-line
     >
       {/* @demo remove-block-start */}
       {isAuthenticated ? (
         <>
+          <Stack.Screen
+            name="Oolshik"
+            component={OolshikNavigator}
+            options={{ headerShown: false }}
+          />
           {/* @demo remove-block-end */}
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           {/* @demo remove-block-start */}
-          <Stack.Screen name="Demo" component={DemoNavigator} />
+          {/* <Stack.Screen name="Demo" component={DemoNavigator} /> */}
         </>
       ) : (
         <>
