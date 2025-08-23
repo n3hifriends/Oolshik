@@ -59,6 +59,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [playing, setPlaying] = React.useState(false)
   const { coords } = useForegroundLocation()
   const { radiusMeters } = useTaskStore()
+  const [justCompleted, setJustCompleted] = React.useState(false)
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -163,7 +164,20 @@ export default function TaskDetailScreen({ navigation }: any) {
   const onComplete = async () => {
     if (!current) return
     const res = await OolshikApi.completeTask(current.id as any)
-    if (res?.ok) setTask((t: any) => (t ? { ...t, status: "COMPLETED" } : t))
+    if (res?.ok) {
+      setTask((t: any) => (t ? { ...t, status: "COMPLETED" } : t))
+      setJustCompleted(true)
+      // Briefly show a success banner, then return to previous screen
+      setTimeout(() => {
+        try {
+          navigation.goBack()
+        } catch {
+          // ignore
+        }
+      }, 1200)
+    } else {
+      alert("Error completing task")
+    }
   }
 
   return (
@@ -272,39 +286,60 @@ export default function TaskDetailScreen({ navigation }: any) {
         )}
       </View>
 
-      {/* Bottom actions */}
+      {/* Bottom actions / success banner */}
       {current && (
-        <View
-          style={{
-            position: "absolute",
-            left: 16,
-            right: 16,
-            bottom: 16,
-            flexDirection: "row",
-            gap: spacing.sm,
-          }}
-        >
-          <Button
-            text="Report"
-            onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
-            style={{ flex: 1, paddingVertical: spacing.xs }}
-          />
-          {normalizedStatus === "PENDING" ? (
-            <Button
-              text="Accept"
-              onPress={onAccept}
-              style={{ flex: 2, paddingVertical: spacing.xs }}
-            />
-          ) : normalizedStatus === "ASSIGNED" ? (
-            <Button
-              text="Mark as Complete"
-              onPress={onComplete}
-              style={{ flex: 2, paddingVertical: spacing.xs }}
-            />
-          ) : (
-            <Button text="Completed" disabled style={{ flex: 2, paddingVertical: spacing.xs }} />
+        <>
+          {normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
+            <View
+              style={{
+                position: "absolute",
+                left: 16,
+                right: 16,
+                bottom: 16,
+                flexDirection: "row",
+                gap: spacing.sm,
+              }}
+            >
+              <Button
+                text="Report"
+                onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
+                style={{ flex: 1, paddingVertical: spacing.xs }}
+              />
+              {normalizedStatus === "PENDING" ? (
+                <Button
+                  text="Accept"
+                  onPress={onAccept}
+                  style={{ flex: 2, paddingVertical: spacing.xs }}
+                />
+              ) : (
+                <Button
+                  text="Mark as Complete"
+                  onPress={onComplete}
+                  style={{ flex: 2, paddingVertical: spacing.xs }}
+                />
+              )}
+            </View>
+          ) : null}
+          {normalizedStatus === "COMPLETED" && (
+            <View
+              style={{
+                position: "absolute",
+                left: 16,
+                right: 16,
+                bottom: 16,
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 8,
+                backgroundColor: successSoft,
+                borderWidth: 1,
+                borderColor: success,
+              }}
+            >
+              <Text text="Task completed ✓" weight="bold" style={{ color: success }} />
+              <Text text="Thanks for helping! Returning to list..." size="xs" />
+            </View>
           )}
-        </View>
+        </>
       )}
     </Screen>
   )
