@@ -3,6 +3,8 @@ import { TextInput, TextStyle, View, ViewStyle, Pressable } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
+import { OolshikApi } from "@/api"
+import { setAccessTokenHeader, setTokens } from "@/api/client"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useAuth } from "@/context/AuthContext"
@@ -71,10 +73,11 @@ function OtpBoxes({
 
 export const LoginScreen: FC<LoginScreenProps> = () => {
   // Mandatory phone & OTP
-  const [phone, setPhone] = useState("") // 10 digits (India-style), adjust as needed
+  const [phone, setPhone] = useState("") // 10 digits (India-style)
   const [otp, setOtp] = useState("")
   const [otpSent, setOtpSent] = useState(false)
   const [otpVerified, setOtpVerified] = useState(false)
+  const [displayName, setDisplayName] = useState("")
   const [loading, setLoading] = useState<"send" | "verify" | null>(null)
   const [resendIn, setResendIn] = useState(0)
   const [showEmail, setShowEmail] = useState(false)
@@ -98,14 +101,21 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     return ""
   }, [phone])
 
-  // Mock services — replace with real API later
-  async function sendOtpMock(mobile: string) {
-    await new Promise((r) => setTimeout(r, 500))
-    return { ok: true }
+  // Real services
+  async function sendOtp(p: string) {
+    try {
+      return await OolshikApi.requestOtp(p)
+    } catch {
+      return { ok: false } as any
+    }
   }
-  async function verifyOtpMock(mobile: string, code: string) {
-    await new Promise((r) => setTimeout(r, 500))
-    return { ok: /^\d{6}$/.test(code) }
+
+  async function verifyOtp(p: string, code: string, dName?: string, email?: string) {
+    try {
+      return await OolshikApi.verifyOtp({ phone: p, code, displayName: dName, email })
+    } catch {
+      return { ok: false } as any
+    }
   }
 
   // Resend timer
@@ -118,7 +128,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
   const onSendOtp = async () => {
     if (phoneError) return
     setLoading("send")
-    const res = await sendOtpMock(phone)
+    const res = await sendOtp(phone)
     setLoading(null)
     if (res.ok) {
       setOtpSent(true)
@@ -134,10 +144,16 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     if (!otpSent) return
     if (!/^\d{6}$/.test(otp)) return
     setLoading("verify")
-    const res = await verifyOtpMock(phone, otp)
+    const res = await verifyOtp(phone, otp, displayName || undefined, authEmail || undefined)
     setLoading(null)
-    if (res.ok) setOtpVerified(true)
-    else alert("Invalid OTP")
+    if (res.ok && res.data?.accessToken) {
+      // Persist both tokens & prime API client
+      setAuthToken(res.data.accessToken)
+      setTokens(res.data.accessToken, res.data.refreshToken) // <-- NEW
+      setOtpVerified(true)
+    } else {
+      alert("Invalid OTP")
+    }
   }
 
   // Auto-verify when 6 digits are entered
@@ -148,12 +164,21 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp, otpSent])
 
-  const onContinue = () => {
+  const onContinue = async () => {
     if (phoneError || !otpVerified) return
-    // proceed to existing flow
-    setAuthToken(String(Date.now()))
-    setUserName("You")
-    setUserId("U-LOCAL-2")
+    // Fetch profile after verification (token already set)
+    try {
+      const prof = await OolshikApi.me()
+      if (prof?.ok && prof.data) {
+        const profile = prof.data as { id?: string | number; displayName?: string }
+        setUserName(profile.displayName ?? (displayName || "You"))
+        if (profile.id != null) setUserId(String(profile.id))
+      } else {
+        setUserName(displayName || "You")
+      }
+    } catch {
+      setUserName(displayName || "You")
+    }
   }
 
   return (
@@ -190,7 +215,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
               maxLength={10}
               editable={!otpVerified}
               inputWrapperStyle={themed($inputWrapperDense)}
-              inputStyle={{ height: 50, paddingVertical: 0 }}
+              style={{ height: 50, paddingVertical: 0 }}
             />
           </View>
         </View>
@@ -238,13 +263,23 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
               text={loading === "verify" ? "Verifying…" : "Verify"}
               onPress={onVerifyOtp}
               disabled={!otpSent || otp.length !== 6 || loading === "verify"}
-              style={{ paddingVertical: spacing.xs }}
+              style={{ marginTop: spacing.md, paddingVertical: spacing.xs }}
             />
           </View>
         )}
       </View>
 
-      {/* Optional Email (collapsed) */}
+      {/* Optional Email / Name */}
+      <View style={themed($card)}>
+        <Text text="Your name (optional)" weight="bold" />
+        <TextField
+          value={displayName}
+          onChangeText={setDisplayName}
+          placeholder="e.g., Nitin"
+          autoCapitalize="words"
+        />
+      </View>
+
       <View style={themed($card)}>
         <Pressable onPress={() => setShowEmail((v) => !v)} style={themed($cardHeader)}>
           <Text text="Email (optional)" weight="bold" />

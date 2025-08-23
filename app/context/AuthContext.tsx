@@ -1,5 +1,13 @@
-import React, { createContext, useContext, useMemo, PropsWithChildren, useCallback } from "react"
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  PropsWithChildren,
+  useCallback,
+  useEffect, // ✅ added
+} from "react"
 import { useMMKVString } from "react-native-mmkv"
+import { onAuthLost, setTokens } from "@/api/client" // ✅ import setTokens so header stays in sync
 
 export type AuthContextType = {
   isAuthenticated: boolean
@@ -30,7 +38,11 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const effectiveUserName = userName || "You"
 
   const setAuthToken = useCallback(
-    (token?: string) => setAuthTokenMMKV(token ?? ""),
+    (token?: string) => {
+      setAuthTokenMMKV(token ?? "")
+      // ✅ keep HTTP client Authorization header in sync immediately
+      setTokens(token || undefined) // (refresh stays as-is, managed by client after OTP/refresh)
+    },
     [setAuthTokenMMKV],
   )
 
@@ -44,11 +56,28 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const setUserName = useCallback((name?: string) => setUserNameMMKV(name ?? ""), [setUserNameMMKV])
 
   const logout = useCallback(() => {
+    // ✅ clear persisted state
     setAuthTokenMMKV("")
     setAuthEmailMMKV("")
     setUserIdMMKV("")
     setUserNameMMKV("")
+    // ✅ clear Authorization header in the HTTP client
+    setTokens(undefined, undefined)
+    // (navigation back to Login is handled by your app’s routing on isAuthenticated=false)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV])
+
+  // ✅ on mount & whenever authToken changes (e.g., app relaunch), sync header once
+  useEffect(() => {
+    setTokens(authToken || undefined)
+  }, [authToken])
+
+  // ✅ subscribe to auth-lost events from the API client (refresh failed → force logout)
+  useEffect(() => {
+    const unsubscribe = onAuthLost(() => {
+      logout()
+    })
+    return unsubscribe
+  }, [logout])
 
   // 🔑 email validation logic preserved
   const validationError = useMemo(() => {

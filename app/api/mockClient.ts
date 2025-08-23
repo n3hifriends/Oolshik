@@ -1,6 +1,23 @@
 // app/api/mockClient.ts
 import type { Task } from "./client"
 
+// --- Mock OTP state (in-memory) ---
+let _lastOtpPhone: string | undefined
+let _lastOtpCode: string | undefined
+let _lastOtpExpiresAt: number | undefined // epoch ms
+
+function _setMockOtp(phone: string) {
+  _lastOtpPhone = phone
+  _lastOtpCode = "123456" // fixed code for mock
+  _lastOtpExpiresAt = Date.now() + 5 * 60 * 1000 // 5 minutes
+}
+
+function _isOtpValid(phone: string, code: string) {
+  if (!_lastOtpPhone || !_lastOtpCode || !_lastOtpExpiresAt) return false
+  if (Date.now() > _lastOtpExpiresAt) return false
+  return _lastOtpPhone === phone && _lastOtpCode === code
+}
+
 const dummyTasks: Task[] = [
   {
     id: "T-MOCK-1",
@@ -94,4 +111,42 @@ export const MockOolshikApi = {
   addReview: async () => ({ ok: true as const }),
   report: async () => ({ ok: true as const }),
   registerDevice: async () => ({ ok: true as const }),
+
+  // --- Phase 1: Auth / OTP mock endpoints ---
+  async requestOtp(phone: string) {
+    await wait(150)
+    // store mock OTP in memory so verify can pass
+    _setMockOtp(phone)
+    return { ok: true as const, data: { message: "otp_sent" } }
+  },
+
+  async verifyOtp(payload: { phone: string; code: string; displayName?: string; email?: string }) {
+    await wait(150)
+    const { phone, code } = payload
+    if (_isOtpValid(phone, code)) {
+      return {
+        ok: true as const,
+        data: {
+          accessToken: "MOCK_ACCESS_TOKEN",
+          refreshToken: "MOCK_REFRESH_TOKEN",
+        },
+      }
+    }
+    return { ok: false as const, data: { error: "invalid_or_expired_otp" } }
+  },
+
+  async me() {
+    await wait(80)
+    return {
+      ok: true as const,
+      data: {
+        id: "U-MOCK-1",
+        phone: _lastOtpPhone ?? "+910000000000",
+        email: "mock@example.com",
+        displayName: "You",
+        roles: "USER",
+        languages: "en,hi,mr",
+      },
+    }
+  },
 }
