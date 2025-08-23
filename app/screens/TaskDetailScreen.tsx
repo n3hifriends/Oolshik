@@ -14,20 +14,32 @@ import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 type RouteParams = { id: string }
 
 function getInitials(name?: string) {
-  if (!name) return "?"
+  if (!name) return "👤"
   const parts = name.trim().split(/\s+/)
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
 function minsAgo(iso?: string) {
   if (!iso) return ""
-  const diffMs = Date.now() - new Date(iso).getTime()
+  const date = new Date(iso)
+  const diffMs = Date.now() - date.getTime()
   const mins = Math.max(0, Math.round(diffMs / 60000))
+
   if (mins < 1) return "just now"
   if (mins === 1) return "1 min ago"
   if (mins < 60) return `${mins} mins ago`
   const hrs = Math.round(mins / 60)
-  return hrs === 1 ? "1 hr ago" : `${hrs} hrs ago`
+  if (hrs === 1) return "1 hr ago"
+  if (hrs < 24) return `${hrs} hrs ago`
+
+  // For older than a day, show readable date
+  return date.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 export default function TaskDetailScreen({ navigation }: any) {
@@ -47,6 +59,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [playing, setPlaying] = React.useState(false)
   const { coords } = useForegroundLocation()
   const { radiusMeters } = useTaskStore()
+  const [justCompleted, setJustCompleted] = React.useState(false)
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -63,13 +76,27 @@ export default function TaskDetailScreen({ navigation }: any) {
     COMPLETED: { label: "Completed", bg: successSoft, fg: success },
   } as const
 
+  const current = task || taskFromStore || null
+
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
-  const normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" =
-    current?.status === "OPEN"
-      ? "PENDING"
-      : current?.status === "CANCELLED" || current?.status === "CANCELED"
-        ? "COMPLETED"
-        : (current?.status as any) || "PENDING"
+  let normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" = "PENDING"
+  const rawStatus = (current?.status as string | undefined) || undefined
+  switch (rawStatus) {
+    case "OPEN":
+      normalizedStatus = "PENDING"
+      break
+    case "CANCELLED":
+    case "CANCELED":
+      normalizedStatus = "COMPLETED"
+      break
+    case "PENDING":
+    case "ASSIGNED":
+    case "COMPLETED":
+      normalizedStatus = rawStatus as any
+      break
+    default:
+      normalizedStatus = "PENDING"
+  }
 
   // ensure we have the task (e.g., deep link / app resume)
   React.useEffect(() => {
@@ -103,7 +130,6 @@ export default function TaskDetailScreen({ navigation }: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
-  const current = task || taskFromStore || null
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const play = async () => {
@@ -124,7 +150,13 @@ export default function TaskDetailScreen({ navigation }: any) {
   const onAccept = async () => {
     if (!current) return
     const result = await accept(current.id)
-    if (result === "ALREADY") alert("Already assigned")
+    if (result === "ALREADY") {
+      alert("Already assigned")
+    } else if (result === "OK") {
+      alert("Task accepted")
+    } else {
+      alert("Error accepting task")
+    }
     // reflect status locally
     setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
   }
@@ -132,7 +164,20 @@ export default function TaskDetailScreen({ navigation }: any) {
   const onComplete = async () => {
     if (!current) return
     const res = await OolshikApi.completeTask(current.id as any)
-    if (res?.ok) setTask((t: any) => (t ? { ...t, status: "COMPLETED" } : t))
+    if (res?.ok) {
+      setTask((t: any) => (t ? { ...t, status: "COMPLETED" } : t))
+      setJustCompleted(true)
+      // Briefly show a success banner, then return to previous screen
+      setTimeout(() => {
+        try {
+          navigation.goBack()
+        } catch {
+          // ignore
+        }
+      }, 1200)
+    } else {
+      alert("Error completing task")
+    }
   }
 
   return (
@@ -241,39 +286,60 @@ export default function TaskDetailScreen({ navigation }: any) {
         )}
       </View>
 
-      {/* Bottom actions */}
+      {/* Bottom actions / success banner */}
       {current && (
-        <View
-          style={{
-            position: "absolute",
-            left: 16,
-            right: 16,
-            bottom: 16,
-            flexDirection: "row",
-            gap: spacing.sm,
-          }}
-        >
-          <Button
-            text="Report"
-            onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
-            style={{ flex: 1, paddingVertical: spacing.xs }}
-          />
-          {current.status === "PENDING" ? (
-            <Button
-              text="Accept"
-              onPress={onAccept}
-              style={{ flex: 2, paddingVertical: spacing.xs }}
-            />
-          ) : current.status === "ASSIGNED" ? (
-            <Button
-              text="Mark as Complete"
-              onPress={onComplete}
-              style={{ flex: 2, paddingVertical: spacing.xs }}
-            />
-          ) : (
-            <Button text="Completed" disabled style={{ flex: 2, paddingVertical: spacing.xs }} />
+        <>
+          {normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
+            <View
+              style={{
+                position: "absolute",
+                left: 16,
+                right: 16,
+                bottom: 16,
+                flexDirection: "row",
+                gap: spacing.sm,
+              }}
+            >
+              <Button
+                text="Report"
+                onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
+                style={{ flex: 1, paddingVertical: spacing.xs }}
+              />
+              {normalizedStatus === "PENDING" ? (
+                <Button
+                  text="Accept"
+                  onPress={onAccept}
+                  style={{ flex: 2, paddingVertical: spacing.xs }}
+                />
+              ) : (
+                <Button
+                  text="Mark as Complete"
+                  onPress={onComplete}
+                  style={{ flex: 2, paddingVertical: spacing.xs }}
+                />
+              )}
+            </View>
+          ) : null}
+          {normalizedStatus === "COMPLETED" && (
+            <View
+              style={{
+                position: "absolute",
+                left: 16,
+                right: 16,
+                bottom: 16,
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 8,
+                backgroundColor: successSoft,
+                borderWidth: 1,
+                borderColor: success,
+              }}
+            >
+              <Text text="Task completed ✓" weight="bold" style={{ color: success }} />
+              <Text text="Thanks for helping! Returning to list..." size="xs" />
+            </View>
           )}
-        </View>
+        </>
       )}
     </Screen>
   )
