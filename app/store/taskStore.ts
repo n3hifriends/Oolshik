@@ -55,9 +55,12 @@ export const useTaskStore = create<State>((set, get) => ({
         set({ tasks: filtered })
       } else {
         // --- real API path (uncomment when backend is ready) ---
-        // const r = get().radiusKm
-        // const res = await OolshikApi.nearbyTasks(_lat, _lng, r)
-        // if (res.ok && res.data) set({ tasks: res.data })
+        console.log("🚀 ~ before r:")
+        const r = get().radiusKm
+        console.log("🚀 ~ r:", r)
+        const res = await OolshikApi.nearbyTasks(_lat, _lng, r)
+        console.log("🚀 ~ res:", res)
+        if (res.ok && res.data) set({ tasks: res.data })
       }
     } finally {
       set({ loading: false })
