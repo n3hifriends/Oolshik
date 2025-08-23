@@ -59,7 +59,7 @@ export default function CreateTaskScreen({ navigation }: any) {
       voiceUrl: finalVoiceUrl,
       description: desc || undefined,
       lat: coords.latitude,
-      lon: coords.longitude,
+      lng: coords.longitude,
       radiusMeters: radiusKm * 1000,
       createdById: userId,
       createdByName: userName,

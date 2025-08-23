@@ -25,7 +25,7 @@ const dummyTasks: Task[] = [
     voiceUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     status: "PENDING",
     lat: 18.5204, // Pune
-    lon: 73.8567,
+    lng: 73.8567,
     radiusMeters: 1,
     createdById: "U-01",
     createdByName: "Amit",
@@ -60,7 +60,7 @@ export const MockOolshikApi = {
 
     const withDistances = dummyTasks.map((t) => ({
       ...t,
-      distanceKm: kmBetween(lat, lon, t.lat, t.lon),
+      distanceKm: kmBetween(lat, lon, t.lat, t.lng),
     }))
     const filtered = withDistances
       .filter((t) => (t.distanceKm ?? Infinity) <= radiusMeters)
@@ -89,7 +89,7 @@ export const MockOolshikApi = {
       voiceUrl: payload.voiceUrl ?? "",
       description: payload.description ?? "",
       lat: payload.lat ?? 0,
-      lon: payload.lon ?? 0,
+      lng: payload.lng ?? 0,
       radiusMeters: payload.radiusMeters ?? 1,
     }
     dummyTasks.unshift(newTask) // append to the dummy feed

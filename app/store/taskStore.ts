@@ -26,7 +26,7 @@ type State = {
   tab: TaskTab
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
-  fetchNearby: (lat: number, lon: number) => Promise<void>
+  fetchNearby: (lat: number, lng: number) => Promise<void>
   accept: (id: string) => Promise<"OK" | "ALREADY">
 }
 
@@ -58,7 +58,7 @@ export const useTaskStore = create<State>((set, get) => ({
         console.log("🚀 ~ before r:")
         const r = get().radiusMeters
         console.log("🚀 ~ r:", r)
-        const res = await OolshikApi.nearbyTasks(_lat, _lon, r)
+        const res = await OolshikApi.nearbyTasks(_lat, _lon, 1000 * r)
         console.log("🚀 ~ res:", res)
         if (res.ok && res.data) set({ tasks: res.data })
       }
