@@ -11,7 +11,7 @@ type Props = {
   title?: string
   kmAway?: number
   onAccept?: () => void
-  status?: "PENDING" | "ASSIGNED" | "COMPLETED"
+  status?: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   voiceUrl?: string | null
   onPress?: () => void
   createdByName?: string
@@ -48,6 +48,15 @@ export function TaskCard({
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
+  // Normalize backend statuses to UI statuses
+  // Backend may send OPEN; map it to PENDING visually. Handle CANCELLED/CANCELED gracefully.
+  const normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" =
+    status === "OPEN"
+      ? "PENDING"
+      : status === "CANCELLED" || status === "CANCELED"
+        ? "COMPLETED" // or choose a different bucket if you have a Cancelled style
+        : (status as any)
+
   const primary = colors.palette.primary500
   const neutral700 = colors.palette.neutral700
 
@@ -56,7 +65,7 @@ export function TaskCard({
     ASSIGNED: { label: "Assigned", bg: colors.palette.warningSoft400, fg: neutral700 },
     COMPLETED: { label: "Completed", bg: colors.palette.successSoft400, fg: neutral700 },
   } as const
-  const S = statusMap[status]
+  const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const [sound, setSound] = React.useState<Audio.Sound | null>(null)
   const [playing, setPlaying] = React.useState(false)

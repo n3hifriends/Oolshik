@@ -13,11 +13,11 @@ type Radius = 1 | 2 | 5
 
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
-  const { tasks, fetchNearby, loading, radiusKm, setRadius, accept } = useTaskStore()
+  const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
 
   useEffect(() => {
     if (coords) fetchNearby(coords.latitude, coords.longitude)
-  }, [coords, radiusKm])
+  }, [coords, radiusMeters])
 
   const data = useMemo(() => tasks ?? [], [tasks])
 
@@ -51,7 +51,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       <View style={{ padding: 12 }}>
         <Text preset="heading" text="Nearby Tasks" style={{ marginBottom: 12 }} />
         <RadioGroup
-          value={radiusKm}
+          value={radiusMeters}
           onChange={(v) => setRadius(v as Radius)}
           options={[
             { label: "1 km", value: 1 },

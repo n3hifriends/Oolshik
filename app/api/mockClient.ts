@@ -25,8 +25,8 @@ const dummyTasks: Task[] = [
     voiceUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     status: "PENDING",
     lat: 18.5204, // Pune
-    lng: 73.8567,
-    radiusKm: 1,
+    lon: 73.8567,
+    radiusMeters: 1,
     createdById: "U-01",
     createdByName: "Amit",
     createdAt: new Date().toISOString(),
@@ -38,32 +38,32 @@ const dummyTasks: Task[] = [
 // small wait to mimic network
 const wait = (ms = 200) => new Promise((r) => setTimeout(r, ms))
 const toRad = (d: number) => (d * Math.PI) / 180
-function kmBetween(aLat: number, aLng: number, bLat: number, bLng: number) {
+function kmBetween(aLat: number, alon: number, bLat: number, blon: number) {
   const R = 6371
   const dLat = toRad(bLat - aLat)
-  const dLng = toRad(bLng - aLng)
+  const dlon = toRad(blon - alon)
   const sLat1 = toRad(aLat)
   const sLat2 = toRad(bLat)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(sLat1) * Math.cos(sLat2) * Math.sin(dLng / 2) ** 2
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(sLat1) * Math.cos(sLat2) * Math.sin(dlon / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(a))
 }
 
 export const MockOolshikApi = {
   // Accept optional params to match real signature
-  async nearbyTasks(lat?: number, lng?: number, radiusKm?: number) {
+  async nearbyTasks(lat?: number, lon?: number, radiusMeters?: number) {
     await wait(150)
 
     // If no coords provided, just return all with existing distances
-    if (lat == null || lng == null || radiusKm == null) {
+    if (lat == null || lon == null || radiusMeters == null) {
       return { ok: true as const, data: dummyTasks.slice() }
     }
 
     const withDistances = dummyTasks.map((t) => ({
       ...t,
-      distanceKm: kmBetween(lat, lng, t.lat, t.lng),
+      distanceKm: kmBetween(lat, lon, t.lat, t.lon),
     }))
     const filtered = withDistances
-      .filter((t) => (t.distanceKm ?? Infinity) <= radiusKm)
+      .filter((t) => (t.distanceKm ?? Infinity) <= radiusMeters)
       .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
 
     return { ok: true as const, data: filtered }
@@ -89,8 +89,8 @@ export const MockOolshikApi = {
       voiceUrl: payload.voiceUrl ?? "",
       description: payload.description ?? "",
       lat: payload.lat ?? 0,
-      lng: payload.lng ?? 0,
-      radiusKm: payload.radiusKm ?? 1,
+      lon: payload.lon ?? 0,
+      radiusMeters: payload.radiusMeters ?? 1,
     }
     dummyTasks.unshift(newTask) // append to the dummy feed
     return { ok: true as const, data: newTask }

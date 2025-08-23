@@ -91,8 +91,8 @@ export type Task = {
   voiceUrl: string
   description?: string
   lat: number
-  lng: number
-  radiusKm: number
+  lon: number
+  radiusMeters: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED"
   distanceKm?: number
   createdBy?: string
@@ -106,8 +106,8 @@ type CreateTaskPayload = {
   voiceUrl: string
   description?: string
   lat: number
-  lng: number
-  radiusKm: number
+  lon: number
+  radiusMeters: number
   createdById?: string
   createdByName?: string
   createdAt?: string
@@ -118,8 +118,8 @@ export const OolshikApi = {
   createTask: (payload: CreateTaskPayload) => api.post("/requests", payload),
 
   // Nearby
-  nearbyTasks: (lat: number, lon: number, radiusKm: number) =>
-    api.get<Task[]>("/requests/nearby", { lat, lon, radiusKm }),
+  nearbyTasks: (lat: number, lon: number, radiusMeters: number) =>
+    api.get<Task[]>("/requests/nearby", { lat, lon, radiusMeters }),
 
   // Accept
   acceptTask: (taskId: string) => api.post(`/requests/${taskId}/accept`, {}),

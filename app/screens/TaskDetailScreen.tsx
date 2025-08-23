@@ -46,7 +46,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [sound, setSound] = React.useState<Audio.Sound | null>(null)
   const [playing, setPlaying] = React.useState(false)
   const { coords } = useForegroundLocation()
-  const { radiusKm } = useTaskStore()
+  const { radiusMeters } = useTaskStore()
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -63,6 +63,14 @@ export default function TaskDetailScreen({ navigation }: any) {
     COMPLETED: { label: "Completed", bg: successSoft, fg: success },
   } as const
 
+  // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
+  const normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" =
+    current?.status === "OPEN"
+      ? "PENDING"
+      : current?.status === "CANCELLED" || current?.status === "CANCELED"
+        ? "COMPLETED"
+        : (current?.status as any) || "PENDING"
+
   // ensure we have the task (e.g., deep link / app resume)
   React.useEffect(() => {
     let cancelled = false
@@ -77,7 +85,7 @@ export default function TaskDetailScreen({ navigation }: any) {
           : await OolshikApi.nearbyTasks(
               coords?.latitude ?? 0,
               coords?.longitude ?? 0,
-              radiusKm ?? 3,
+              radiusMeters ?? 3,
             )
 
         const list = res?.ok ? (res.data ?? []) : []
@@ -96,7 +104,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [taskId])
 
   const current = task || taskFromStore || null
-  const S = current ? statusMap[current.status as keyof typeof statusMap] : statusMap.PENDING
+  const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const play = async () => {
     if (!current?.voiceUrl) return
