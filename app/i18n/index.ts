@@ -49,8 +49,8 @@ export const initI18n = async () => {
 
   await i18n.init({
     resources,
-    lng: locale?.languageTag ?? fallbackLocale,
-    fallbackLng: fallbackLocale,
+    lon: locale?.languageTag ?? fallbackLocale,
+    fallbacklon: fallbackLocale,
     interpolation: {
       escapeValue: false,
     },

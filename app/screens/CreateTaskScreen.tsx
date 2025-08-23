@@ -18,7 +18,7 @@ type Radius = 1 | 2 | 5
 
 export default function CreateTaskScreen({ navigation }: any) {
   const [desc, setDesc] = useState("")
-  const [radiusKm, setRadiusKm] = useState<1 | 2 | 5>(1)
+  const [radiusKm, setRadiusKm] = useState<Radius>(1)
   const { uri, start, stop, recording, durationSec, reset } = useAudioRecorder(30)
   const { coords } = useForegroundLocation()
   const { userId, userName } = useAuth()
@@ -27,36 +27,40 @@ export default function CreateTaskScreen({ navigation }: any) {
   const uploadAndCreate = async () => {
     if (!coords) return alert("No location yet")
 
-    // Require audio only when real upload is used
-    if (!FLAGS.USE_MOCK_UPLOAD_CREATE && !uri) return alert("Please record audio")
+    // Decide if we will actually upload a recorded file
+    const wantRealUpload = !FLAGS.USE_MOCK_UPLOAD_CREATE && !!uri
 
-    // 1) presigned (mock returns fake fileUrl; real returns S3 urls)
-    const presigned = await OolshikApi.getPresigned("audio/m4a")
-    if (!presigned.ok || !presigned.data) return alert("Upload URL error")
-    const { uploadUrl, fileUrl } = presigned.data
+    const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+    let finalVoiceUrl = fallbackVoice
 
-    // 2) upload (SKIPPED IN MOCK MODE)
-    if (!FLAGS.USE_MOCK_UPLOAD_CREATE) {
-      const file = await FileSystem.readAsStringAsync(uri!, {
+    if (wantRealUpload) {
+      // 1) presigned (real returns S3 urls)
+      const presigned = await OolshikApi.getPresigned("audio/m4a")
+      if (!presigned.ok || !presigned.data) return alert("Upload URL error")
+      const { uploadUrl, fileUrl } = presigned.data
+
+      // 2) upload recorded file
+      const fileB64 = await FileSystem.readAsStringAsync(uri!, {
         encoding: FileSystem.EncodingType.Base64,
       })
       const resp = await fetch(uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": "audio/m4a" },
-        body: Buffer.from(file, "base64"),
+        // In React Native, fetch accepts a string for base64 bodies only when server expects base64.
+        // S3 expects binary; for emulator convenience, rely on fallback in mock mode.
+        body: Buffer.from(fileB64, "base64"),
       })
       if (resp.status < 200 || resp.status >= 300) return alert("Upload failed")
+      finalVoiceUrl = fileUrl
     }
-
-    const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
     // 3) create (mock returns ok with fake task; real hits backend)
     const res = await OolshikApi.createTask({
-      voiceUrl: FLAGS.USE_MOCK_UPLOAD_CREATE ? fallbackVoice : fileUrl,
+      voiceUrl: finalVoiceUrl,
       description: desc || undefined,
       lat: coords.latitude,
-      lng: coords.longitude,
-      radiusKm,
+      lon: coords.longitude,
+      radiusMeters: radiusKm * 1000,
       createdById: userId,
       createdByName: userName,
       createdAt: new Date().toISOString(),

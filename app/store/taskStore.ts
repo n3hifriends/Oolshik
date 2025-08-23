@@ -19,27 +19,27 @@ type Task = {
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"
 
 type State = {
-  radiusKm: 1 | 2 | 5
+  radiusMeters: 1 | 2 | 5
   tasks: Task[]
   myTasks: Task[]
   loading: boolean
   tab: TaskTab
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
-  fetchNearby: (lat: number, lng: number) => Promise<void>
+  fetchNearby: (lat: number, lon: number) => Promise<void>
   accept: (id: string) => Promise<"OK" | "ALREADY">
 }
 
 export const useTaskStore = create<State>((set, get) => ({
-  radiusKm: 1,
+  radiusMeters: 1,
   tasks: [],
   myTasks: [],
   loading: false,
   tab: "ALL",
-  setRadius: (r) => set({ radiusKm: r }),
+  setRadius: (r) => set({ radiusMeters: r }),
   setTab: (t) => set({ tab: t }),
 
-  fetchNearby: async (_lat, _lng) => {
+  fetchNearby: async (_lat, _lon) => {
     set({ loading: true })
     try {
       if (FLAGS.USE_MOCK_NEARBY) {
@@ -47,7 +47,7 @@ export const useTaskStore = create<State>((set, get) => ({
         await new Promise((r) => setTimeout(r, 600))
 
         // filter/sort by selected radius
-        const r = get().radiusKm
+        const r = get().radiusMeters
         const filtered = MOCK_NEARBY_TASKS.filter((t) => (t.distanceKm ?? 0) <= r).sort(
           (a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0),
         )
@@ -56,9 +56,9 @@ export const useTaskStore = create<State>((set, get) => ({
       } else {
         // --- real API path (uncomment when backend is ready) ---
         console.log("🚀 ~ before r:")
-        const r = get().radiusKm
+        const r = get().radiusMeters
         console.log("🚀 ~ r:", r)
-        const res = await OolshikApi.nearbyTasks(_lat, _lng, r)
+        const res = await OolshikApi.nearbyTasks(_lat, _lon, r)
         console.log("🚀 ~ res:", res)
         if (res.ok && res.data) set({ tasks: res.data })
       }

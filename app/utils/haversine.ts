@@ -1,7 +1,7 @@
-export function kmDistance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+export function kmDistance(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
   const R = 6371
   const dLat = ((b.lat - a.lat) * Math.PI) / 180
-  const dLon = ((b.lng - a.lng) * Math.PI) / 180
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180
   const lat1 = (a.lat * Math.PI) / 180
   const lat2 = (b.lat * Math.PI) / 180
   const sinDLat = Math.sin(dLat / 2)
