@@ -24,7 +24,7 @@ type State = {
   tab: TaskTab
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
-  fetchNearby: (lat: number, lng: number) => Promise<void>
+  fetchNearby: (lat: number, lng: number, statuses?: string[]) => Promise<void>
   accept: (id: string) => Promise<"OK" | "ALREADY" | "ERROR">
   complete: (id: string) => Promise<"OK" | "FORBIDDEN" | "ERROR">
 }
@@ -38,25 +38,24 @@ export const useTaskStore = create<State>((set, get) => ({
   setRadius: (r) => set({ radiusMeters: r }),
   setTab: (t) => set({ tab: t }),
 
-  fetchNearby: async (_lat, _lon) => {
+  fetchNearby: async (lat, lon, statuses?: string[]) => {
     set({ loading: true })
     try {
       if (FLAGS.USE_MOCK_NEARBY) {
-        // simulate network delay
-        await new Promise((r) => setTimeout(r, 600))
-
-        // filter/sort by selected radius
+        await new Promise((r) => setTimeout(r, 300))
         const r = get().radiusMeters
-        const filtered = MOCK_NEARBY_TASKS.filter((t) => (t.distanceKm ?? 0) <= r).sort(
-          (a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0),
+        const allowed = new Set(
+          (statuses?.length ? statuses : ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
         )
-
+        const filtered = MOCK_NEARBY_TASKS.filter(
+          (t) => (t.distanceKm ?? 0) <= r && allowed.has(t.status),
+        ).sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
         set({ tasks: filtered })
       } else {
-        // real API path
         const r = get().radiusMeters
-        const res = await OolshikApi.nearbyTasks(_lat, _lon, 1000 * r)
-        if (res.ok && res.data) set({ tasks: res.data })
+        const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
+        console.log("🚀 ~ res:", res)
+        if (res.ok) set({ tasks: res.data ?? [] })
       }
     } finally {
       set({ loading: false })

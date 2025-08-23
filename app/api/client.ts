@@ -86,21 +86,36 @@ if (axiosInst?.interceptors?.response) {
   )
 }
 
-export type Task = {
+export type ServerTask = {
   id: string
-  voiceUrl: string
+  title?: string
   description?: string
-  lat: number
-  lng: number
+  status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  latitude: number
+  longitude: number
   radiusMeters: number
-  status: "PENDING" | "ASSIGNED" | "COMPLETED"
-  distanceKm?: number
-  createdBy?: string
-  assignedTo?: string | null
-  createdById?: string
-  createdByName?: string
-  createdAt?: string // ISO
+  requesterId?: string
+  helperId?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
+
+export type Page<T> = {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  size: number
+  number: number
+  numberOfElements: number
+  first: boolean
+  last: boolean
+  empty: boolean
+  pageable?: any
+  sort?: any
+}
+
+// Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
+export type Task = ServerTask
 
 type CreateTaskPayload = {
   voiceUrl: string
@@ -113,13 +128,43 @@ type CreateTaskPayload = {
   createdAt?: string
 }
 
+const toClientTask = (t: ServerTask): Task => ({ ...t })
+
 export const OolshikApi = {
   // Create Request
   createTask: (payload: CreateTaskPayload) => api.post("/requests", payload),
 
   // Nearby
-  nearbyTasks: (lat: number, lng: number, radiusMeters: number) =>
-    api.get<Task[]>("/requests/nearby", { lat, lng, radiusMeters }),
+  async nearbyTasks(
+    lat: number,
+    lng: number,
+    radiusMeters: number,
+    statuses?: string[], // ✅ optional filter
+    page = 0,
+    size = 50,
+  ) {
+    const qs = new URLSearchParams()
+    qs.set("lat", String(lat))
+    qs.set("lng", String(lng))
+    qs.set("radiusMeters", String(radiusMeters))
+    qs.set("page", String(page))
+    qs.set("size", String(size))
+    if (statuses?.length) {
+      statuses.forEach((s) => qs.append("statuses", s)) // repeat format: statuses=OPEN&statuses=ASSIGNED
+    }
+
+    const url = `/requests/nearby?${qs.toString()}`
+    const res = await api.get<Page<ServerTask>>(url)
+    if (res.ok) {
+      const page = res.data
+      if (page && Array.isArray(page.content)) {
+        return { ok: res.ok, data: page.content }
+      }
+    } else {
+      console.log("❌ nearbyTasks error:", res.problem, res.status)
+    }
+    return { ok: false }
+  },
 
   // Accept
   acceptTask: (taskId: string) => api.post(`/requests/${taskId}/accept`, {}),
