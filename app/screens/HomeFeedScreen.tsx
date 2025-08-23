@@ -48,18 +48,17 @@ export default function HomeFeedScreen({ navigation }: any) {
       return next
     })
   }
-
-  useEffect(() => {
-    if (coords) fetchNearby(coords.latitude, coords.longitude)
-  }, [coords, radiusMeters])
+  // useEffect(() => {
+  //   if (coords) fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
+  // }, [coords, radiusMeters, selectedStatuses])
 
   useFocusEffect(
     useCallback(() => {
       if (coords) {
-        fetchNearby(coords.latitude, coords.longitude)
+        fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
       }
       // no cleanup needed
-    }, [coords?.latitude, coords?.longitude, radiusMeters]),
+    }, [coords?.latitude, coords?.longitude, radiusMeters, selectedStatuses]),
   )
 
   const data = useMemo(() => {
@@ -171,7 +170,9 @@ export default function HomeFeedScreen({ navigation }: any) {
             extraData={{ radiusMeters, selected: Array.from(selectedStatuses).sort().join(",") }}
             refreshing={loading}
             onRefresh={() => {
-              if (coords) fetchNearby(coords.latitude, coords.longitude)
+              if (coords) {
+                fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
+              }
             }}
             removeClippedSubviews
             contentContainerStyle={{

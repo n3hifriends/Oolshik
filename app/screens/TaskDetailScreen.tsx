@@ -116,6 +116,7 @@ export default function TaskDetailScreen({ navigation }: any) {
             )
 
         const list = res?.ok ? (res.data ?? []) : []
+        console.log("🚀 ~ load ~ res:", res)
         const found = list.find?.((t: any) => String(t.id) === String(taskId)) ?? null
 
         if (!cancelled) setTask(found)
