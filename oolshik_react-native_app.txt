@@ -2149,7 +2149,7 @@ export function useHeader(
 
 
 ===== BEGIN FILE: app/utils/haversine.ts =====
-export function kmDistance(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+export function kmDistance(a: { lat: number; lng: number }, b: { lng: number; lon: number }) {
   const R = 6371
   const dLat = ((b.lat - a.lat) * Math.PI) / 180
   const dLon = ((b.lon - a.lon) * Math.PI) / 180

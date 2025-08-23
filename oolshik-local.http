@@ -8,19 +8,19 @@ Content-Type: application/json
 POST http://localhost:8080/api/auth/otp/verify
 Content-Type: application/json
 
-{ "phone": "+919876543210", "code": "768845", "displayName": "Nitin" }
+{ "phone": "+919876543210", "code": "398137", "displayName": "Nitin" }
 
 ### Me (replace TOKEN below)
 GET http://localhost:8080/api/auth/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5MzQ5Y2YxYi03MGZhLTQ2NTMtYmQyNC0yMmYzYzFiMWI1OWEiLCJpYXQiOjE3NTU5NDgxNjAsImV4cCI6MTc1NTk1MTc2MCwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIiwidHlwIjoiYWNjZXNzIn0.TSvuIE2w4G6oWNKU0ZteJjqR_o-ssD2vRfJIgQuc1kA
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5MzQ5Y2YxYi03MGZhLTQ2NTMtYmQyNC0yMmYzYzFiMWI1OWEiLCJpYXQiOjE3NTU5NTcwNTAsImV4cCI6MTc1NTk2MDY1MCwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIn0.3UnNeuZc2Bvoseu7BaLnF5FbIoMGTz00eYdby30F6dY
 
 ### Create Help Request
 POST http://localhost:8080/api/requests
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5MzQ5Y2YxYi03MGZhLTQ2NTMtYmQyNC0yMmYzYzFiMWI1OWEiLCJpYXQiOjE3NTU5NDgxNjAsImV4cCI6MTc1NTk1MTc2MCwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIiwidHlwIjoiYWNjZXNzIn0.TSvuIE2w4G6oWNKU0ZteJjqR_o-ssD2vRfJIgQuc1kA
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5MzQ5Y2YxYi03MGZhLTQ2NTMtYmQyNC0yMmYzYzFiMWI1OWEiLCJpYXQiOjE3NTU5NTcwNTAsImV4cCI6MTc1NTk2MDY1MCwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIn0.3UnNeuZc2Bvoseu7BaLnF5FbIoMGTz00eYdby30F6dY
 Content-Type: application/json
 
 { "title":"Need to share news","description":"I am feeling happy","latitude":37.4220936,"longitude":-122.083922,"radiusMeters":1000 }
 
 ### Nearby
-GET http://localhost:8080/api/requests/nearby?lat=37.4220936&lon=-122.083922&radiusMeters=1000
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5MzQ5Y2YxYi03MGZhLTQ2NTMtYmQyNC0yMmYzYzFiMWI1OWEiLCJpYXQiOjE3NTU5NDgxNjAsImV4cCI6MTc1NTk1MTc2MCwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIiwidHlwIjoiYWNjZXNzIn0.TSvuIE2w4G6oWNKU0ZteJjqR_o-ssD2vRfJIgQuc1kA
+GET http://localhost:8080/api/requests/nearby?lat=37.4220936&lng=-122.083922&radiusMeters=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5MzQ5Y2YxYi03MGZhLTQ2NTMtYmQyNC0yMmYzYzFiMWI1OWEiLCJpYXQiOjE3NTU5NTcwNTAsImV4cCI6MTc1NTk2MDY1MCwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIn0.3UnNeuZc2Bvoseu7BaLnF5FbIoMGTz00eYdby30F6dY
