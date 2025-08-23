@@ -8,7 +8,7 @@ type Task = {
   voiceUrl?: string | null
   description?: string
   distanceKm?: number
-  status: "PENDING" | "ASSIGNED" | "COMPLETED"
+  status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
