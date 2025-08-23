@@ -1,6 +1,4 @@
 import { create } from "zustand"
-// import your real API if you have it here
-// import { OolshikApi } from "@/api"
 import { FLAGS } from "@/config/flags"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
 import { OolshikApi } from "@/api"
@@ -27,7 +25,8 @@ type State = {
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
   fetchNearby: (lat: number, lng: number) => Promise<void>
-  accept: (id: string) => Promise<"OK" | "ALREADY">
+  accept: (id: string) => Promise<"OK" | "ALREADY" | "ERROR">
+  complete: (id: string) => Promise<"OK" | "FORBIDDEN" | "ERROR">
 }
 
 export const useTaskStore = create<State>((set, get) => ({
@@ -54,12 +53,9 @@ export const useTaskStore = create<State>((set, get) => ({
 
         set({ tasks: filtered })
       } else {
-        // --- real API path (uncomment when backend is ready) ---
-        console.log("🚀 ~ before r:")
+        // real API path
         const r = get().radiusMeters
-        console.log("🚀 ~ r:", r)
         const res = await OolshikApi.nearbyTasks(_lat, _lon, 1000 * r)
-        console.log("🚀 ~ res:", res)
         if (res.ok && res.data) set({ tasks: res.data })
       }
     } finally {
@@ -75,7 +71,6 @@ export const useTaskStore = create<State>((set, get) => ({
       }))
       return "OK"
     } else {
-      // --- real API path (uncomment later) ---
       const res = await OolshikApi.acceptTask(id)
       if (res.ok) {
         set((s) => ({
@@ -84,9 +79,45 @@ export const useTaskStore = create<State>((set, get) => ({
         return "OK"
       }
       if (res.status === 409) return "ALREADY"
-      return "ALREADY"
+      return "ERROR"
+    }
+  },
 
-      return "OK"
+  complete: async (id) => {
+    if (FLAGS.USE_MOCK_NEARBY) {
+      // In mock mode, allow completion if requester unknown; otherwise block (no auth context here)
+      let updated = false
+      set((s) => {
+        const next = s.tasks.map((t) => {
+          if (t.id !== id) return t
+          const meId = undefined // no auth lookup in this store
+          const allowed = !t.createdById || (meId && t.createdById === meId)
+          if (allowed) {
+            updated = true
+            return { ...t, status: "COMPLETED" as const }
+          }
+          return t
+        })
+        return { tasks: next }
+      })
+      return updated ? "OK" : "FORBIDDEN"
+    } else {
+      const res = await OolshikApi.completeTask(id)
+      if (res.ok) {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "COMPLETED" } : t)),
+        }))
+        return "OK"
+      }
+      // Backend throws when non-requester completes
+      if (
+        res.status === 403 ||
+        res.status === 409 ||
+        String(res.data || "").includes("Only requester can complete")
+      ) {
+        return "FORBIDDEN"
+      }
+      return "ERROR"
     }
   },
 }))

@@ -19,20 +19,32 @@ type Props = {
 }
 
 function getInitials(name?: string) {
-  if (!name) return "?"
+  if (!name) return "👤"
   const parts = name.trim().split(/\s+/)
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
 function minsAgo(iso?: string) {
   if (!iso) return ""
-  const diffMs = Date.now() - new Date(iso).getTime()
+  const date = new Date(iso)
+  const diffMs = Date.now() - date.getTime()
   const mins = Math.max(0, Math.round(diffMs / 60000))
+
   if (mins < 1) return "just now"
   if (mins === 1) return "1 min ago"
   if (mins < 60) return `${mins} mins ago`
   const hrs = Math.round(mins / 60)
-  return hrs === 1 ? "1 hr ago" : `${hrs} hrs ago`
+  if (hrs === 1) return "1 hr ago"
+  if (hrs < 24) return `${hrs} hrs ago`
+
+  // For older than a day, show readable date
+  return date.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 export function TaskCard({
