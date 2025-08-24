@@ -9,6 +9,7 @@ import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { RadioGroup } from "@/components/RadioGroup"
 import { colors } from "@/theme/colors"
+import { useAuth } from "@/context/AuthContext"
 
 type Radius = 1 | 2 | 5
 
@@ -34,6 +35,7 @@ const STATUS_LABELS: Record<Status, string> = {
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
+  const { setAuthToken } = useAuth()
 
   // Status filter (default matches previous behavior: hide Completed/Cancelled)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -48,14 +50,13 @@ export default function HomeFeedScreen({ navigation }: any) {
       return next
     })
   }
-  // useEffect(() => {
-  //   if (coords) fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
-  // }, [coords, radiusMeters, selectedStatuses])
 
   useFocusEffect(
     useCallback(() => {
       if (coords) {
-        fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
+        const statusesArg = selectedStatuses.size ? Array.from(selectedStatuses) : undefined
+        // If none selected, omit the statuses argument so backend returns all
+        fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
       }
       // no cleanup needed
     }, [coords?.latitude, coords?.longitude, radiusMeters, selectedStatuses]),
@@ -66,8 +67,18 @@ export default function HomeFeedScreen({ navigation }: any) {
     // de-dupe by id (last write wins)
     const map = new Map(list.map((t) => [t.id, t]))
     const unique = Array.from(map.values())
-    // filter by selected statuses
-    const filtered = unique.filter((t: any) => selectedStatuses.has(t.status as Status))
+
+    // Decide which statuses to include:
+    // - If none selected, use all statuses observed in the backend response
+    //   (so the feed never looks empty).
+    const statusesToUse: Status[] =
+      selectedStatuses.size === 0
+        ? (Array.from(new Set(unique.map((t: any) => t.status))).filter(Boolean) as Status[])
+        : (Array.from(selectedStatuses) as Status[])
+
+    // filter by chosen statuses
+    const filtered = unique.filter((t: any) => statusesToUse.includes(t.status as Status))
+
     // stable order by distance then createdAt desc fallback
     return filtered.sort((a: any, b: any) => {
       const d = (a.distanceKm ?? 0) - (b.distanceKm ?? 0)
@@ -171,7 +182,8 @@ export default function HomeFeedScreen({ navigation }: any) {
             refreshing={loading}
             onRefresh={() => {
               if (coords) {
-                fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
+                const statusesArg = selectedStatuses.size ? Array.from(selectedStatuses) : undefined
+                fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
               }
             }}
             removeClippedSubviews

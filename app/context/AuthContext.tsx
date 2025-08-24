@@ -1,3 +1,6 @@
+import { setLoginTokens } from "@/api/client"
+import { authEvents } from "@/auth/events"
+import { navigationRef } from "@/navigators/navigationUtilities"
 import React, {
   createContext,
   useContext,
@@ -7,7 +10,6 @@ import React, {
   useEffect, // ✅ added
 } from "react"
 import { useMMKVString } from "react-native-mmkv"
-import { onAuthLost, setTokens } from "@/api/client" // ✅ import setTokens so header stays in sync
 
 export type AuthContextType = {
   isAuthenticated: boolean
@@ -22,16 +24,20 @@ export type AuthContextType = {
   logout: () => void
   validationError: string
 }
+export const MMKV_AUTH_TOKEN = "auth.token"
+export const MMKV_AUTH_EMAIL = "auth.email"
+export const MMKV_USER_ID = "auth.userId"
+export const MMKV_USER_NAME = "auth.userName"
 
 export const AuthContext = createContext<AuthContextType | null>(null)
 
 export interface AuthProviderProps {}
 
 export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>) {
-  const [authToken, setAuthTokenMMKV] = useMMKVString("auth.token")
-  const [authEmail, setAuthEmailMMKV] = useMMKVString("auth.email")
-  const [userId, setUserIdMMKV] = useMMKVString("auth.userId")
-  const [userName, setUserNameMMKV] = useMMKVString("auth.userName")
+  const [authToken, setAuthTokenMMKV] = useMMKVString(MMKV_AUTH_TOKEN)
+  const [authEmail, setAuthEmailMMKV] = useMMKVString(MMKV_AUTH_EMAIL)
+  const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
+  const [userName, setUserNameMMKV] = useMMKVString(MMKV_USER_NAME)
 
   // Defaults for local/dev use
   const effectiveUserId = userId || "U-LOCAL-1"
@@ -41,7 +47,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     (token?: string) => {
       setAuthTokenMMKV(token ?? "")
       // ✅ keep HTTP client Authorization header in sync immediately
-      setTokens(token || undefined) // (refresh stays as-is, managed by client after OTP/refresh)
+      // setLoginTokens(token || undefined) // (refresh stays as-is, managed by client after OTP/refresh)
     },
     [setAuthTokenMMKV],
   )
@@ -62,22 +68,24 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     setUserIdMMKV("")
     setUserNameMMKV("")
     // ✅ clear Authorization header in the HTTP client
-    setTokens(undefined, undefined)
+    setLoginTokens(undefined, undefined)
     // (navigation back to Login is handled by your app’s routing on isAuthenticated=false)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV])
 
   // ✅ on mount & whenever authToken changes (e.g., app relaunch), sync header once
-  useEffect(() => {
-    setTokens(authToken || undefined)
-  }, [authToken])
+  // useEffect(() => {
+  //   setLoginTokens(authToken || undefined)
+  // }, [authToken])
 
-  // ✅ subscribe to auth-lost events from the API client (refresh failed → force logout)
   useEffect(() => {
-    const unsubscribe = onAuthLost(() => {
+    const handler = () => {
       logout()
-    })
-    return unsubscribe
-  }, [logout])
+    }
+    authEvents.on("logout", handler)
+    return () => {
+      authEvents.off("logout", handler)
+    }
+  }, [])
 
   // 🔑 email validation logic preserved
   const validationError = useMemo(() => {
