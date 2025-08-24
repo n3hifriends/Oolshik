@@ -1,91 +1,150 @@
-import { create } from "apisauce"
+// app/api/client.ts
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios"
 import { Platform } from "react-native"
+import { create, ApisauceInstance } from "apisauce"
+import { tokens } from "@/auth/tokens"
+import { authEvents } from "@/auth/events"
 import Config from "@/config"
 
-// Choose a reachable host for simulator/emulator or use Config.API_URL if provided
-// iOS Simulator can reach localhost directly; Android emulator must use 10.0.2.2
 const devHost = Platform.select({ ios: "http://localhost:8080", android: "http://10.0.2.2:8080" })
-// Prefer Config.API_URL when set (use your LAN IP on real devices); strip trailing slashes
-// const baseHost = (
-//   Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API_URL : devHost
-// )!.replace(/\/+$/, "")
 const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API_URL : devHost)!
   .trim()
   .replace(/\/+$/, "")
-const baseURL = /\/api$/i.test(rawHost) ? rawHost : `${rawHost}/api`
+const BASE_URL = /\/api$/i.test(rawHost) ? rawHost : `${rawHost}/api`
 
-const api = create({
-  baseURL: `${baseURL}`,
+// ---------- Axios instance (shared) ----------
+export const axiosInstance: AxiosInstance = axios.create({
+  baseURL: `${BASE_URL}`,
   timeout: 10000,
   headers: { "Content-Type": "application/json" },
 })
 
-// ---------- NEW: token helpers & interceptor ----------
-let _accessToken: string | undefined
-let _refreshToken: string | undefined
-let _isRefreshing = false
-let _queue: Array<() => void> = []
-
-export const setTokens = (access?: string, refresh?: string) => {
-  _accessToken = access
-  _refreshToken = refresh
-  if (access) api.setHeader("Authorization", `Bearer ${access}`)
-  else api.deleteHeader("Authorization")
+// ---------- Single-flight refresh queue ----------
+let isRefreshing = false
+type Subscriber = (newAccess: string | null) => void
+const subscribers: Subscriber[] = []
+function subscribeTokenRefresh(cb: Subscriber) {
+  subscribers.push(cb)
+}
+function flushSubscribers(newAccess: string | null) {
+  while (subscribers.length) {
+    const cb = subscribers.shift()
+    try {
+      cb?.(newAccess)
+    } catch {}
+  }
 }
 
-// Back-compat: still exported, delegates to setTokens (keeps existing imports working)
-export const setAccessTokenHeader = (token?: string) => setTokens(token, _refreshToken)
+// Paths that should NOT attach Authorization or trigger refresh
+const AUTH_WHITELIST = ["/auth/otp/request", "/auth/otp/verify", "/auth/refresh"]
 
-// Install an axios-level response interceptor to refresh on 401 and retry once
-const axiosInst: any = (api as any).axiosInstance
-if (axiosInst?.interceptors?.response) {
-  axiosInst.interceptors.response.use(
-    (response: any) => response,
-    async (error: any) => {
-      const cfg = error?.config
-      const status = error?.response?.status
+// ---------- Attach access token ----------
+axiosInstance.interceptors.request.use((config) => {
+  const isAuthEndpoint = !!config.url && AUTH_WHITELIST.some((p) => config.url!.includes(p))
+  const access = tokens.access
+  if (!isAuthEndpoint && access) {
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${access}`
+  }
+  return config
+})
 
-      // Don’t attempt refresh for OTP/refresh endpoints or if no refresh token
-      const url: string = cfg?.url || ""
-      const isAuthCall = url.includes("/auth/otp") || url.includes("/auth/refresh")
-      if (status !== 401 || isAuthCall || !_refreshToken) {
-        return Promise.reject(error)
+// A raw axios (no interceptors) for refresh call
+// const raw = axios.create({ baseURL: `${BASE_URL}/api`, timeout: 20000 })
+
+async function refreshAccessToken(): Promise<string> {
+  const refresh = tokens.refresh
+  if (!refresh) throw new Error("NO_REFRESH_TOKEN")
+  const resps = await OolshikApi.refresh(refresh)
+  if (!resps.ok) throw new Error("REFRESH_FAILED")
+  const body = resps.data
+  if (!body) throw new Error("NO_RESPONSE_BODY")
+
+  // Support multiple shapes from backend
+  const newAccess = body.accessToken ?? body?.accessToken ?? body?.accessToken
+  const newRefresh = body.refreshToken ?? body?.refreshToken ?? body?.refreshToken ?? refresh
+
+  if (!newAccess) throw new Error("NO_ACCESS_FROM_REFRESH")
+
+  tokens.setBoth(newAccess, newRefresh)
+  return newAccess
+}
+
+// ---------- 401/419 handling + retry ----------
+axiosInstance.interceptors.response.use(
+  (res) => res,
+  async (error: AxiosError) => {
+    const original = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
+    const status = error.response?.status ?? 0
+    const url = original?.url || ""
+
+    const isAuthEndpoint = AUTH_WHITELIST.some((p) => url.includes(p))
+    const shouldTryRefresh = (status === 401 || status === 419) && !isAuthEndpoint
+
+    if (!shouldTryRefresh) {
+      // If refresh endpoint itself fails or forbidden → logout hard
+      if (isAuthEndpoint && (status === 401 || status === 403)) {
+        tokens.clear()
+        authEvents.emit("logout")
       }
+      return Promise.reject(error)
+    }
 
-      try {
-        // Gate parallel refreshes
-        if (_isRefreshing) {
-          await new Promise<void>((resolve) => _queue.push(resolve))
-        } else {
-          _isRefreshing = true
-          const res = await OolshikApi.refresh(_refreshToken)
-          if (res.ok && res.data?.accessToken) {
-            setTokens(res.data.accessToken, res.data.refreshToken ?? _refreshToken)
-          } else {
-            // refresh failed → clear and bubble up (caller can route to login)
-            setTokens(undefined, undefined)
-            notifyAuthLost()
+    // avoid infinite loop
+    if (original?._retry) {
+      tokens.clear()
+      authEvents.emit("logout")
+      return Promise.reject(error)
+    }
+
+    // Already refreshing? queue this request
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        subscribeTokenRefresh((newAccess) => {
+          if (!newAccess) return reject(error)
+          try {
+            const cfg: AxiosRequestConfig = {
+              ...original,
+              headers: { ...(original?.headers || {}), Authorization: `Bearer ${newAccess}` },
+              _retry: true,
+            } as any
+            resolve(axiosInstance.request(cfg))
+          } catch (e) {
+            reject(e)
           }
-          _queue.forEach((fn) => fn())
-          _queue = []
-          _isRefreshing = false
-        }
+        })
+      })
+    }
 
-        // After refresh, retry the original request once (with new Authorization header)
-        if (_accessToken && cfg) {
-          cfg.headers = { ...(cfg.headers || {}), Authorization: `Bearer ${_accessToken}` }
-          return axiosInst.request(cfg)
-        }
-        return Promise.reject(error)
-      } catch (e) {
-        _isRefreshing = false
-        _queue = []
-        return Promise.reject(e)
+    // Start a refresh
+    original!._retry = true
+    isRefreshing = true
+    try {
+      const newAccess = await refreshAccessToken()
+      isRefreshing = false
+      flushSubscribers(newAccess)
+
+      const cfg: AxiosRequestConfig = {
+        ...original,
+        headers: { ...(original?.headers || {}), Authorization: `Bearer ${newAccess}` },
       }
-    },
-  )
-}
+      return axiosInstance.request(cfg)
+    } catch (e) {
+      isRefreshing = false
+      flushSubscribers(null) // fail all queued
+      tokens.clear()
+      authEvents.emit("logout")
+      return Promise.reject(e)
+    }
+  },
+)
 
+// ---------- Apisauce wrapper (your app should use this) ----------
+export const api: ApisauceInstance = create({
+  baseURL: `${BASE_URL}/api`,
+  timeout: 10000,
+  axiosInstance, // 👈 use our configured axios with interceptors
+})
 export type ServerTask = {
   id: string
   title?: string
@@ -198,20 +257,13 @@ export const OolshikApi = {
     api.post<{ accessToken: string; refreshToken?: string }>("/auth/refresh", { refreshToken }),
   // ---------- /NEW ----------
 }
-
-// --- auth-lost event bridge so React code can logout ---
-const authLostListeners = new Set<() => void>()
-export const onAuthLost = (cb: () => void): (() => void) => {
-  authLostListeners.add(cb)
-  return () => {
-    // ensure cleanup returns void, not boolean
-    authLostListeners.delete(cb)
-  }
+// Optional helper: call this after successful OTP verify to persist tokens
+export function setLoginTokens(accessToken?: string | null, refreshToken?: string | null) {
+  tokens.setBoth(accessToken ?? null, refreshToken ?? null)
 }
-const notifyAuthLost = () => {
-  authLostListeners.forEach((fn) => {
-    try {
-      fn()
-    } catch {}
-  })
+
+// Optional helper: global logout
+export function logoutNow() {
+  tokens.clear()
+  authEvents.emit("logout")
 }

@@ -54,7 +54,6 @@ export const useTaskStore = create<State>((set, get) => ({
       } else {
         const r = get().radiusMeters
         const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
-        console.log("🚀 ~ res:", res)
         if (res.ok) set({ tasks: res.data ?? [] })
       }
     } finally {

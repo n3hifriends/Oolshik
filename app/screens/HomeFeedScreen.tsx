@@ -9,6 +9,7 @@ import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { RadioGroup } from "@/components/RadioGroup"
 import { colors } from "@/theme/colors"
+import { useAuth } from "@/context/AuthContext"
 
 type Radius = 1 | 2 | 5
 
@@ -34,6 +35,7 @@ const STATUS_LABELS: Record<Status, string> = {
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
+  const { setAuthToken } = useAuth()
 
   // Status filter (default matches previous behavior: hide Completed/Cancelled)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -48,9 +50,6 @@ export default function HomeFeedScreen({ navigation }: any) {
       return next
     })
   }
-  // useEffect(() => {
-  //   if (coords) fetchNearby(coords.latitude, coords.longitude, Array.from(selectedStatuses))
-  // }, [coords, radiusMeters, selectedStatuses])
 
   useFocusEffect(
     useCallback(() => {

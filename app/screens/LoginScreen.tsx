@@ -4,7 +4,7 @@ import { TextInput, TextStyle, View, ViewStyle, Pressable } from "react-native"
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { OolshikApi } from "@/api"
-import { setAccessTokenHeader, setTokens } from "@/api/client"
+import { setLoginTokens } from "@/api/client"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useAuth } from "@/context/AuthContext"
@@ -149,7 +149,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     if (res.ok && res.data?.accessToken) {
       // Persist both tokens & prime API client
       setAuthToken(res.data.accessToken)
-      setTokens(res.data.accessToken, res.data.refreshToken) // <-- NEW
+      setLoginTokens(res.data.accessToken, res.data.refreshToken) // <-- NEW
       setOtpVerified(true)
     } else {
       alert("Invalid OTP")
