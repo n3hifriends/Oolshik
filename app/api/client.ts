@@ -50,19 +50,23 @@ axiosInstance.interceptors.request.use((config) => {
 })
 
 // A raw axios (no interceptors) for refresh call
-// const raw = axios.create({ baseURL: `${BASE_URL}/api`, timeout: 20000 })
+const raw = axios.create({
+  baseURL: `${BASE_URL}`,
+  timeout: 10000,
+  headers: { "Content-Type": "application/json" },
+})
 
 async function refreshAccessToken(): Promise<string> {
   const refresh = tokens.refresh
   if (!refresh) throw new Error("NO_REFRESH_TOKEN")
-  const resps = await OolshikApi.refresh(refresh)
-  if (!resps.ok) throw new Error("REFRESH_FAILED")
-  const body = resps.data
-  if (!body) throw new Error("NO_RESPONSE_BODY")
+
+  const resp = await raw.post("/auth/refresh", { refreshToken: refresh })
+  const body: any = resp?.data ?? {}
 
   // Support multiple shapes from backend
-  const newAccess = body.accessToken ?? body?.accessToken ?? body?.accessToken
-  const newRefresh = body.refreshToken ?? body?.refreshToken ?? body?.refreshToken ?? refresh
+  const newAccess = body.accessToken ?? body?.data?.accessToken ?? body?.token?.accessToken
+  const newRefresh =
+    body.refreshToken ?? body?.data?.refreshToken ?? body?.token?.refreshToken ?? refresh
 
   if (!newAccess) throw new Error("NO_ACCESS_FROM_REFRESH")
 
@@ -121,6 +125,7 @@ axiosInstance.interceptors.response.use(
     isRefreshing = true
     try {
       const newAccess = await refreshAccessToken()
+      console.log("🚀 ~ newAccess:", newAccess)
       isRefreshing = false
       flushSubscribers(newAccess)
 
@@ -130,6 +135,7 @@ axiosInstance.interceptors.response.use(
       }
       return axiosInstance.request(cfg)
     } catch (e) {
+      console.log("🚀 ~ e:", e)
       isRefreshing = false
       flushSubscribers(null) // fail all queued
       tokens.clear()

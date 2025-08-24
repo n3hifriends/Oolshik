@@ -24,16 +24,20 @@ export type AuthContextType = {
   logout: () => void
   validationError: string
 }
+export const MMKV_AUTH_TOKEN = "auth.token"
+export const MMKV_AUTH_EMAIL = "auth.email"
+export const MMKV_USER_ID = "auth.userId"
+export const MMKV_USER_NAME = "auth.userName"
 
 export const AuthContext = createContext<AuthContextType | null>(null)
 
 export interface AuthProviderProps {}
 
 export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>) {
-  const [authToken, setAuthTokenMMKV] = useMMKVString("auth.token")
-  const [authEmail, setAuthEmailMMKV] = useMMKVString("auth.email")
-  const [userId, setUserIdMMKV] = useMMKVString("auth.userId")
-  const [userName, setUserNameMMKV] = useMMKVString("auth.userName")
+  const [authToken, setAuthTokenMMKV] = useMMKVString(MMKV_AUTH_TOKEN)
+  const [authEmail, setAuthEmailMMKV] = useMMKVString(MMKV_AUTH_EMAIL)
+  const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
+  const [userName, setUserNameMMKV] = useMMKVString(MMKV_USER_NAME)
 
   // Defaults for local/dev use
   const effectiveUserId = userId || "U-LOCAL-1"
@@ -43,7 +47,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     (token?: string) => {
       setAuthTokenMMKV(token ?? "")
       // ✅ keep HTTP client Authorization header in sync immediately
-      setLoginTokens(token || undefined) // (refresh stays as-is, managed by client after OTP/refresh)
+      // setLoginTokens(token || undefined) // (refresh stays as-is, managed by client after OTP/refresh)
     },
     [setAuthTokenMMKV],
   )
@@ -69,9 +73,9 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV])
 
   // ✅ on mount & whenever authToken changes (e.g., app relaunch), sync header once
-  useEffect(() => {
-    setLoginTokens(authToken || undefined)
-  }, [authToken])
+  // useEffect(() => {
+  //   setLoginTokens(authToken || undefined)
+  // }, [authToken])
 
   useEffect(() => {
     const handler = () => {
