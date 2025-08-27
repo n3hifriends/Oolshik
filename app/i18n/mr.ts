@@ -9,7 +9,9 @@ const mr = {
     reject: "नाकार",
   },
   oolshik: {
-    appName: "ऊळशिक",
+    nearbyTasks: "जवळील कामे",
+    create: "काम सांगा",
+    appName: "ऊलशिक",
     home: "होम",
     feed: "जवळील कामे",
     createTask: "काम तयार करा",

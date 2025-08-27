@@ -2,6 +2,8 @@ import demoEn from "./demo-en" // @demo remove-current-line
 
 const en = {
   oolshik: {
+    nearbyTasks: "Nearby Tasks",
+    create: "Create",
     appName: "Oolshik",
     home: "Home",
     feed: "Nearby Tasks",
