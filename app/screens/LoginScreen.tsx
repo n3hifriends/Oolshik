@@ -71,16 +71,21 @@ function OtpBoxes({
   )
 }
 
-export const LoginScreen: FC<LoginScreenProps> = () => {
+export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   // Mandatory phone & OTP
   const [phone, setPhone] = useState("") // 10 digits (India-style)
   const [otp, setOtp] = useState("")
   const [otpSent, setOtpSent] = useState(false)
   const [otpVerified, setOtpVerified] = useState(false)
   const [displayName, setDisplayName] = useState("")
+  const [triedContinue, setTriedContinue] = useState(false)
   const [loading, setLoading] = useState<"send" | "verify" | null>(null)
   const [resendIn, setResendIn] = useState(0)
   const [showEmail, setShowEmail] = useState(false)
+  const [pendingTokens, setPendingTokens] = useState<{
+    accessToken: string
+    refreshToken: string
+  } | null>(null)
 
   const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, validationError } =
     useAuth()
@@ -100,6 +105,10 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     if (t.length < 10) return "must be 10 digits"
     return ""
   }, [phone])
+
+  const nameError = useMemo(() => {
+    return displayName.trim().length === 0 ? "can't be blank" : ""
+  }, [displayName])
 
   // Real services
   async function sendOtp(p: string) {
@@ -147,26 +156,45 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     const res = await verifyOtp(phone, otp, displayName || undefined, authEmail || undefined)
     setLoading(null)
     if (res.ok && res.data?.accessToken) {
-      // Persist both tokens & prime API client
-      setAuthToken(res.data.accessToken)
-      setLoginTokens(res.data.accessToken, res.data.refreshToken) // <-- NEW
+      // Do not persist tokens here to avoid auto-navigation.
+      setPendingTokens({ accessToken: res.data.accessToken, refreshToken: res.data.refreshToken })
       setOtpVerified(true)
     } else {
       alert("Invalid OTP")
     }
   }
 
-  // Auto-verify when 6 digits are entered
-  useEffect(() => {
-    if (otpSent && otp.length === 6 && !otpVerified && loading !== "verify") {
-      onVerifyOtp()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otp, otpSent])
-
   const onContinue = async () => {
-    if (phoneError || !otpVerified) return
-    // Fetch profile after verification (token already set)
+    setTriedContinue(true)
+    if (phoneError || displayName.trim().length === 0) return
+
+    let tokens = pendingTokens
+
+    // If OTP hasn't been verified yet, attempt verification now (no auto-verify on 6th digit)
+    if (!otpVerified) {
+      if (!otpSent || !/^\d{6}$/.test(otp)) {
+        alert("Please enter the 6-digit code to continue.")
+        return
+      }
+      setLoading("verify")
+      const res = await verifyOtp(phone, otp, displayName || undefined, authEmail || undefined)
+      setLoading(null)
+      if (!(res.ok && res.data?.accessToken)) {
+        alert("Invalid OTP")
+        return
+      }
+      tokens = { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken }
+      setPendingTokens(tokens)
+      setOtpVerified(true)
+    }
+
+    // Persist tokens now (and only now) to prevent auto-redirects earlier
+    if (tokens?.accessToken) {
+      setAuthToken(tokens.accessToken)
+      setLoginTokens(tokens.accessToken, tokens.refreshToken)
+    }
+
+    // Fetch profile after token is set
     try {
       const prof = await OolshikApi.me()
       if (prof?.ok && prof.data) {
@@ -179,6 +207,11 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
     } catch {
       setUserName(displayName || "You")
     }
+
+    // // Navigate to HomeFeed only from here
+    // try {
+    //   ;(navigation as any)?.navigate?.("HomeFeed")
+    // } catch {}
   }
 
   return (
@@ -269,20 +302,30 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
         )}
       </View>
 
-      {/* Optional Email / Name */}
+      {/* STEP 3: Name */}
       <View style={themed($card)}>
-        <Text text="Your name (optional)" weight="bold" />
+        <View style={themed($cardHeader)}>
+          <View style={themed($stepBadge)}>
+            <Text text="3" weight="bold" style={{ color: "white" }} />
+          </View>
+          <Text text="Your name" weight="bold" />
+          {displayName.trim().length > 0 ? (
+            <Text text="✓" style={{ marginLeft: "auto", color: "#16A34A" }} />
+          ) : null}
+        </View>
         <TextField
           value={displayName}
           onChangeText={setDisplayName}
-          placeholder="e.g., Nitin"
+          placeholder="Your name"
           autoCapitalize="words"
+          status={triedContinue && nameError ? "error" : undefined}
+          helper={triedContinue && nameError ? nameError : undefined}
         />
       </View>
 
       <View style={themed($card)}>
         <Pressable onPress={() => setShowEmail((v) => !v)} style={themed($cardHeader)}>
-          <Text text="Email (optional)" weight="bold" />
+          <Text text="Email" weight="bold" />
           <Text text={showEmail ? "–" : "+"} style={{ marginLeft: "auto" }} />
         </Pressable>
         {showEmail && (
@@ -301,12 +344,13 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
 
       {/* Bottom fixed Continue */}
       <View
+        pointerEvents="box-none"
         style={{ position: "absolute", left: spacing.md, right: spacing.md, bottom: spacing.md }}
       >
         <Button
           text="Continue"
           onPress={onContinue}
-          disabled={!!phoneError || !otpVerified}
+          disabled={!!phoneError || displayName.trim().length === 0}
           style={{ paddingVertical: spacing.sm }}
         />
       </View>
@@ -315,7 +359,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
 }
 
 const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
+  // Do not set flex here; it can prevent ScrollView from scrolling
   padding: spacing.md,
   paddingBottom: 96,
 })

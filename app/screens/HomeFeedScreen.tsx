@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useCallback, useState } from "react"
-import { View, ActivityIndicator, FlatList, ListRenderItem, Pressable } from "react-native"
+import { View, ActivityIndicator, FlatList, ListRenderItem, Pressable, Alert } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -25,6 +25,8 @@ const STATUS_COLORS: Record<Status, string> = {
   CANCELLED: "#EF4444", // red-500 like
 }
 
+const LOGOUT_COLOR = "#FF6B2C"
+
 const STATUS_LABELS: Record<Status, string> = {
   OPEN: "Open",
   ASSIGNED: "Assigned",
@@ -35,7 +37,7 @@ const STATUS_LABELS: Record<Status, string> = {
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
-  const { setAuthToken } = useAuth()
+  const { logout } = useAuth()
 
   // Status filter (default matches previous behavior: hide Completed/Cancelled)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -120,9 +122,56 @@ export default function HomeFeedScreen({ navigation }: any) {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ flex: 1 }} // let internal views fill height
     >
+      {/* Floating Logout button (top-right) */}
+      <Pressable
+        onPress={() => {
+          Alert.alert(
+            "Logout",
+            "Are you sure you want to logout?",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Logout",
+                style: "destructive",
+                onPress: () => {
+                  // Clear auth token; navigation should react via auth flow
+                  logout()
+                },
+              },
+            ],
+            { cancelable: true },
+          )
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Logout"
+        style={({ pressed }) => ({
+          position: "absolute",
+          top: 10,
+          right: 12,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: LOGOUT_COLOR,
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+          // subtle shadow
+          shadowColor: "#000",
+          shadowOpacity: 0.18,
+          shadowRadius: 3,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 4,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+        })}
+        hitSlop={8}
+      >
+        {/* Simple power glyph as icon; white for contrast */}
+        <Text text="⎋" style={{ color: "#fff", fontSize: 18, lineHeight: 18 }} />
+      </Pressable>
+
       {/* Header (fixed) */}
       <View style={{ padding: 12 }}>
-        <Text preset="heading" text="Nearby Tasks" style={{ marginBottom: 12 }} />
+        <Text preset="heading" tx="oolshik:nearbyTasks" style={{ marginBottom: 12 }} />
 
         <RadioGroup
           value={radiusMeters}
@@ -154,11 +203,11 @@ export default function HomeFeedScreen({ navigation }: any) {
                 }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={`Filter ${STATUS_LABELS[s]}`}
+                accessibilityLabel={`Filter ${s}`}
               >
                 <Text
                   style={{ fontWeight: "600", color: active ? "#ffffff" : STATUS_COLORS[s] }}
-                  text={STATUS_LABELS[s]}
+                  tx={`status:${s}`}
                 />
               </Pressable>
             )
@@ -198,7 +247,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       {/* Bottom fixed Create button */}
       <View style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
         <Button
-          text="Create"
+          tx="oolshik:create"
           onPress={() => navigation.navigate("OolshikCreate")}
           style={{ width: "100%", marginBottom: 0 }}
         />
