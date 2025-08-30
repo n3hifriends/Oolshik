@@ -74,6 +74,12 @@ export const MockOolshikApi = {
       data: { uploadUrl: "mock://skip-upload", fileUrl: "https://mock.local/files/new-audio.m4a" },
     }
   },
+  report: async () => ({ ok: true as const }),
+
+  revealPhone: async (id: string) => ({
+    ok: true as const,
+    data: { phoneNumber: "+910000000000", revealCount: 2 },
+  }),
 
   async createTask(payload: Partial<Task>) {
     await wait(120)
