@@ -94,7 +94,7 @@ export default function HomeFeedScreen({ navigation }: any) {
   const renderItem: ListRenderItem<(typeof data)[number]> = ({ item: t }) => (
     <TaskCard
       id={t.id}
-      title={t.description}
+      title={t.title}
       kmAway={t.distanceKm}
       status={t.status}
       voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}

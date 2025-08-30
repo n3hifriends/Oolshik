@@ -6,6 +6,82 @@ import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import Config from "@/config"
 
+// ---------- Toggleable API logs (default: true) ----------
+export let API_LOGS_ENABLED = true
+export function setApiLogsEnabled(enabled: boolean) {
+  API_LOGS_ENABLED = !!enabled
+}
+
+// augment config to carry timing metadata (no type import needed; keep it loose)
+type ReqMeta = { _tsStart?: number }
+
+function maskHeaders(h: any) {
+  const clone = { ...(h || {}) }
+  if (clone.Authorization) clone.Authorization = "Bearer ****"
+  if (clone.authorization) clone.authorization = "Bearer ****"
+  return clone
+}
+
+function isAuthPath(url?: string | null) {
+  if (!url) return false
+  return AUTH_WHITELIST.some((p) => url.includes(p))
+}
+
+function redactBody(url?: string | null, data?: any) {
+  // Do not log OTP codes or passwords for auth endpoints
+  if (isAuthPath(url)) return "[REDACTED_FOR_AUTH_ENDPOINT]"
+  return data
+}
+
+function logRequest(prefix: string, cfg: any) {
+  if (!API_LOGS_ENABLED) return
+  try {
+    const method = (cfg?.method || "GET").toUpperCase()
+    const url = cfg?.baseURL ? `${cfg.baseURL}${cfg.url || ""}` : cfg?.url
+    const params = cfg?.params
+    const data = redactBody(cfg?.url, cfg?.data)
+    const headers = maskHeaders(cfg?.headers)
+    console.log(`⬆️  ${prefix} REQUEST: ${method} ${url}`, { params, data, headers })
+  } catch {}
+}
+
+function logResponse(prefix: string, cfg: any, resp: any) {
+  if (!API_LOGS_ENABLED) return
+  try {
+    const method = (cfg?.method || "GET").toUpperCase()
+    const url = cfg?.baseURL ? `${cfg.baseURL}${cfg.url || ""}` : cfg?.url
+    const status = resp?.status
+    const dur =
+      typeof (cfg as ReqMeta)?._tsStart === "number"
+        ? Date.now() - (cfg as ReqMeta)._tsStart!
+        : undefined
+    const headers = maskHeaders(resp?.headers)
+    const data = resp?.data
+    const extra = dur != null ? ` (${dur}ms)` : ""
+    console.log(`⬇️  ${prefix} RESPONSE: ${status} ${method} ${url}${extra}`, { data, headers })
+  } catch {}
+}
+
+function logError(prefix: string, cfg: any, err: any) {
+  if (!API_LOGS_ENABLED) return
+  try {
+    const method = (cfg?.method || "GET").toUpperCase()
+    const url = cfg?.baseURL ? `${cfg.baseURL}${cfg.url || ""}` : cfg?.url
+    const status = err?.response?.status
+    const dur =
+      typeof (cfg as ReqMeta)?._tsStart === "number"
+        ? Date.now() - (cfg as ReqMeta)._tsStart!
+        : undefined
+    const headers = maskHeaders(err?.response?.headers)
+    const data = err?.response?.data
+    const extra = dur != null ? ` (${dur}ms)` : ""
+    console.log(`❌ ${prefix} ERROR: ${status ?? "NO_STATUS"} ${method} ${url}${extra}`, {
+      response: { data, headers },
+      message: err?.message,
+    })
+  } catch {}
+}
+
 const devHost = Platform.select({ ios: "http://localhost:8080", android: "http://10.0.2.2:8080" })
 const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API_URL : devHost)!
   .trim()
@@ -40,6 +116,8 @@ const AUTH_WHITELIST = ["/auth/otp/request", "/auth/otp/verify", "/auth/refresh"
 
 // ---------- Attach access token ----------
 axiosInstance.interceptors.request.use((config) => {
+  ;(config as any as ReqMeta)._tsStart = Date.now()
+  logRequest("AXIOS", config)
   const isAuthEndpoint = !!config.url && AUTH_WHITELIST.some((p) => config.url!.includes(p))
   const access = tokens.access
   if (!isAuthEndpoint && access) {
@@ -55,6 +133,26 @@ const raw = axios.create({
   timeout: 10000,
   headers: { "Content-Type": "application/json" },
 })
+// ---- logging for raw axios (refresh) ----
+raw.interceptors.request.use((config) => {
+  ;(config as any as ReqMeta)._tsStart = Date.now()
+  logRequest("RAW", config)
+  return config
+})
+raw.interceptors.response.use(
+  (res) => {
+    try {
+      logResponse("RAW", (res?.config as any) ?? {}, res)
+    } catch {}
+    return res
+  },
+  (err) => {
+    try {
+      logError("RAW", (err?.config as any) ?? {}, err)
+    } catch {}
+    return Promise.reject(err)
+  },
+)
 
 async function refreshAccessToken(): Promise<string> {
   const refresh = tokens.refresh
@@ -76,8 +174,17 @@ async function refreshAccessToken(): Promise<string> {
 
 // ---------- 401/419 handling + retry ----------
 axiosInstance.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    try {
+      logResponse("AXIOS", (res?.config as any) ?? {}, res)
+    } catch {}
+    return res
+  },
   async (error: AxiosError) => {
+    try {
+      logError("AXIOS", (error?.config as any) ?? {}, error)
+    } catch {}
+
     const original = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
     const status = error.response?.status ?? 0
     const url = original?.url || ""
@@ -125,7 +232,6 @@ axiosInstance.interceptors.response.use(
     isRefreshing = true
     try {
       const newAccess = await refreshAccessToken()
-      console.log("🚀 ~ newAccess:", newAccess)
       isRefreshing = false
       flushSubscribers(newAccess)
 
@@ -135,7 +241,6 @@ axiosInstance.interceptors.response.use(
       }
       return axiosInstance.request(cfg)
     } catch (e) {
-      console.log("🚀 ~ e:", e)
       isRefreshing = false
       flushSubscribers(null) // fail all queued
       tokens.clear()
@@ -156,6 +261,7 @@ export type ServerTask = {
   title?: string
   description?: string
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  voiceUrl?: string | null
   latitude: number
   longitude: number
   radiusMeters: number
@@ -163,6 +269,8 @@ export type ServerTask = {
   helperId?: string | null
   createdAt?: string
   updatedAt?: string
+  requesterName?: string
+  requesterPhoneNumber?: string
 }
 
 export type Page<T> = {
@@ -185,12 +293,13 @@ export type Task = ServerTask
 type CreateTaskPayload = {
   voiceUrl: string
   description?: string
-  lat: number
-  lng: number
   radiusMeters: number
   createdById?: string
   createdByName?: string
   createdAt?: string
+  title: string
+  latitude: number
+  longitude: number
 }
 
 const toClientTask = (t: ServerTask): Task => ({ ...t })
@@ -273,3 +382,7 @@ export function logoutNow() {
   tokens.clear()
   authEvents.emit("logout")
 }
+
+// To toggle logs at runtime:
+// import { setApiLogsEnabled } from "@/app/api/client"
+// setApiLogsEnabled(false)
