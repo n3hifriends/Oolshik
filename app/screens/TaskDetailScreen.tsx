@@ -258,7 +258,9 @@ export default function TaskDetailScreen({ navigation }: any) {
         <View style={{ marginLeft: "auto" }}>
           <Button
             text="Report"
-            onPress={() => navigation.navigate("OolshikReport", { taskId: current?.id })}
+            onPress={() => {
+              navigation.navigate("OolshikReport", { taskId: current?.id })
+            }}
           />
         </View>
       </View>
@@ -401,11 +403,6 @@ export default function TaskDetailScreen({ navigation }: any) {
                 gap: spacing.sm,
               }}
             >
-              <Button
-                text="Report"
-                onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
-                style={{ flex: 1, paddingVertical: spacing.xs }}
-              />
               {normalizedStatus === "PENDING" ? (
                 <Button
                   text="Accept"
