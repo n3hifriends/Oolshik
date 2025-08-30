@@ -7,9 +7,17 @@ import { TaskCard } from "@/components/TaskCard"
 import { Button } from "@/components/Button"
 import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
-import { RadioGroup } from "@/components/RadioGroup"
+// import { RadioGroup } from "@/components/RadioGroup" // removed – custom pills look cleaner
 import { colors } from "@/theme/colors"
 import { useAuth } from "@/context/AuthContext"
+
+/**
+ * HomeFeedScreen – refreshed UI
+ * - Cleaner "segmented" header for For You | My Requests
+ * - Card-like filter bar with Distance pills + Status chips
+ * - Calmer colors and spacing for industry-standard feel
+ * - No new deps; pure RN + existing components
+ */
 
 // Distances (km)
 type Radius = 1 | 2 | 5
@@ -25,6 +33,13 @@ const STATUS_COLORS: Record<Status, string> = {
   ASSIGNED: "#F59E0B",
   COMPLETED: "#10B981",
   CANCELLED: "#EF4444",
+}
+
+const STATUS_BG: Record<Status, string> = {
+  OPEN: "rgba(14,165,233,0.10)",
+  ASSIGNED: "rgba(245,158,11,0.10)",
+  COMPLETED: "rgba(16,185,129,0.10)",
+  CANCELLED: "rgba(239,68,68,0.12)",
 }
 
 const LOGOUT_COLOR = "#FF6B2C"
@@ -105,6 +120,131 @@ export default function HomeFeedScreen({ navigation }: any) {
     })
   }, [tasks, selectedStatuses, viewMode, isMine])
 
+  // ---------- Small UI building blocks ----------
+
+  const SectionCard: React.FC<{ children: React.ReactNode; style?: any }> = ({
+    children,
+    style,
+  }) => (
+    <View
+      style={[
+        {
+          backgroundColor: "#fff",
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: "#ECECEC",
+          padding: 12,
+          shadowColor: "#000",
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 1,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  )
+
+  const Segmented: React.FC<{
+    value: ViewMode
+    onChange: (v: ViewMode) => void
+  }> = ({ value, onChange }) => {
+    const tabs: { key: ViewMode; tx: string; a11y: string }[] = [
+      { key: "forYou", tx: "oolshik:tabForYou", a11y: "For you" },
+      { key: "mine", tx: "oolshik:tabMyRequests", a11y: "My requests" },
+    ]
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: "#F5F6F7",
+          borderRadius: 12,
+          padding: 4,
+          gap: 4,
+        }}
+      >
+        {tabs.map((t) => {
+          const active = value === t.key
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => onChange(t.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t.a11y}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 10,
+                borderRadius: 10,
+                backgroundColor: active ? "#111827" : "transparent",
+              }}
+            >
+              <Text tx={t.tx} style={{ fontWeight: "700", color: active ? "#fff" : "#111827" }} />
+            </Pressable>
+          )
+        })}
+      </View>
+    )
+  }
+
+  const Pill: React.FC<{
+    label: string
+    active?: boolean
+    onPress?: () => void
+    dotColor?: string
+  }> = ({ label, active, onPress, dotColor = "#FF6B2C" }) => (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: active ? "#111827" : "#F2F4F7",
+      }}
+    >
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: active ? "#fff" : dotColor,
+          opacity: active ? 1 : 0.8,
+        }}
+      />
+      <Text style={{ color: active ? "#fff" : "#111827", fontWeight: "600" }} text={label} />
+    </Pressable>
+  )
+
+  const StatusChip: React.FC<{ s: Status; active: boolean; onPress: () => void }> = ({
+    s,
+    active,
+    onPress,
+  }) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`Filter ${s}`}
+      style={{
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: STATUS_COLORS[s],
+        backgroundColor: active ? STATUS_COLORS[s] : STATUS_BG[s],
+      }}
+    >
+      <Text tx={`status:${s}`} style={{ color: active ? "#fff" : STATUS_COLORS[s] }} />
+    </Pressable>
+  )
+
   const renderItem: ListRenderItem<(typeof data)[number]> = ({ item: t }) => (
     <TaskCard
       id={t.id}
@@ -148,20 +288,20 @@ export default function HomeFeedScreen({ navigation }: any) {
         accessibilityLabel="Logout"
         style={({ pressed }) => ({
           position: "absolute",
-          top: 10,
+          top: 12,
           right: 12,
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           backgroundColor: LOGOUT_COLOR,
           alignItems: "center",
           justifyContent: "center",
           zIndex: 1000,
           shadowColor: "#000",
-          shadowOpacity: 0.18,
-          shadowRadius: 3,
+          shadowOpacity: 0.14,
+          shadowRadius: 8,
           shadowOffset: { width: 0, height: 2 },
-          elevation: 4,
+          elevation: 5,
           transform: [{ scale: pressed ? 0.98 : 1 }],
         })}
         hitSlop={8}
@@ -170,107 +310,56 @@ export default function HomeFeedScreen({ navigation }: any) {
       </Pressable>
 
       {/* Header */}
-      <View style={{ padding: 12 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}>
         <Text
           preset="heading"
           tx={viewMode === "mine" ? "oolshik:myRequestsHeader" : "oolshik:nearbyForYouHeader"}
           style={{ marginBottom: 12 }}
         />
 
-        {/* Segmented toggle: For You | My Requests */}
-        <View
-          style={{
-            flexDirection: "row",
-            backgroundColor: "#FFFFFF",
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: "#E5E7EB",
-            padding: 4,
-            gap: 4,
-            marginBottom: 5,
-          }}
-        >
-          {(
-            [
-              { key: "forYou", tx: "oolshik:tabForYou" },
-              { key: "mine", tx: "oolshik:tabMyRequests" },
-            ] as const
-          ).map((tab) => {
-            const active = viewMode === tab.key
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => setViewMode(tab.key)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={tab.key === "forYou" ? "For you" : "My requests"}
-                style={{
-                  flex: 1,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 5,
-                  borderRadius: 999,
-                  backgroundColor: active ? "#111827" : "transparent",
-                }}
-              >
-                <Text
-                  tx={tab.tx}
-                  style={{ fontWeight: "700", color: active ? "#FFFFFF" : "#111827" }}
-                />
-              </Pressable>
-            )
-          })}
-        </View>
+        {/* Segmented toggle */}
+        <Segmented value={viewMode} onChange={setViewMode} />
+      </View>
 
-        {/* Radius selector */}
-        <RadioGroup
-          value={radiusMeters}
-          onChange={(v) => setRadius(v as Radius)}
-          options={[
-            { label: "1 km", value: 1 },
-            { label: "2 km", value: 2 },
-            { label: "5 km", value: 5 },
-          ]}
-          size="md"
-          gap={8}
-        />
+      {/* Filters Card */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 6 }}>
+        <SectionCard>
+          {/* Distance */}
+          <Text tx="oolshik:distanceFilter" style={{ marginBottom: 8, color: "#6B7280" }} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {[1, 2, 5].map((km) => (
+              <Pill
+                key={km}
+                label={`${km} km`}
+                active={radiusMeters === km}
+                onPress={() => setRadius(km as Radius)}
+              />
+            ))}
+          </View>
 
-        {/* Status filter chips */}
-        <View style={{ marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {STATUS_ORDER.map((s) => {
-            const active = selectedStatuses.has(s)
-            return (
-              <Pressable
-                key={s}
-                onPress={() => toggleStatus(s)}
-                style={{
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: STATUS_COLORS[s],
-                  backgroundColor: active ? STATUS_COLORS[s] : "transparent",
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Filter ${s}`}
-              >
-                <Text style={{ color: active ? "#ffffff" : STATUS_COLORS[s] }} tx={`status:${s}`} />
-              </Pressable>
-            )
-          })}
-        </View>
+          {/* Divider */}
+          <View style={{ height: 12 }} />
+
+          {/* Status */}
+          <Text tx="oolshik:statusFilter" style={{ marginBottom: 8, color: "#6B7280" }} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {STATUS_ORDER.map((s) => {
+              const active = selectedStatuses.has(s)
+              return <StatusChip key={s} s={s} active={active} onPress={() => toggleStatus(s)} />
+            })}
+          </View>
+        </SectionCard>
       </View>
 
       {/* Scrollable list */}
-      <View style={{ flex: 1, paddingHorizontal: 12, backgroundColor: colors.background }}>
+      <View style={{ flex: 1, paddingHorizontal: 16, backgroundColor: colors.background }}>
         {loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator />
           </View>
         ) : (
           <FlatList
-            style={{ marginBottom: 15 }}
+            style={{ marginBottom: 16 }}
             data={data}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderItem}
@@ -287,7 +376,7 @@ export default function HomeFeedScreen({ navigation }: any) {
               }
             }}
             removeClippedSubviews
-            contentContainerStyle={{ paddingBottom: 120 }}
+            contentContainerStyle={{ paddingBottom: 140 }}
             ListEmptyComponent={
               <Text
                 tx={viewMode === "mine" ? "oolshik:emptyMine" : "oolshik:emptyForYou"}
@@ -299,7 +388,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       </View>
 
       {/* Bottom fixed Create button */}
-      <View style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
+      <View style={{ position: "absolute", left: 16, right: 16, bottom: 0 }}>
         <Button
           tx="oolshik:create"
           onPress={() => navigation.navigate("OolshikCreate")}
