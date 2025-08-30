@@ -22,15 +22,13 @@ const dummyTasks: Task[] = [
   {
     id: "T-MOCK-1",
     description: "Fetch groceries",
+    title: "Fetch groceries",
     voiceUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     status: "PENDING",
-    lat: 18.5204, // Pune
-    lng: 73.8567,
+    latitude: 18.5204, // Pune
+    longitude: 73.8567,
     radiusMeters: 1,
-    createdById: "U-01",
-    createdByName: "Amit",
     createdAt: new Date().toISOString(),
-    distanceKm: 0.3,
   },
   // add more seeds if you want
 ]
@@ -60,7 +58,7 @@ export const MockOolshikApi = {
 
     const withDistances = dummyTasks.map((t) => ({
       ...t,
-      distanceKm: kmBetween(lat, lon, t.lat, t.lng),
+      distanceKm: kmBetween(lat, lon, t.latitude, t.longitude),
     }))
     const filtered = withDistances
       .filter((t) => (t.distanceKm ?? Infinity) <= radiusMeters)
@@ -82,14 +80,11 @@ export const MockOolshikApi = {
     const newTask: Task = {
       id: `T-MOCK-${dummyTasks.length + 1}`,
       status: "PENDING",
-      distanceKm: 0,
       createdAt: payload.createdAt ?? new Date().toISOString(),
-      createdById: payload.createdById ?? "U-LOCAL-1",
-      createdByName: payload.createdByName ?? "You",
       voiceUrl: payload.voiceUrl ?? "",
       description: payload.description ?? "",
-      lat: payload.lat ?? 0,
-      lng: payload.lng ?? 0,
+      latitude: payload.latitude ?? 0,
+      longitude: payload.longitude ?? 0,
       radiusMeters: payload.radiusMeters ?? 1,
     }
     dummyTasks.unshift(newTask) // append to the dummy feed

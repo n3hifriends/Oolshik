@@ -146,24 +146,34 @@ export default function CreateTaskScreen({ navigation }: any) {
           autoCapitalize="sentences"
           autoCorrect
         />
-        <Text preset="default" text={`${description.length}/${MAX_DESC}`} />
+        <Text
+          style={{ alignSelf: "flex-end" }}
+          preset="default"
+          text={`${description.length}/${MAX_DESC}`}
+        />
       </View>
 
       {/* Radius */}
-      <RadioGroup
-        value={radiusKm}
-        onChange={(v) => setRadiusKm(v as Radius)}
-        options={[
-          { label: "1 km", value: 1 },
-          { label: "2 km", value: 2 },
-          { label: "5 km", value: 5 },
-        ]}
-        size="md"
-        gap={8}
-      />
-
+      <View style={{ gap: 6 }}>
+        <Text
+          text="Show my request to helpers within:"
+          style={{ fontWeight: "600", opacity: 0.9 }}
+        />
+        <RadioGroup
+          value={radiusKm}
+          onChange={(v) => setRadiusKm(v as Radius)}
+          options={[
+            { label: "1 km", value: 1 },
+            { label: "2 km", value: 2 },
+            { label: "5 km", value: 5 },
+          ]}
+          size="md"
+          gap={8}
+        />
+      </View>
       {/* Recorder */}
-      <View style={{ flexDirection: "row", gap: 8 }}>
+      <View style={{ flexDirection: "column", gap: 8, marginTop: 12, marginBottom: 24 }}>
+        <Text text="Record Voice Note (30s max):" style={{ fontWeight: "600", opacity: 0.9 }} />
         {!recording && <Button text="Record ≤30s" onPress={start} />}
         {recording && <Button text={`Stop (${durationSec}s)`} onPress={stop} />}
       </View>

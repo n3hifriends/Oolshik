@@ -6,12 +6,14 @@ import { OolshikApi } from "@/api"
 type Task = {
   id: string
   voiceUrl?: string | null
+  title?: string
   description?: string
   distanceKm?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
+  createdByPhoneNumber?: string
 }
 
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"
