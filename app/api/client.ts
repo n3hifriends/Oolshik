@@ -287,6 +287,13 @@ export type Page<T> = {
   sort?: any
 }
 
+export type ReportPayload = {
+  taskId?: string
+  targetUserId?: string
+  reason: "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
+  text?: string
+}
+
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
@@ -351,8 +358,7 @@ export const OolshikApi = {
     api.post("/reviews", payload),
 
   // Reports
-  report: (payload: { targetUserId?: string; taskId?: string; reason: string; text?: string }) =>
-    api.post("/reports", payload),
+  report: (payload: ReportPayload) => api.post("/reports", payload),
 
   // Device token (push)
   registerDevice: (token: string) => api.post("/users/device", { token }),
