@@ -176,6 +176,12 @@ export default function TaskDetailScreen({ navigation }: any) {
           // ignore
         }
       }, 1200)
+    } else if (
+      res?.status === 403 ||
+      res?.status === 409 ||
+      String(res?.data || "").includes("Only requester can complete")
+    ) {
+      alert("Only the requester can complete this task")
     } else {
       alert("Error completing task")
     }

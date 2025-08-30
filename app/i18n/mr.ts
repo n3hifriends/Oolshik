@@ -43,6 +43,12 @@ const mr = {
     alreadyAssigned: "आधीच नेमणूक झाले",
     distanceAway: "{{km}} कि.मी. अंतरावर",
     emptyNearby: "सध्या जवळ कोणतीही कामे नाहीत — मोठा परिघ निवडा.",
+    nearbyForYouHeader: "तुमच्यासाठी जवळील",
+    myRequestsHeader: "माझ्या विनंत्या",
+    tabForYou: "तुमच्यासाठी",
+    tabMyRequests: "माझ्या विनंत्या",
+    emptyForYou: "सध्या जवळ कोणतीही विनंत्या नाहीत.",
+    emptyMine: "तुम्ही अजून कोणतीही विनंत्या तयार केलेल्या नाहीत.",
   },
 }
 export default mr

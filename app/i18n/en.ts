@@ -36,6 +36,12 @@ const en = {
     alreadyAssigned: "Already Assigned",
     distanceAway: "{{km}} km away",
     emptyNearby: "No nearby tasks yet — try a larger radius.",
+    nearbyForYouHeader: "Nearby for You",
+    myRequestsHeader: "My Requests",
+    tabForYou: "For You",
+    tabMyRequests: "My Requests",
+    emptyForYou: "No nearby requests right now.",
+    emptyMine: "You haven't created any requests yet.",
   },
   common: {
     ok: "OK!",
