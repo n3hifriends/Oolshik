@@ -261,6 +261,7 @@ export type ServerTask = {
   title?: string
   description?: string
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  voiceUrl?: string | null
   latitude: number
   longitude: number
   radiusMeters: number
@@ -268,6 +269,8 @@ export type ServerTask = {
   helperId?: string | null
   createdAt?: string
   updatedAt?: string
+  requesterName?: string
+  requesterPhoneNumber?: string
 }
 
 export type Page<T> = {
@@ -326,6 +329,7 @@ export const OolshikApi = {
 
     const url = `/requests/nearby?${qs.toString()}`
     const res = await api.get<Page<ServerTask>>(url)
+    console.log("🚀 ~ nearbyTasks ~ res:", res.data)
     if (res.ok) {
       const page = res.data
       if (page && Array.isArray(page.content)) {
