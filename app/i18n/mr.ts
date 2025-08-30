@@ -49,6 +49,8 @@ const mr = {
     tabMyRequests: "माझ्या विनंत्या",
     emptyForYou: "सध्या जवळ कोणतीही विनंत्या नाहीत.",
     emptyMine: "तुम्ही अजून कोणतीही विनंत्या तयार केलेल्या नाहीत.",
+    distanceFilter: "अंतर",
+    statusFilter: "स्थिती",
   },
 }
 export default mr

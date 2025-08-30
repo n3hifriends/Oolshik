@@ -42,6 +42,8 @@ const en = {
     tabMyRequests: "My Requests",
     emptyForYou: "No nearby requests right now.",
     emptyMine: "You haven't created any requests yet.",
+    distanceFilter: "Distance",
+    statusFilter: "Status",
   },
   common: {
     ok: "OK!",
