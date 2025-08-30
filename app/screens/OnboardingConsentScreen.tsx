@@ -7,11 +7,17 @@ import { RadioGroup } from "@/components/RadioGroup"
 import { useAppTheme } from "@/theme/context"
 import { useTranslation } from "react-i18next"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
+import { storage } from "@/utils/storage"
+import { useMMKVString } from "react-native-mmkv"
 
 export default function OnboardingConsentScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { i18n } = useTranslation()
+  const [onboardingComplete, setOnboardingComplete] = useMMKVString(
+    "onboarding.v1.completed",
+    storage,
+  )
 
   // location hook (assumes it exposes `granted` and maybe a `request` function)
   const { granted, request } = useForegroundLocation() as {
@@ -115,7 +121,10 @@ export default function OnboardingConsentScreen({ navigation }: any) {
       >
         <Button
           tx="oolshik:home"
-          onPress={() => navigation.replace("OolshikHome")}
+          onPress={() => {
+            setOnboardingComplete("true")
+            navigation.replace("OolshikHome")
+          }}
           disabled={!canContinue}
           style={{ width: "100%", paddingVertical: spacing.xs, opacity: canContinue ? 1 : 0.6 }}
         />

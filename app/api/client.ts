@@ -371,6 +371,9 @@ export const OolshikApi = {
   refresh: (refreshToken: string) =>
     api.post<{ accessToken: string; refreshToken?: string }>("/auth/refresh", { refreshToken }),
   // ---------- /NEW ----------
+
+  revealPhone: (id: string) => api.post(`/requests/${id}/revealPhone`, {}),
+  // Expect { phoneNumber: string revealCount: number }
 }
 // Optional helper: call this after successful OTP verify to persist tokens
 export function setLoginTokens(accessToken?: string | null, refreshToken?: string | null) {

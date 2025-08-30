@@ -1,5 +1,5 @@
 import React from "react"
-import { View, ActivityIndicator, Pressable } from "react-native"
+import { View, ActivityIndicator, Pressable, Linking } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -10,6 +10,7 @@ import { OolshikApi } from "@/api"
 import { Audio } from "expo-av"
 import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
+import { $styles } from "@/theme/styles"
 
 type RouteParams = { id: string }
 
@@ -42,6 +43,30 @@ function minsAgo(iso?: string) {
   })
 }
 
+function maskPhoneNumber(input?: string) {
+  if (!input) return ""
+  // keep non-digits as-is, mask all digits except the last 4
+  const digits = input.replace(/\D/g, "")
+  if (digits.length <= 4) return input
+  const last4 = digits.slice(-4)
+  let maskedDigitsIdx = 0
+  const numDigitsToMask = Math.max(0, digits.length - 4)
+  return input
+    .split("")
+    .map((ch) => {
+      if (/\d/.test(ch)) {
+        if (maskedDigitsIdx < numDigitsToMask) {
+          maskedDigitsIdx += 1
+          return "•"
+        }
+        // past masked portion -> reveal last 4
+        return last4[maskedDigitsIdx++ - numDigitsToMask] || ch
+      }
+      return ch
+    })
+    .join("")
+}
+
 export default function TaskDetailScreen({ navigation }: any) {
   const { params } = useRoute<any>() as { params: RouteParams }
   const taskId = params?.id
@@ -61,6 +86,10 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { radiusMeters } = useTaskStore()
   const [justCompleted, setJustCompleted] = React.useState(false)
 
+  const [fullPhone, setFullPhone] = React.useState<string | null>(null)
+  const [isRevealed, setIsRevealed] = React.useState(false)
+  const [revealLoading, setRevealLoading] = React.useState(false)
+
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
   const success = "#16A34A"
@@ -77,6 +106,13 @@ export default function TaskDetailScreen({ navigation }: any) {
   } as const
 
   const current = task || taskFromStore || null
+
+  React.useEffect(() => {
+    if (current?.createdByPhoneNumber) {
+      setFullPhone(String(current.createdByPhoneNumber))
+      setIsRevealed(false) // always start masked on open
+    }
+  }, [current?.createdByPhoneNumber])
 
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
   let normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" = "PENDING"
@@ -133,6 +169,32 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
+  const onRevealPhone = async () => {
+    if (!current) return
+    try {
+      setRevealLoading(true)
+      setIsRevealed(true)
+
+      // Calls backend to log & return full number
+      const res = await OolshikApi.revealPhone(current.id as any)
+      if (res?.ok) {
+        const num = res.data?.phoneNumber ?? fullPhone
+        if (num) setFullPhone(String(num))
+        setIsRevealed(true)
+      } else {
+        const msg = res?.data?.message || "Unable to show number"
+        alert(msg)
+      }
+    } finally {
+      setRevealLoading(false)
+    }
+  }
+
+  const onCall = () => {
+    const num = (fullPhone || "").replace(/[^+\d]/g, "")
+    if (num) Linking.openURL(`tel:${num}`)
+  }
+
   const play = async () => {
     if (!current?.voiceUrl) return
     const { sound } = await Audio.Sound.createAsync({ uri: String(current.voiceUrl) })
@@ -188,7 +250,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   }
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
+    <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
       <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
         <Text preset="heading" text="Task Detail" />
@@ -202,7 +264,7 @@ export default function TaskDetailScreen({ navigation }: any) {
       </View>
 
       {/* Content */}
-      <View style={{ flex: 1, paddingHorizontal: 16 }}>
+      <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 32 }}>
         {loading || !current ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             {loading ? <ActivityIndicator /> : <Text text="Task not found" />}
@@ -259,6 +321,38 @@ export default function TaskDetailScreen({ navigation }: any) {
                 style={{ color: neutral700 }}
               />
             </View>
+
+            {/* Contact (masked -> reveal) */}
+            {!!fullPhone && (
+              <View
+                style={{
+                  gap: spacing.xs,
+                  padding: spacing.sm,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.palette.neutral300,
+                  backgroundColor: colors.palette.neutral100,
+                }}
+              >
+                <Text text="Contact" weight="medium" style={{ color: neutral700 }} />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <Text
+                    text={isRevealed ? String(fullPhone) : maskPhoneNumber(fullPhone || "")}
+                    weight="bold"
+                    style={{ flex: 1, color: neutral700 }}
+                  />
+                  {isRevealed ? (
+                    <Button text="Call" onPress={onCall} style={{ paddingVertical: spacing.xs }} />
+                  ) : (
+                    <Button
+                      text={revealLoading ? "…" : "Show"}
+                      onPress={onRevealPhone}
+                      style={{ paddingVertical: spacing.xs }}
+                    />
+                  )}
+                </View>
+              </View>
+            )}
 
             {/* Distance + Status pill in one row */}
             <View
@@ -330,12 +424,9 @@ export default function TaskDetailScreen({ navigation }: any) {
           {normalizedStatus === "COMPLETED" && (
             <View
               style={{
-                position: "absolute",
-                left: 16,
-                right: 16,
-                bottom: 16,
                 paddingVertical: spacing.xs,
                 paddingHorizontal: spacing.sm,
+                marginHorizontal: 16,
                 borderRadius: 8,
                 backgroundColor: successSoft,
                 borderWidth: 1,

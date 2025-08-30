@@ -241,10 +241,7 @@ export default function HomeFeedScreen({ navigation }: any) {
         backgroundColor: active ? STATUS_COLORS[s] : STATUS_BG[s],
       }}
     >
-      <Text
-        tx={`status:${s}`}
-        style={{ color: active ? "#fff" : STATUS_COLORS[s], fontWeight: "700" }}
-      />
+      <Text tx={`status:${s}`} style={{ color: active ? "#fff" : STATUS_COLORS[s] }} />
     </Pressable>
   )
 
@@ -309,7 +306,7 @@ export default function HomeFeedScreen({ navigation }: any) {
         })}
         hitSlop={8}
       >
-        <Text text="↻" style={{ color: "#fff", fontSize: 18, lineHeight: 18 }} />
+        <Text text="⎋" style={{ color: "#fff", fontSize: 18, lineHeight: 18 }} />
       </Pressable>
 
       {/* Header */}
@@ -391,7 +388,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       </View>
 
       {/* Bottom fixed Create button */}
-      <View style={{ position: "absolute", left: 16, right: 16, bottom: 16 }}>
+      <View style={{ position: "absolute", left: 16, right: 16, bottom: 0 }}>
         <Button
           tx="oolshik:create"
           onPress={() => navigation.navigate("OolshikCreate")}
