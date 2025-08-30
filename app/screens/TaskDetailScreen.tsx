@@ -337,7 +337,16 @@ export default function TaskDetailScreen({ navigation }: any) {
               }}
             >
               <Text text="Task completed ✓" weight="bold" style={{ color: success }} />
-              <Text text="Thanks for helping! Returning to list..." size="xs" />
+              <Text
+                style={{ marginBottom: 5 }}
+                text="Thanks for helping! Returning to list..."
+                size="xs"
+              />
+              <Button
+                text="Ok"
+                onPress={() => navigation.goBack()}
+                style={{ flex: 2, paddingVertical: spacing.xs }}
+              />
             </View>
           )}
         </>

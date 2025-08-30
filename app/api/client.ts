@@ -329,7 +329,6 @@ export const OolshikApi = {
 
     const url = `/requests/nearby?${qs.toString()}`
     const res = await api.get<Page<ServerTask>>(url)
-    console.log("🚀 ~ nearbyTasks ~ res:", res.data)
     if (res.ok) {
       const page = res.data
       if (page && Array.isArray(page.content)) {
