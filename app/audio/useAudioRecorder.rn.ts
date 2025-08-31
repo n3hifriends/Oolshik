@@ -2,7 +2,10 @@
 // Bare React Native path using react-native-audio-recorder-player
 import { useEffect, useRef, useState } from "react"
 import { Platform, PermissionsAndroid, Alert } from "react-native"
-import AudioRecorderPlayer, { AVEncoderAudioQualityIOSType, AVEncodingOption } from "react-native-audio-recorder-player"
+import AudioRecorderPlayer, {
+  AVEncoderAudioQualityIOSType,
+  AVEncodingOption,
+} from "react-native-audio-recorder-player"
 
 export type RecordingState = "idle" | "recording" | "paused" | "stopped"
 export type Recording = { path: string; durationMs: number }
@@ -14,16 +17,22 @@ export function useAudioRecorder() {
   const [durationMs, setDurationMs] = useState(0)
 
   useEffect(() => {
-    return () => { try { arpRef.current.stopRecorder(); } catch {} }
+    return () => {
+      try {
+        arpRef.current.stopRecorder()
+      } catch {}
+    }
   }, [])
 
   const requestPermission = async () => {
     if (Platform.OS === "android") {
       const granted = await PermissionsAndroid.requestMultiple([
         PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
       ])
-      if (granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED) {
+      if (
+        granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED
+      ) {
         Alert.alert("Permission required", "Recording permission is needed.")
         return false
       }
@@ -47,8 +56,18 @@ export function useAudioRecorder() {
     arpRef.current.addRecordBackListener((e) => setDurationMs(e.currentPosition))
   }
 
-  const pause = async () => { if (state === "recording") { await arpRef.current.pauseRecorder(); setState("paused") } }
-  const resume = async () => { if (state === "paused") { await arpRef.current.resumeRecorder(); setState("recording") } }
+  const pause = async () => {
+    if (state === "recording") {
+      await arpRef.current.pauseRecorder()
+      setState("paused")
+    }
+  }
+  const resume = async () => {
+    if (state === "paused") {
+      await arpRef.current.resumeRecorder()
+      setState("recording")
+    }
+  }
   const stop = async (): Promise<Recording | null> => {
     if (state === "idle") return null
     const result = await arpRef.current.stopRecorder()

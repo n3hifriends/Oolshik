@@ -12,14 +12,20 @@ export function useAudioRecorder() {
   const [durationMs, setDurationMs] = useState(0)
   const recRef = useRef<Audio.Recording | null>(null)
 
-  useEffect(() => { return () => { try { recRef.current?.stopAndUnloadAsync() } catch {} } }, [])
+  useEffect(() => {
+    return () => {
+      try {
+        recRef.current?.stopAndUnloadAsync()
+      } catch {}
+    }
+  }, [])
 
   const start = async () => {
     const perm = await Audio.requestPermissionsAsync()
     if (!perm.granted) return
     await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
     const recording = new Audio.Recording()
-    await recording.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY)
+    await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
     await recording.startAsync()
     recRef.current = recording
     setState("recording")
@@ -30,8 +36,14 @@ export function useAudioRecorder() {
     }, 300)
   }
 
-  const pause = async () => { await recRef.current?.pauseAsync(); setState("paused") }
-  const resume = async () => { await recRef.current?.startAsync(); setState("recording") }
+  const pause = async () => {
+    await recRef.current?.pauseAsync()
+    setState("paused")
+  }
+  const resume = async () => {
+    await recRef.current?.startAsync()
+    setState("recording")
+  }
   const stop = async (): Promise<Recording | null> => {
     if (!recRef.current) return null
     await recRef.current.stopAndUnloadAsync()

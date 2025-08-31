@@ -4103,6 +4103,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"base-64@npm:^0.1.0":
+  version: 0.1.0
+  resolution: "base-64@npm:0.1.0"
+  checksum: 10c0/fe0dcf076e823f04db7ee9b02495be08a91c445fbc6db03cb9913be9680e2fcc0af8b74459041fe08ad16800b1f65a549501d8f08696a8a6d32880789b7de69d
+  languageName: node
+  linkType: hard
+
 "base64-js@npm:^1.2.3, base64-js@npm:^1.3.1, base64-js@npm:^1.5.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
@@ -9342,6 +9349,7 @@ __metadata:
     react-native: "npm:0.79.4"
     react-native-drawer-layout: "npm:^4.0.1"
     react-native-edge-to-edge: "npm:1.6.0"
+    react-native-fs: "npm:^2.20.0"
     react-native-gesture-handler: "npm:~2.24.0"
     react-native-keyboard-controller: "npm:^1.12.7"
     react-native-mmkv: "npm:^3.2.0"
@@ -9971,6 +9979,22 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/6373cc1b447eae31689a9b62e38b15621e9273626e2324700c4c3eb58c02ce489236a4b9e3e0dc1187e062defd8316195c5b1213facd718706b79b92127a05a3
+  languageName: node
+  linkType: hard
+
+"react-native-fs@npm:^2.20.0":
+  version: 2.20.0
+  resolution: "react-native-fs@npm:2.20.0"
+  dependencies:
+    base-64: "npm:^0.1.0"
+    utf8: "npm:^3.0.0"
+  peerDependencies:
+    react-native: "*"
+    react-native-windows: "*"
+  peerDependenciesMeta:
+    react-native-windows:
+      optional: true
+  checksum: 10c0/3722b5568610cd72f319c90f60ba8b019a005d015f27e49017ddd0ea314d1ea6991f79288c28549fdc2964dc81c0fa24f8a5f87a4a6283c97c6ea88d4caa6851
   languageName: node
   linkType: hard
 
@@ -11973,6 +11997,13 @@ __metadata:
   peerDependencies:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
   checksum: 10c0/1b8663515c0be34fa653feb724fdcce3984037c78dd4a18f68b2c8be55cc1a1084c578d5b75f158d41b5ddffc2bf5600766d1af3c19c8e329bb20af2ec6f52f4
+  languageName: node
+  linkType: hard
+
+"utf8@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "utf8@npm:3.0.0"
+  checksum: 10c0/675d008bab65fc463ce718d5cae8fd4c063540f269e4f25afebce643098439d53e7164bb1f193e0c3852825c7e3e32fbd8641163d19a618dbb53f1f09acb0d5a
   languageName: node
   linkType: hard
 
