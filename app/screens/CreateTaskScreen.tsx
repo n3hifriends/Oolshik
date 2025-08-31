@@ -57,17 +57,17 @@ export default function CreateTaskScreen({ navigation }: any) {
           } catch {}
           soundRef.current = null
         }
-        const { sound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: false },
-          (status) => {
-            if (!mounted) return
-            if (status.isLoaded) {
-              setPlaybackSecs(Math.floor((status.positionMillis || 0) / 1000))
-              setIsPlaying(!!status.isPlaying)
-            }
-          },
-        )
+        const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: false })
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!mounted) return
+          if (!status.isLoaded) return
+          setPlaybackSecs(Math.floor((status.positionMillis || 0) / 1000))
+          setIsPlaying(!!status.isPlaying)
+          if ((status as any).didJustFinish) {
+            // when playback completes, keep the counter at the end
+            setIsPlaying(false)
+          }
+        })
         soundRef.current = sound
       } catch {}
     }
@@ -85,6 +85,10 @@ export default function CreateTaskScreen({ navigation }: any) {
     if (status.isPlaying) {
       await sound.pauseAsync()
     } else {
+      try {
+        await sound.setPositionAsync(0)
+      } catch {}
+      setPlaybackSecs(0)
       await sound.playAsync()
     }
   }
@@ -190,6 +194,14 @@ export default function CreateTaskScreen({ navigation }: any) {
     }
   }
 
+  const onStartPress = async () => {
+    try {
+      await start()
+    } catch (e: any) {
+      Alert.alert("Recorder error", e?.message ?? "Microphone not available")
+    }
+  }
+
   return (
     <Screen
       preset="scroll"
@@ -253,7 +265,7 @@ export default function CreateTaskScreen({ navigation }: any) {
       {/* Recorder */}
       <View style={{ flexDirection: "column", gap: 10, marginTop: 12, marginBottom: 24 }}>
         <Text text="Record Voice Note (30s max):" style={{ fontWeight: "600", opacity: 0.9 }} />
-        {!recording && !uri && <Button text="Record ≤30s" onPress={start} />}
+        {!recording && !uri && <Button text="Record ≤30s" onPress={onStartPress} />}
         {recording && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <ActivityIndicator />

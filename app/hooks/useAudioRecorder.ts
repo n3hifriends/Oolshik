@@ -1,56 +1,125 @@
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av"
 import { useEffect, useRef, useState } from "react"
-import { Audio } from "expo-av"
+import { Platform, PermissionsAndroid } from "react-native"
 
-export function useAudioRecorder(maxSeconds: number = 30) {
-  const recordingRef = useRef<Audio.Recording | null>(null)
+type State = "idle" | "recording" | "stopped"
+export function useAudioRecorder(maxSeconds = 30) {
+  const [state, setState] = useState<State>("idle")
   const [uri, setUri] = useState<string | null>(null)
-  const [recording, setRecording] = useState<boolean>(false)
-  const [durationSec, setDurationSec] = useState<number>(0)
+  const [durationSec, setDurationSec] = useState(0)
+  const recRef = useRef<Audio.Recording | null>(null)
+  const tickRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    let interval: any
-    if (recording) {
-      interval = setInterval(() => setDurationSec((s) => s + 1), 1000)
-    } else {
-      clearInterval(interval)
+  // request mic permission (Android 12/13 emulator can be picky)
+  const askPermission = async () => {
+    if (Platform.OS === "android") {
+      // If you’re bare RN without Expo managed perms, request at runtime:
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        )
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) return false
+      } catch {
+        return false
+      }
     }
-    return () => clearInterval(interval)
-  }, [recording])
+    const perm = await Audio.requestPermissionsAsync()
+    return perm.granted
+  }
 
   const start = async () => {
-    const perm = await Audio.requestPermissionsAsync()
-    if (perm.status !== "granted") throw new Error("Audio permission denied")
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
-    const rec = new Audio.Recording()
-    await rec.prepareToRecordAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
-    )
-    await rec.startAsync()
-    recordingRef.current = rec
+    // clean previous recording
+    if (recRef.current) {
+      try {
+        await recRef.current.stopAndUnloadAsync()
+      } catch {}
+      recRef.current = null
+    }
+    setUri(null)
     setDurationSec(0)
-    setRecording(true)
+
+    const ok = await askPermission()
+    if (!ok) return
+
+    // set audio mode
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+    })
+
+    const recording = new Audio.Recording()
+    try {
+      await recording.prepareToRecordAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY, // AAC/M4A on both platforms
+      )
+      await recording.startAsync()
+      recRef.current = recording
+      setState("recording")
+
+      // poll duration
+      tickRef.current = setInterval(async () => {
+        const status = await recording.getStatusAsync()
+        if (!status.isRecording) return
+        const secs = Math.floor((status.durationMillis ?? 0) / 1000)
+        setDurationSec(secs)
+        if (secs >= maxSeconds) {
+          await stop()
+        }
+      }, 250)
+    } catch (e) {
+      // common emulator failure: no mic route; fail gracefully
+      setState("idle")
+      try {
+        await recording.stopAndUnloadAsync()
+      } catch {}
+      recRef.current = null
+    }
   }
 
   const stop = async () => {
-    const rec = recordingRef.current
-    if (!rec) return null
-    await rec.stopAndUnloadAsync()
-    const u = rec.getURI()
-    setUri(u ?? null)
-    setRecording(false)
-    return u
+    if (!recRef.current) return
+    try {
+      if (tickRef.current) {
+        clearInterval(tickRef.current)
+        tickRef.current = null
+      }
+      await recRef.current.stopAndUnloadAsync()
+      const out = recRef.current.getURI()
+      setUri(out ?? null)
+      setState("stopped")
+    } catch {
+      // ignore
+    }
   }
 
   const reset = () => {
-    recordingRef.current = null
+    if (tickRef.current) {
+      clearInterval(tickRef.current)
+      tickRef.current = null
+    }
     setUri(null)
     setDurationSec(0)
-    setRecording(false)
+    setState("idle")
+    try {
+      recRef.current?.stopAndUnloadAsync()
+    } catch {}
+    recRef.current = null
   }
 
-  useEffect(() => {
-    if (recording && durationSec >= maxSeconds) stop()
-  }, [recording, durationSec, maxSeconds])
+  useEffect(
+    () => () => {
+      if (tickRef.current) clearInterval(tickRef.current as any)
+      try {
+        recRef.current?.stopAndUnloadAsync()
+      } catch {}
+    },
+    [],
+  )
 
-  return { start, stop, reset, uri, recording, durationSec }
+  return { uri, start, stop, recording: state === "recording", durationSec, reset }
 }
