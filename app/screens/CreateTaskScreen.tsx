@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext"
 import { FLAGS } from "@/config/flags"
 import { useTaskStore } from "@/store/taskStore"
 import { Task } from "@/api/client"
-import { id } from "date-fns/locale"
+import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
 
@@ -122,29 +122,25 @@ export default function CreateTaskScreen({ navigation }: any) {
       const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
       let finalVoiceUrl = fallbackVoice
 
-      if (wantRealUpload) {
-        // 1) Get presigned URL from backend
-        const presigned = await OolshikApi.getPresigned("audio/m4a")
-        if (!presigned.ok || !presigned.data) {
-          Alert.alert("Upload URL error", "Couldn't get a secure upload URL. Please try again.")
-          setSubmitting(false)
-          return
-        }
-        const { uploadUrl, fileUrl } = presigned.data
+      if (!wantRealUpload) {
+        // inside handlePost:
+        let voiceUrl: string | undefined
 
-        // 2) Upload the file as binary using Expo FileSystem
-        const up = await FileSystem.uploadAsync(uploadUrl, uri!, {
-          httpMethod: "PUT",
-          headers: { "Content-Type": "audio/m4a" },
-          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        })
-        const ok = up.status >= 200 && up.status < 300
-        if (!ok) {
-          Alert.alert("Upload failed", `Server responded ${up.status}. Please try again.`)
-          setSubmitting(false)
-          return
+        if (uri && audioAccepted) {
+          const res = await uploadAudioSmart({
+            uri,
+            filename: `voice_${Date.now()}.m4a`,
+            mimeType: "audio/m4a",
+            durationMs: durationSec * 1000,
+          })
+          if (!res.ok) {
+            Alert.alert("Upload failed", "Please try again.")
+            setSubmitting(false)
+            return
+          }
+          voiceUrl = res.url
         }
-        finalVoiceUrl = fileUrl
+        finalVoiceUrl = "" + voiceUrl
       }
 
       // 3) create (mock returns ok with fake task; real hits backend)
