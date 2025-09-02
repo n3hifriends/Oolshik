@@ -7,10 +7,11 @@ const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
 
 type Opts = {
   uri: string // file://...
-  filename?: string // defaults to recording_<ts>.m4a
-  mimeType?: string // defaults to audio/m4a
-  durationMs?: number
+  filename: string // defaults to recording_<ts>.m4a
+  mimeType: string // defaults to audio/m4a
+  durationMs: number
   sampleRate?: number
+  requestId?: string // optional client-provided upload ID (for deduping)
 }
 
 /**
@@ -107,3 +108,9 @@ function base64ToBytes(b64: string): Uint8Array {
   }
   return Uint8Array.from(out)
 }
+// curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0YTY3MDgzMy1jYWZkLTQyMTItYTlkYy1iOGRlNTFmM2I1MmYiLCJpYXQiOjE3NTY2NDM0NDIsImV4cCI6MTc1NjY0NzA0MiwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5NzYyMjc5NjY3In0.hGYj-b-qzlYeZe7Usz9t0y11KamkVCpBwxABAH3oXls" \
+//   http://localhost:8080/api/media/audio/my
+
+//  curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0YTY3MDgzMy1jYWZkLTQyMTItYTlkYy1iOGRlNTFmM2I1MmYiLCJpYXQiOjE3NTY2NDM0NDIsImV4cCI6MTc1NjY0NzA0MiwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5NzYyMjc5NjY3In0.hGYj-b-qzlYeZe7Usz9t0y11KamkVCpBwxABAH3oXls" \
+//      http://localhost:8080/api/media/audio/72da3149-7b0a-416b-9739-bdc6e6bb1914/stream \
+//      --output sample.m4a

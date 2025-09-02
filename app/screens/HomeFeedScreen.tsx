@@ -53,7 +53,8 @@ export default function HomeFeedScreen({ navigation }: any) {
   const { logout, user } = useAuth() as any
 
   // Who am I? Try common shapes; keep it simple & resilient
-  const myId: string | undefined = user?.id ?? user?.userId ?? user?.uid ?? user?.sub
+  // const myId: string | undefined = user?.id ?? user?.userId ?? user?.uid ?? user?.sub
+  const myId: string | undefined = user?.id
 
   // Status filter (default = OPEN + ASSIGNED)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -86,7 +87,8 @@ export default function HomeFeedScreen({ navigation }: any) {
   const isMine = useCallback(
     (t: any) => {
       if (!myId) return false
-      const owner = t?.requesterId ?? t?.createdById ?? t?.ownerId
+      // const owner = t?.requesterId ?? t?.createdById ?? t?.ownerId
+      const owner = t?.requesterId
       return owner ? String(owner) === String(myId) : false
     },
     [myId],
@@ -94,6 +96,7 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   const data = useMemo(() => {
     const list = Array.isArray(tasks) ? tasks : []
+    console.log("🚀 ~ HomeFeedScreen ~ tasks:", tasks)
 
     // de-dupe by id
     const unique = Array.from(new Map(list.map((t: any) => [t.id, t])).values())
