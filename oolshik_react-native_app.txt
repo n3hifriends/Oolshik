@@ -2,7 +2,7 @@
 # Root: /Users/nitinkalokhe/Ni3/Oolshik
 # Included: ['.bash', '.bat', '.c', '.cfg', '.cjs', '.conf', '.cpp', '.css', '.dart', '.editorconfig', '.env', '.gitattributes', '.gitignore', '.go', '.gradle', '.groovy', '.h', '.hpp', '.htm', '.html', '.ini', '.java', '.js', '.json', '.jsonc', '.jsx', '.kt', '.kts', '.less', '.lua', '.m', '.md', '.mdx', '.mjs', '.mm', '.php', '.properties', '.proto', '.ps1', '.py', '.rb', '.rs', '.scss', '.sh', '.sql', '.swift', '.ts', '.tsx', '.txt', '.xml', '.yaml', '.yml', '.zsh']
 # Excluded dirs: ['.expo', '.git', '.gradle', '.idea', '.next', '.venv', '.vscode', 'Pods', 'android/build', 'build', 'coverage', 'dist', 'ios/build', 'node_modules', 'venv']
-# Git ignored entries skipped: 59089 (if repo)
+# Git ignored entries skipped: 59231 (if repo)
 # ---
 
 
@@ -642,6 +642,7 @@ web-build/
     "react-native": "0.79.4",
     "react-native-drawer-layout": "^4.0.1",
     "react-native-edge-to-edge": "1.6.0",
+    "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-keyboard-controller": "^1.12.7",
     "react-native-mmkv": "^3.2.0",
@@ -1476,7 +1477,7 @@ export const authEvents = new EventEmitter()
 
 
 ===== BEGIN FILE: app/navigators/OolshikNavigator.tsx =====
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import OnboardingConsentScreen from "@/screens/OnboardingConsentScreen"
 import HomeFeedScreen from "@/screens/HomeFeedScreen"
@@ -1486,6 +1487,22 @@ import MyTasksScreen from "@/screens/MyTasksScreen"
 import ChatScreen from "@/screens/ChatScreen"
 import ProfileScreen from "@/screens/ProfileScreen"
 import ReportScreen from "@/screens/ReportScreen"
+import { useMMKVString } from "react-native-mmkv"
+import { storage } from "@/utils/storage"
+
+/**
+ * IMPORTANT
+ * We decide the initial route at runtime so that:
+ * - Onboarding is shown ONLY the first time after login OR when we detect it hasn't been completed.
+ * - Otherwise, users go straight to Home.
+ *
+ * We persist a single boolean flag after a successful onboarding flow:
+ *   key: "onboarding.v1.completed" -> "true" | undefined
+ *
+ * If your OnboardingConsentScreen already handles permissions, call:
+ *   await AsyncStorage.setItem("onboarding.v1.completed", "true")
+ * when the user finishes granting or explicitly skipping with your app's policy.
+ */
 
 export type OolshikParamList = {
   OolshikOnboard: undefined
@@ -1501,10 +1518,32 @@ export type OolshikParamList = {
 const Stack = createNativeStackNavigator<OolshikParamList>()
 
 export function OolshikNavigator() {
+  const [initialRoute, setInitialRoute] = useState<keyof OolshikParamList | null>(null)
+  const [onboardingComplete, setOnboardingComplete] = useMMKVString(
+    "onboarding.v1.completed",
+    storage,
+  )
+
+  useEffect(() => {
+    const decide = async () => {
+      try {
+        // If flag not set, show onboarding; else jump to Home
+        setInitialRoute(onboardingComplete === "true" ? "OolshikHome" : "OolshikOnboard")
+      } catch {
+        // Fail-safe: if anything goes wrong, keep user functional and go to Home
+        setInitialRoute("OolshikHome")
+      }
+    }
+    decide()
+  }, [])
+
+  // Avoid rendering the navigator until we know the initial route
+  if (!initialRoute) return null
+
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false, animation: "slide_from_right" }}
-      initialRouteName="OolshikOnboard"
+      initialRouteName={initialRoute}
     >
       <Stack.Screen name="OolshikOnboard" component={OnboardingConsentScreen} />
       <Stack.Screen name="OolshikHome" component={HomeFeedScreen} />
@@ -2464,7 +2503,7 @@ export default function MyTasksScreen() {
 
 ===== BEGIN FILE: app/screens/TaskDetailScreen.tsx =====
 import React from "react"
-import { View, ActivityIndicator, Pressable } from "react-native"
+import { View, ActivityIndicator, Pressable, Linking } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -2475,6 +2514,7 @@ import { OolshikApi } from "@/api"
 import { Audio } from "expo-av"
 import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
+import { $styles } from "@/theme/styles"
 
 type RouteParams = { id: string }
 
@@ -2507,6 +2547,30 @@ function minsAgo(iso?: string) {
   })
 }
 
+function maskPhoneNumber(input?: string) {
+  if (!input) return ""
+  // keep non-digits as-is, mask all digits except the last 4
+  const digits = input.replace(/\D/g, "")
+  if (digits.length <= 4) return input
+  const last4 = digits.slice(-4)
+  let maskedDigitsIdx = 0
+  const numDigitsToMask = Math.max(0, digits.length - 4)
+  return input
+    .split("")
+    .map((ch) => {
+      if (/\d/.test(ch)) {
+        if (maskedDigitsIdx < numDigitsToMask) {
+          maskedDigitsIdx += 1
+          return "•"
+        }
+        // past masked portion -> reveal last 4
+        return last4[maskedDigitsIdx++ - numDigitsToMask] || ch
+      }
+      return ch
+    })
+    .join("")
+}
+
 export default function TaskDetailScreen({ navigation }: any) {
   const { params } = useRoute<any>() as { params: RouteParams }
   const taskId = params?.id
@@ -2526,6 +2590,10 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { radiusMeters } = useTaskStore()
   const [justCompleted, setJustCompleted] = React.useState(false)
 
+  const [fullPhone, setFullPhone] = React.useState<string | null>(null)
+  const [isRevealed, setIsRevealed] = React.useState(false)
+  const [revealLoading, setRevealLoading] = React.useState(false)
+
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
   const success = "#16A34A"
@@ -2542,6 +2610,13 @@ export default function TaskDetailScreen({ navigation }: any) {
   } as const
 
   const current = task || taskFromStore || null
+
+  React.useEffect(() => {
+    if (current?.createdByPhoneNumber) {
+      setFullPhone(String(current.createdByPhoneNumber))
+      setIsRevealed(false) // always start masked on open
+    }
+  }, [current?.createdByPhoneNumber])
 
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
   let normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" = "PENDING"
@@ -2598,6 +2673,32 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
+  const onRevealPhone = async () => {
+    if (!current) return
+    try {
+      setRevealLoading(true)
+      setIsRevealed(true)
+
+      // Calls backend to log & return full number
+      const res = await OolshikApi.revealPhone(current.id as any)
+      if (res?.ok) {
+        const num = res.data?.phoneNumber ?? fullPhone
+        if (num) setFullPhone(String(num))
+        setIsRevealed(true)
+      } else {
+        const msg = res?.data?.message || "Unable to show number"
+        alert(msg)
+      }
+    } finally {
+      setRevealLoading(false)
+    }
+  }
+
+  const onCall = () => {
+    const num = (fullPhone || "").replace(/[^+\d]/g, "")
+    if (num) Linking.openURL(`tel:${num}`)
+  }
+
   const play = async () => {
     if (!current?.voiceUrl) return
     const { sound } = await Audio.Sound.createAsync({ uri: String(current.voiceUrl) })
@@ -2641,13 +2742,19 @@ export default function TaskDetailScreen({ navigation }: any) {
           // ignore
         }
       }, 1200)
+    } else if (
+      res?.status === 403 ||
+      res?.status === 409 ||
+      String(res?.data || "").includes("Only requester can complete")
+    ) {
+      alert("Only the requester can complete this task")
     } else {
       alert("Error completing task")
     }
   }
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
+    <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
       <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
         <Text preset="heading" text="Task Detail" />
@@ -2655,13 +2762,15 @@ export default function TaskDetailScreen({ navigation }: any) {
         <View style={{ marginLeft: "auto" }}>
           <Button
             text="Report"
-            onPress={() => navigation.navigate("OolshikReport", { taskId: current?.id })}
+            onPress={() => {
+              navigation.navigate("OolshikReport", { taskId: current?.id })
+            }}
           />
         </View>
       </View>
 
       {/* Content */}
-      <View style={{ flex: 1, paddingHorizontal: 16 }}>
+      <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 32 }}>
         {loading || !current ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             {loading ? <ActivityIndicator /> : <Text text="Task not found" />}
@@ -2719,6 +2828,38 @@ export default function TaskDetailScreen({ navigation }: any) {
               />
             </View>
 
+            {/* Contact (masked -> reveal) */}
+            {!!fullPhone && (
+              <View
+                style={{
+                  gap: spacing.xs,
+                  padding: spacing.sm,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.palette.neutral300,
+                  backgroundColor: colors.palette.neutral100,
+                }}
+              >
+                <Text text="Contact" weight="medium" style={{ color: neutral700 }} />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <Text
+                    text={isRevealed ? String(fullPhone) : maskPhoneNumber(fullPhone || "")}
+                    weight="bold"
+                    style={{ flex: 1, color: neutral700 }}
+                  />
+                  {isRevealed ? (
+                    <Button text="Call" onPress={onCall} style={{ paddingVertical: spacing.xs }} />
+                  ) : (
+                    <Button
+                      text={revealLoading ? "…" : "Show"}
+                      onPress={onRevealPhone}
+                      style={{ paddingVertical: spacing.xs }}
+                    />
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* Distance + Status pill in one row */}
             <View
               style={{
@@ -2766,11 +2907,6 @@ export default function TaskDetailScreen({ navigation }: any) {
                 gap: spacing.sm,
               }}
             >
-              <Button
-                text="Report"
-                onPress={() => navigation.navigate("OolshikReport", { taskId: current.id })}
-                style={{ flex: 1, paddingVertical: spacing.xs }}
-              />
               {normalizedStatus === "PENDING" ? (
                 <Button
                   text="Accept"
@@ -2789,12 +2925,9 @@ export default function TaskDetailScreen({ navigation }: any) {
           {normalizedStatus === "COMPLETED" && (
             <View
               style={{
-                position: "absolute",
-                left: 16,
-                right: 16,
-                bottom: 16,
                 paddingVertical: spacing.xs,
                 paddingHorizontal: spacing.sm,
+                marginHorizontal: 16,
                 borderRadius: 8,
                 backgroundColor: successSoft,
                 borderWidth: 1,
@@ -2825,7 +2958,7 @@ export default function TaskDetailScreen({ navigation }: any) {
 ===== BEGIN FILE: app/screens/ReportScreen.tsx =====
 // app/screens/ReportScreen.tsx
 import React from "react"
-import { View } from "react-native"
+import { View, Alert, Pressable } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -2837,58 +2970,120 @@ import { RadioGroup } from "@/components/RadioGroup"
 
 type Params = { taskId?: string; userId?: string }
 
+type Reason = "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
+
 export default function ReportScreen() {
   const nav = useNavigation<any>()
   const { params } = useRoute<any>() as { params: Params }
   const { theme } = useAppTheme()
-  const { spacing, colors } = theme
+  const { spacing } = theme
 
-  const [reason, setReason] = React.useState<"SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER">("SPAM")
+  const [reason, setReason] = React.useState<Reason>("SPAM")
   const [text, setText] = React.useState("")
   const [loading, setLoading] = React.useState(false)
 
+  const MAX_DESC = 500
+
+  const validate = (): { ok: boolean; message?: string } => {
+    if (!params?.taskId && !params?.userId) {
+      return { ok: false, message: "Missing context. Please report from a task or a profile." }
+    }
+    if (reason === "OTHER" && !text.trim()) {
+      return { ok: false, message: "Please add details when selecting Other." }
+    }
+    if (text.length > 1000) {
+      return { ok: false, message: "Details are too long. Please keep under 1000 characters." }
+    }
+    return { ok: true }
+  }
+
   const submit = async () => {
+    const v = validate()
+    if (!v.ok) {
+      Alert.alert("Report", v.message)
+      return
+    }
+
     setLoading(true)
     try {
+      console.log("🚀 ~ submit ~ params:", params)
       const res = await OolshikApi.report({
         taskId: params?.taskId,
         targetUserId: params?.userId,
         reason,
         text: text.trim() || undefined,
       })
+
       if (res?.ok) {
+        Alert.alert("Thanks for reporting", "Our team will review this shortly.")
         nav.goBack()
       } else {
-        alert("Report failed")
+        Alert.alert("Report failed", res?.error ?? "Please try again.")
       }
+    } catch (e: any) {
+      Alert.alert("Report failed", e?.message ?? "Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
+  const reasons = [
+    { label: "Spam / Advertising", value: "SPAM" },
+    { label: "Inappropriate Content", value: "INAPPROPRIATE" },
+    { label: "Unsafe / Harmful", value: "UNSAFE" },
+    { label: "Other", value: "OTHER" },
+  ]
+  const Pill: React.FC<{
+    label: string
+    active?: boolean
+    onPress?: () => void
+    dotColor?: string
+  }> = ({ label, active, onPress, dotColor = "#FF6B2C" }) => (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: active ? "#111827" : "#F2F4F7",
+      }}
+    >
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: active ? "#fff" : dotColor,
+          opacity: active ? 1 : 0.8,
+        }}
+      />
+      <Text style={{ color: active ? "#fff" : "#111827", fontWeight: "600" }} text={label} />
+    </Pressable>
+  )
   return (
     <Screen
       preset="fixed"
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: 16 }}
     >
-      <Text preset="heading" text="Report" />
+      <Text preset="heading" text="Report an issue" />
       <View style={{ height: spacing.md }} />
 
       <Text text="Reason" weight="medium" />
       <View style={{ height: spacing.xs }} />
-      <RadioGroup
-        value={reason}
-        onChange={(v) => setReason(v as any)}
-        options={[
-          { label: "Spam / Advertising", value: "SPAM" },
-          { label: "Inappropriate Content", value: "INAPPROPRIATE" },
-          { label: "Unsafe / Harmful", value: "UNSAFE" },
-          { label: "Other", value: "OTHER" },
-        ]}
-        gap={8}
-        wrap
-      />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {reasons.map((r) => (
+          <Pill
+            key={r.value}
+            label={r.label}
+            active={reason === r.value}
+            onPress={() => setReason(r.value as Reason)}
+          />
+        ))}
+      </View>
 
       <View style={{ height: spacing.md }} />
       <Text text="Details (optional)" weight="medium" />
@@ -2897,10 +3092,14 @@ export default function ReportScreen() {
         multiline
         numberOfLines={6}
         value={text}
-        onChangeText={setText}
-        placeholder="Describe the issue…"
+        onChangeText={(t) => setText(t.slice(0, MAX_DESC))}
+        placeholder="Describe what happened…"
         style={{ minHeight: 120 }}
+        editable={!loading}
       />
+      <Text
+        style={{ alignSelf: "flex-end", color: "#6B7280", marginTop: 4 }}
+      >{`${text.length}/${MAX_DESC}`}</Text>
 
       <View style={{ height: spacing.lg }} />
       <Button
@@ -3044,42 +3243,61 @@ import { TaskCard } from "@/components/TaskCard"
 import { Button } from "@/components/Button"
 import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
-import { RadioGroup } from "@/components/RadioGroup"
+// import { RadioGroup } from "@/components/RadioGroup" // removed – custom pills look cleaner
 import { colors } from "@/theme/colors"
 import { useAuth } from "@/context/AuthContext"
 
+/**
+ * HomeFeedScreen – refreshed UI
+ * - Cleaner "segmented" header for For You | My Requests
+ * - Card-like filter bar with Distance pills + Status chips
+ * - Calmer colors and spacing for industry-standard feel
+ * - No new deps; pure RN + existing components
+ */
+
+// Distances (km)
 type Radius = 1 | 2 | 5
 
+// Backend statuses
 type Status = "OPEN" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
 
 const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
 
-// Color tokens for chips (fallback hexes chosen to fit a professional theme)
+// Chip colors
 const STATUS_COLORS: Record<Status, string> = {
-  OPEN: "#0EA5E9", // sky-500 like
-  ASSIGNED: "#F59E0B", // amber-500 like
-  COMPLETED: "#10B981", // emerald-500 like
-  CANCELLED: "#EF4444", // red-500 like
+  OPEN: "#0EA5E9",
+  ASSIGNED: "#F59E0B",
+  COMPLETED: "#10B981",
+  CANCELLED: "#EF4444",
+}
+
+const STATUS_BG: Record<Status, string> = {
+  OPEN: "rgba(14,165,233,0.10)",
+  ASSIGNED: "rgba(245,158,11,0.10)",
+  COMPLETED: "rgba(16,185,129,0.10)",
+  CANCELLED: "rgba(239,68,68,0.12)",
 }
 
 const LOGOUT_COLOR = "#FF6B2C"
 
-const STATUS_LABELS: Record<Status, string> = {
-  OPEN: "Open",
-  ASSIGNED: "Assigned",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-}
+// NEW: view switch
+type ViewMode = "forYou" | "mine"
 
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth() as any
 
-  // Status filter (default matches previous behavior: hide Completed/Cancelled)
+  // Who am I? Try common shapes; keep it simple & resilient
+  const myId: string | undefined = user?.id ?? user?.userId ?? user?.uid ?? user?.sub
+
+  // Status filter (default = OPEN + ASSIGNED)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
     new Set(["OPEN", "ASSIGNED"]),
   )
+
+  // NEW: tab to switch between "For You" (not mine) and "My Requests"
+  const [viewMode, setViewMode] = useState<ViewMode>("forYou")
 
   const toggleStatus = (s: Status) => {
     setSelectedStatuses((prev) => {
@@ -3097,28 +3315,38 @@ export default function HomeFeedScreen({ navigation }: any) {
         // If none selected, omit the statuses argument so backend returns all
         fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
       }
-      // no cleanup needed
     }, [coords?.latitude, coords?.longitude, radiusMeters, selectedStatuses]),
+  )
+
+  // Utility: is this task created by me?
+  const isMine = useCallback(
+    (t: any) => {
+      if (!myId) return false
+      const owner = t?.requesterId ?? t?.createdById ?? t?.ownerId
+      return owner ? String(owner) === String(myId) : false
+    },
+    [myId],
   )
 
   const data = useMemo(() => {
     const list = Array.isArray(tasks) ? tasks : []
-    // de-dupe by id (last write wins)
-    const map = new Map(list.map((t) => [t.id, t]))
-    const unique = Array.from(map.values())
 
-    // Decide which statuses to include:
-    // - If none selected, use all statuses observed in the backend response
-    //   (so the feed never looks empty).
+    // de-dupe by id
+    const unique = Array.from(new Map(list.map((t: any) => [t.id, t])).values())
+
+    // If none selected, include all statuses present in the response
     const statusesToUse: Status[] =
       selectedStatuses.size === 0
         ? (Array.from(new Set(unique.map((t: any) => t.status))).filter(Boolean) as Status[])
         : (Array.from(selectedStatuses) as Status[])
 
-    // filter by chosen statuses
-    const filtered = unique.filter((t: any) => statusesToUse.includes(t.status as Status))
+    // Filter by status
+    let filtered = unique.filter((t: any) => statusesToUse.includes(t.status as Status))
 
-    // stable order by distance then createdAt desc fallback
+    // Filter by view mode
+    filtered = filtered.filter((t: any) => (viewMode === "mine" ? isMine(t) : !isMine(t)))
+
+    // Sort: nearest first, then newest
     return filtered.sort((a: any, b: any) => {
       const d = (a.distanceKm ?? 0) - (b.distanceKm ?? 0)
       if (d !== 0) return d
@@ -3126,7 +3354,132 @@ export default function HomeFeedScreen({ navigation }: any) {
       const bt = new Date(b.createdAt ?? 0).getTime()
       return bt - at
     })
-  }, [tasks, selectedStatuses])
+  }, [tasks, selectedStatuses, viewMode, isMine])
+
+  // ---------- Small UI building blocks ----------
+
+  const SectionCard: React.FC<{ children: React.ReactNode; style?: any }> = ({
+    children,
+    style,
+  }) => (
+    <View
+      style={[
+        {
+          backgroundColor: "#fff",
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: "#ECECEC",
+          padding: 12,
+          shadowColor: "#000",
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 1,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  )
+
+  const Segmented: React.FC<{
+    value: ViewMode
+    onChange: (v: ViewMode) => void
+  }> = ({ value, onChange }) => {
+    const tabs: { key: ViewMode; tx: string; a11y: string }[] = [
+      { key: "forYou", tx: "oolshik:tabForYou", a11y: "For you" },
+      { key: "mine", tx: "oolshik:tabMyRequests", a11y: "My requests" },
+    ]
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: "#F5F6F7",
+          borderRadius: 12,
+          padding: 4,
+          gap: 4,
+        }}
+      >
+        {tabs.map((t) => {
+          const active = value === t.key
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => onChange(t.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t.a11y}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 10,
+                borderRadius: 10,
+                backgroundColor: active ? "#111827" : "transparent",
+              }}
+            >
+              <Text tx={t.tx} style={{ fontWeight: "700", color: active ? "#fff" : "#111827" }} />
+            </Pressable>
+          )
+        })}
+      </View>
+    )
+  }
+
+  const Pill: React.FC<{
+    label: string
+    active?: boolean
+    onPress?: () => void
+    dotColor?: string
+  }> = ({ label, active, onPress, dotColor = "#FF6B2C" }) => (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: active ? "#111827" : "#F2F4F7",
+      }}
+    >
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: active ? "#fff" : dotColor,
+          opacity: active ? 1 : 0.8,
+        }}
+      />
+      <Text style={{ color: active ? "#fff" : "#111827", fontWeight: "600" }} text={label} />
+    </Pressable>
+  )
+
+  const StatusChip: React.FC<{ s: Status; active: boolean; onPress: () => void }> = ({
+    s,
+    active,
+    onPress,
+  }) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`Filter ${s}`}
+      style={{
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: STATUS_COLORS[s],
+        backgroundColor: active ? STATUS_COLORS[s] : STATUS_BG[s],
+      }}
+    >
+      <Text tx={`status:${s}`} style={{ color: active ? "#fff" : STATUS_COLORS[s] }} />
+    </Pressable>
+  )
 
   const renderItem: ListRenderItem<(typeof data)[number]> = ({ item: t }) => (
     <TaskCard
@@ -3136,11 +3489,10 @@ export default function HomeFeedScreen({ navigation }: any) {
       status={t.status}
       voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
       onAccept={
-        t.status === "OPEN"
+        viewMode === "forYou" && t.status === "OPEN"
           ? async () => {
               const res = await accept(t.id)
               if (res === "ALREADY") alert("Already assigned")
-              // refresh list after accepting
               if (coords) fetchNearby(coords.latitude, coords.longitude)
             }
           : undefined
@@ -3148,18 +3500,14 @@ export default function HomeFeedScreen({ navigation }: any) {
       onPress={async () => {
         navigation.navigate("OolshikDetail", { id: t.id })
       }}
-      createdByName={t.createdByName}
+      createdByName={t.createdByName ?? t.requesterName}
       createdAt={t.createdAt}
     />
   )
 
   return (
-    <Screen
-      preset="fixed" // fixed layout; only FlatList scrolls
-      safeAreaEdges={["top", "bottom"]}
-      contentContainerStyle={{ flex: 1 }} // let internal views fill height
-    >
-      {/* Floating Logout button (top-right) */}
+    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
+      {/* Floating Logout */}
       <Pressable
         onPress={() => {
           Alert.alert(
@@ -3167,14 +3515,7 @@ export default function HomeFeedScreen({ navigation }: any) {
             "Are you sure you want to logout?",
             [
               { text: "Cancel", style: "cancel" },
-              {
-                text: "Logout",
-                style: "destructive",
-                onPress: () => {
-                  // Clear auth token; navigation should react via auth flow
-                  logout()
-                },
-              },
+              { text: "Logout", style: "destructive", onPress: () => logout() },
             ],
             { cancelable: true },
           )
@@ -3183,88 +3524,86 @@ export default function HomeFeedScreen({ navigation }: any) {
         accessibilityLabel="Logout"
         style={({ pressed }) => ({
           position: "absolute",
-          top: 10,
+          top: 12,
           right: 12,
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           backgroundColor: LOGOUT_COLOR,
           alignItems: "center",
           justifyContent: "center",
           zIndex: 1000,
-          // subtle shadow
           shadowColor: "#000",
-          shadowOpacity: 0.18,
-          shadowRadius: 3,
+          shadowOpacity: 0.14,
+          shadowRadius: 8,
           shadowOffset: { width: 0, height: 2 },
-          elevation: 4,
+          elevation: 5,
           transform: [{ scale: pressed ? 0.98 : 1 }],
         })}
         hitSlop={8}
       >
-        {/* Simple power glyph as icon; white for contrast */}
         <Text text="⎋" style={{ color: "#fff", fontSize: 18, lineHeight: 18 }} />
       </Pressable>
 
-      {/* Header (fixed) */}
-      <View style={{ padding: 12 }}>
-        <Text preset="heading" tx="oolshik:nearbyTasks" style={{ marginBottom: 12 }} />
-
-        <RadioGroup
-          value={radiusMeters}
-          onChange={(v) => setRadius(v as Radius)}
-          options={[
-            { label: "1 km", value: 1 },
-            { label: "2 km", value: 2 },
-            { label: "5 km", value: 5 },
-          ]}
-          size="md"
-          gap={8}
+      {/* Header */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}>
+        <Text
+          preset="heading"
+          tx={viewMode === "mine" ? "oolshik:myRequestsHeader" : "oolshik:nearbyForYouHeader"}
+          style={{ marginBottom: 12 }}
         />
 
-        {/* Status filter chips */}
-        <View style={{ marginTop: 12, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {STATUS_ORDER.map((s) => {
-            const active = selectedStatuses.has(s)
-            return (
-              <Pressable
-                key={s}
-                onPress={() => toggleStatus(s)}
-                style={{
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: STATUS_COLORS[s],
-                  backgroundColor: active ? STATUS_COLORS[s] : "transparent",
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Filter ${s}`}
-              >
-                <Text
-                  style={{ fontWeight: "600", color: active ? "#ffffff" : STATUS_COLORS[s] }}
-                  tx={`status:${s}`}
-                />
-              </Pressable>
-            )
-          })}
-        </View>
+        {/* Segmented toggle */}
+        <Segmented value={viewMode} onChange={setViewMode} />
       </View>
 
-      {/* Scrollable list area */}
-      <View style={{ flex: 1, paddingHorizontal: 12, backgroundColor: colors.background }}>
+      {/* Filters Card */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 6 }}>
+        <SectionCard>
+          {/* Distance */}
+          <Text tx="oolshik:distanceFilter" style={{ marginBottom: 8, color: "#6B7280" }} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {[1, 2, 5].map((km) => (
+              <Pill
+                key={km}
+                label={`${km} km`}
+                active={radiusMeters === km}
+                onPress={() => setRadius(km as Radius)}
+              />
+            ))}
+          </View>
+
+          {/* Divider */}
+          <View style={{ height: 12 }} />
+
+          {/* Status */}
+          <Text tx="oolshik:statusFilter" style={{ marginBottom: 8, color: "#6B7280" }} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {STATUS_ORDER.map((s) => {
+              const active = selectedStatuses.has(s)
+              return <StatusChip key={s} s={s} active={active} onPress={() => toggleStatus(s)} />
+            })}
+          </View>
+        </SectionCard>
+      </View>
+
+      {/* Scrollable list */}
+      <View style={{ flex: 1, paddingHorizontal: 16, backgroundColor: colors.background }}>
         {loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator />
           </View>
         ) : (
           <FlatList
-            style={{ marginBottom: 15 }}
+            style={{ marginBottom: 16 }}
             data={data}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderItem}
-            extraData={{ radiusMeters, selected: Array.from(selectedStatuses).sort().join(",") }}
+            extraData={{
+              radiusMeters,
+              selected: Array.from(selectedStatuses).sort().join(","),
+              viewMode,
+            }}
             refreshing={loading}
             onRefresh={() => {
               if (coords) {
@@ -3273,16 +3612,19 @@ export default function HomeFeedScreen({ navigation }: any) {
               }
             }}
             removeClippedSubviews
-            contentContainerStyle={{
-              paddingBottom: 120, // space for the fixed Create button
-            }}
-            ListEmptyComponent={<Text tx="oolshik:emptyNearby" style={{ paddingVertical: 12 }} />}
+            contentContainerStyle={{ paddingBottom: 140 }}
+            ListEmptyComponent={
+              <Text
+                tx={viewMode === "mine" ? "oolshik:emptyMine" : "oolshik:emptyForYou"}
+                style={{ paddingVertical: 12 }}
+              />
+            }
           />
         )}
       </View>
 
       {/* Bottom fixed Create button */}
-      <View style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
+      <View style={{ position: "absolute", left: 16, right: 16, bottom: 0 }}>
         <Button
           tx="oolshik:create"
           onPress={() => navigation.navigate("OolshikCreate")}
@@ -3931,11 +4273,17 @@ import { RadioGroup } from "@/components/RadioGroup"
 import { useAppTheme } from "@/theme/context"
 import { useTranslation } from "react-i18next"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
+import { storage } from "@/utils/storage"
+import { useMMKVString } from "react-native-mmkv"
 
 export default function OnboardingConsentScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { i18n } = useTranslation()
+  const [onboardingComplete, setOnboardingComplete] = useMMKVString(
+    "onboarding.v1.completed",
+    storage,
+  )
 
   // location hook (assumes it exposes `granted` and maybe a `request` function)
   const { granted, request } = useForegroundLocation() as {
@@ -4039,7 +4387,10 @@ export default function OnboardingConsentScreen({ navigation }: any) {
       >
         <Button
           tx="oolshik:home"
-          onPress={() => navigation.replace("OolshikHome")}
+          onPress={() => {
+            setOnboardingComplete("true")
+            navigation.replace("OolshikHome")
+          }}
           disabled={!canContinue}
           style={{ width: "100%", paddingVertical: spacing.xs, opacity: canContinue ? 1 : 0.6 }}
         />
@@ -4614,8 +4965,8 @@ const $inputWrapperDense: ThemedStyle<ViewStyle> = () => ({
 
 
 ===== BEGIN FILE: app/screens/CreateTaskScreen.tsx =====
-import React, { useState } from "react"
-import { View, Alert } from "react-native"
+import React, { useState, useRef, useEffect } from "react"
+import { View, Alert, ActivityIndicator } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -4624,11 +4975,13 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { OolshikApi } from "@/api"
 import * as FileSystem from "expo-file-system"
+import { Audio } from "expo-av"
 import { RadioGroup } from "@/components/RadioGroup"
 import { useAuth } from "@/context/AuthContext"
 import { FLAGS } from "@/config/flags"
 import { useTaskStore } from "@/store/taskStore"
 import { Task } from "@/api/client"
+import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
 
@@ -4637,12 +4990,86 @@ export default function CreateTaskScreen({ navigation }: any) {
   const [description, setDescription] = useState("")
   const [radiusKm, setRadiusKm] = useState<Radius>(1)
   const [submitting, setSubmitting] = useState(false)
+  const [audioAccepted, setAudioAccepted] = useState(false)
+  const soundRef = useRef<Audio.Sound | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playbackSecs, setPlaybackSecs] = useState(0)
   const MAX_DESC = 500
 
   const { uri, start, stop, recording, durationSec, reset } = useAudioRecorder(30)
   const { coords } = useForegroundLocation()
   const { userId, userName } = useAuth()
   const { tasks } = useTaskStore()
+
+  // Load/unload preview sound when a new recording is available
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      if (!uri) {
+        if (soundRef.current) {
+          try {
+            await soundRef.current.unloadAsync()
+          } catch {}
+          soundRef.current = null
+        }
+        setIsPlaying(false)
+        setPlaybackSecs(0)
+        setAudioAccepted(false)
+        return
+      }
+      try {
+        if (soundRef.current) {
+          try {
+            await soundRef.current.unloadAsync()
+          } catch {}
+          soundRef.current = null
+        }
+        const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: false })
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!mounted) return
+          if (!status.isLoaded) return
+          setPlaybackSecs(Math.floor((status.positionMillis || 0) / 1000))
+          setIsPlaying(!!status.isPlaying)
+          if ((status as any).didJustFinish) {
+            // when playback completes, keep the counter at the end
+            setIsPlaying(false)
+          }
+        })
+        soundRef.current = sound
+      } catch {}
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [uri])
+
+  const togglePlay = async () => {
+    const sound = soundRef.current
+    if (!sound) return
+    const status = await sound.getStatusAsync()
+    if (!status.isLoaded) return
+    if (status.isPlaying) {
+      await sound.pauseAsync()
+    } else {
+      try {
+        await sound.setPositionAsync(0)
+      } catch {}
+      setPlaybackSecs(0)
+      await sound.playAsync()
+    }
+  }
+
+  const discardRecording = async () => {
+    try {
+      await soundRef.current?.unloadAsync()
+    } catch {}
+    soundRef.current = null
+    setIsPlaying(false)
+    setPlaybackSecs(0)
+    setAudioAccepted(false)
+    reset()
+  }
 
   const handlePost = async () => {
     if (!coords) {
@@ -4657,45 +5084,41 @@ export default function CreateTaskScreen({ navigation }: any) {
     setSubmitting(true)
     try {
       // Decide if we will actually upload a recorded file
-      const wantRealUpload = !FLAGS.USE_MOCK_UPLOAD_CREATE && !!uri
+      const wantRealUpload = false && !!uri && audioAccepted
 
       const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
       let finalVoiceUrl = fallbackVoice
 
-      if (wantRealUpload) {
-        // 1) presigned (real returns S3 urls)
-        const presigned = await OolshikApi.getPresigned("audio/m4a")
-        if (!presigned.ok || !presigned.data) {
-          Alert.alert("Upload URL error", "Couldn't get a secure upload URL. Please try again.")
-          setSubmitting(false)
-          return
-        }
-        const { uploadUrl, fileUrl } = presigned.data
+      if (!wantRealUpload) {
+        // inside handlePost:
+        let voiceUrl: string | undefined
 
-        // 2) upload recorded file
-        const fileB64 = await FileSystem.readAsStringAsync(uri!, {
-          encoding: FileSystem.EncodingType.Base64,
-        })
-        const resp = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": "audio/m4a" },
-          // In React Native, fetch accepts a string for base64 bodies only when server expects base64.
-          // S3 expects binary; for emulator convenience, rely on fallback in mock mode.
-          body: Buffer.from(fileB64, "base64"),
-        })
-        if (resp.status < 200 || resp.status >= 300) {
-          Alert.alert("Upload failed", "We couldn't upload your voice note. Please try again.")
-          setSubmitting(false)
-          return
+        if (uri && audioAccepted) {
+          const res = await uploadAudioSmart({
+            uri,
+            filename: `voice_${Date.now()}.m4a`,
+            mimeType: "audio/m4a",
+            durationMs: durationSec * 1000,
+          })
+          if (!res.ok) {
+            Alert.alert("Upload failed", "Please try again.")
+            setSubmitting(false)
+            return
+          }
+          voiceUrl = res.url
         }
-        finalVoiceUrl = fileUrl
+        finalVoiceUrl = "" + voiceUrl
       }
 
       // 3) create (mock returns ok with fake task; real hits backend)
       const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
-        voiceUrl: finalVoiceUrl,
+        voiceUrl: wantRealUpload
+          ? finalVoiceUrl
+          : FLAGS.USE_MOCK_UPLOAD_CREATE
+            ? finalVoiceUrl
+            : undefined,
         latitude: coords.latitude,
         longitude: coords.longitude,
         radiusMeters: radiusKm * 1000,
@@ -4707,6 +5130,13 @@ export default function CreateTaskScreen({ navigation }: any) {
       const res = await OolshikApi.createTask(payload)
 
       if (res.ok && res.data) {
+        try {
+          await soundRef.current?.unloadAsync()
+        } catch {}
+        soundRef.current = null
+        setAudioAccepted(false)
+        setIsPlaying(false)
+        setPlaybackSecs(0)
         reset()
         tasks.unshift(res.data as Task)
         Alert.alert("Posted", "Your request has been created successfully.", [
@@ -4724,6 +5154,14 @@ export default function CreateTaskScreen({ navigation }: any) {
       Alert.alert("Create failed", e?.message ?? "Unexpected error occurred.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const onStartPress = async () => {
+    try {
+      await start()
+    } catch (e: any) {
+      Alert.alert("Recorder error", e?.message ?? "Microphone not available")
     }
   }
 
@@ -4788,10 +5226,53 @@ export default function CreateTaskScreen({ navigation }: any) {
         />
       </View>
       {/* Recorder */}
-      <View style={{ flexDirection: "column", gap: 8, marginTop: 12, marginBottom: 24 }}>
+      <View style={{ flexDirection: "column", gap: 10, marginTop: 12, marginBottom: 24 }}>
         <Text text="Record Voice Note (30s max):" style={{ fontWeight: "600", opacity: 0.9 }} />
-        {!recording && <Button text="Record ≤30s" onPress={start} />}
-        {recording && <Button text={`Stop (${durationSec}s)`} onPress={stop} />}
+        {!recording && !uri && <Button text="Record ≤30s" onPress={onStartPress} />}
+        {recording && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ActivityIndicator />
+            <Button text={`Stop (${durationSec}s)`} onPress={stop} />
+          </View>
+        )}
+        {!recording && uri && (
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: "#e5e7eb",
+              borderRadius: 12,
+              padding: 12,
+              backgroundColor: "#fafafa",
+              gap: 10,
+            }}
+          >
+            <Text preset="subheading" text="Preview your recording" />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Button text={isPlaying ? "Pause" : "Play"} onPress={togglePlay} />
+              <Text
+                text={`${playbackSecs}s / ${Math.max(durationSec, Math.ceil(playbackSecs))}s`}
+              />
+            </View>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {!audioAccepted && (
+                <Button text="Use this audio" onPress={() => setAudioAccepted(true)} />
+              )}
+              {audioAccepted && (
+                <Text
+                  text="Audio selected"
+                  style={{ color: "#16a34a", fontWeight: "600", paddingVertical: 10 }}
+                />
+              )}
+              <Button text="Discard & Re-record" onPress={discardRecording} />
+            </View>
+            {!audioAccepted && (
+              <Text
+                text={'(Audio will not be attached unless you tap "Use this audio")'}
+                style={{ opacity: 0.7 }}
+              />
+            )}
+          </View>
+        )}
       </View>
 
       {/* Submit */}
@@ -7678,6 +8159,8 @@ export function TaskCard({
   createdByName,
   createdAt,
 }: Props) {
+  console.log("🚀 ~ TaskCard ~ title:", title)
+  console.log("🚀 ~ TaskCard ~ theme:", voiceUrl)
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
@@ -11190,6 +11673,271 @@ const $inputOuter: StyleProp<ViewStyle> = [$inputOuterBase, { borderRadius: 4 }]
 ===== END FILE: app/components/Toggle/Checkbox.tsx =====
 
 
+===== BEGIN FILE: app/audio/useAudioRecorder.expo.ts =====
+// app/audio/useAudioRecorder.expo.ts
+// Expo path using expo-av
+import { Audio } from "expo-av"
+import { useEffect, useRef, useState } from "react"
+
+export type RecordingState = "idle" | "recording" | "paused" | "stopped"
+export type Recording = { path: string; durationMs: number }
+
+export function useAudioRecorder() {
+  const [state, setState] = useState<RecordingState>("idle")
+  const [path, setPath] = useState<string | null>(null)
+  const [durationMs, setDurationMs] = useState(0)
+  const recRef = useRef<Audio.Recording | null>(null)
+
+  useEffect(() => {
+    return () => {
+      try {
+        recRef.current?.stopAndUnloadAsync()
+      } catch {}
+    }
+  }, [])
+
+  const start = async () => {
+    const perm = await Audio.requestPermissionsAsync()
+    if (!perm.granted) return
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
+    const recording = new Audio.Recording()
+    await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
+    await recording.startAsync()
+    recRef.current = recording
+    setState("recording")
+    const interval = setInterval(async () => {
+      const s = await recording.getStatusAsync()
+      if (s.isRecording) setDurationMs(s.durationMillis || 0)
+      else clearInterval(interval)
+    }, 300)
+  }
+
+  const pause = async () => {
+    await recRef.current?.pauseAsync()
+    setState("paused")
+  }
+  const resume = async () => {
+    await recRef.current?.startAsync()
+    setState("recording")
+  }
+  const stop = async (): Promise<Recording | null> => {
+    if (!recRef.current) return null
+    await recRef.current.stopAndUnloadAsync()
+    const uri = recRef.current.getURI()!
+    setPath(uri)
+    setState("stopped")
+    return { path: uri, durationMs }
+  }
+
+  return { state, start, pause, resume, stop, path, durationMs }
+}
+===== END FILE: app/audio/useAudioRecorder.expo.ts =====
+
+
+===== BEGIN FILE: app/audio/useAudioRecorder.rn.ts =====
+// app/audio/useAudioRecorder.rn.ts
+// Bare React Native path using react-native-audio-recorder-player
+import { useEffect, useRef, useState } from "react"
+import { Platform, PermissionsAndroid, Alert } from "react-native"
+import AudioRecorderPlayer, {
+  AVEncoderAudioQualityIOSType,
+  AVEncodingOption,
+} from "react-native-audio-recorder-player"
+
+export type RecordingState = "idle" | "recording" | "paused" | "stopped"
+export type Recording = { path: string; durationMs: number }
+
+export function useAudioRecorder() {
+  const arpRef = useRef(new AudioRecorderPlayer())
+  const [state, setState] = useState<RecordingState>("idle")
+  const [path, setPath] = useState<string | null>(null)
+  const [durationMs, setDurationMs] = useState(0)
+
+  useEffect(() => {
+    return () => {
+      try {
+        arpRef.current.stopRecorder()
+      } catch {}
+    }
+  }, [])
+
+  const requestPermission = async () => {
+    if (Platform.OS === "android") {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      ])
+      if (
+        granted[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] !== PermissionsAndroid.RESULTS.GRANTED
+      ) {
+        Alert.alert("Permission required", "Recording permission is needed.")
+        return false
+      }
+    }
+    return true
+  }
+
+  const start = async () => {
+    if (!(await requestPermission())) return
+    const fname = `oolshik_${Date.now()}.m4a`
+    const uri = Platform.select({ ios: `/${fname}`, android: undefined })
+    const result = await arpRef.current.startRecorder(uri, {
+      quality: AVEncoderAudioQualityIOSType.high,
+      audioSource: 6,
+      AVNumberOfChannelsKeyIOS: 1,
+      AVFormatIDKeyIOS: AVEncodingOption.aac,
+      SampleRateIOS: 44100,
+    })
+    setPath(result)
+    setState("recording")
+    arpRef.current.addRecordBackListener((e) => setDurationMs(e.currentPosition))
+  }
+
+  const pause = async () => {
+    if (state === "recording") {
+      await arpRef.current.pauseRecorder()
+      setState("paused")
+    }
+  }
+  const resume = async () => {
+    if (state === "paused") {
+      await arpRef.current.resumeRecorder()
+      setState("recording")
+    }
+  }
+  const stop = async (): Promise<Recording | null> => {
+    if (state === "idle") return null
+    const result = await arpRef.current.stopRecorder()
+    arpRef.current.removeRecordBackListener()
+    setState("stopped")
+    setPath(result)
+    return { path: result, durationMs }
+  }
+
+  return { state, start, pause, resume, stop, path, durationMs }
+}
+===== END FILE: app/audio/useAudioRecorder.rn.ts =====
+
+
+===== BEGIN FILE: app/audio/uploadAudio.ts =====
+// app/audio/uploadAudio.ts
+import RNFS from "react-native-fs"
+import { api as Api } from "@/api/client"
+import { initUpload, uploadChunk, completeUpload, ensureOk, streamUrl } from "@/api/audio"
+
+const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
+
+type Opts = {
+  uri: string // file://...
+  filename?: string // defaults to recording_<ts>.m4a
+  mimeType?: string // defaults to audio/m4a
+  durationMs?: number
+  sampleRate?: number
+}
+
+/**
+ * Uploads audio:
+ * - tries S3 presigned PUT first (if backend supports it),
+ * - otherwise falls back to server-buffered chunk upload (works on media.storage=local).
+ * Returns a URL your app can play (S3 public URL OR backend /stream URL).
+ */
+export async function uploadAudioSmart(opts: Opts): Promise<{ ok: true; url: string }> {
+  const mimeType = opts.mimeType ?? "audio/m4a"
+  const filename = opts.filename ?? `recording_${Date.now()}.m4a`
+
+  // Try presigned S3 first (will 501/500 on local → we catch and fallback)
+  try {
+    const pres = await Api.post<{ uploadUrl: string; fileUrl: string; objectKey: string }>(
+      "/media/pre-signed",
+      { contentType: mimeType },
+    )
+    if (pres.ok && pres.data) {
+      const { uploadUrl, fileUrl } = pres.data
+      // Upload file as binary (no base64) using RNFS
+      const stat = await RNFS.stat(opts.uri.replace("file://", ""))
+      const data = await RNFS.readFile(opts.uri, "base64")
+      const res = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": mimeType },
+        body: Buffer.from(data, "base64") as any,
+      })
+      if (!res.ok) throw new Error(`PUT failed ${res.status}`)
+      return { ok: true, url: fileUrl }
+    }
+  } catch {
+    // ignore; fall back to chunked
+  }
+
+  // ---- Fallback: server-buffered chunk upload (LOCAL) ----
+  // 1) stat
+  const filePath = opts.uri.startsWith("file://") ? opts.uri.replace("file://", "") : opts.uri
+  const st = await RNFS.stat(filePath)
+  const size = Number(st.size)
+  if (!Number.isFinite(size) || size <= 0) throw new Error("File not found or empty")
+
+  // 2) init
+  const initRes = await initUpload({ filename, mimeType, size })
+  const initData = ensureOk<{ uploadId: string }>(initRes)
+  const uploadId = initData.uploadId
+
+  // 3) chunk loop
+  let offset = 0
+  let index = 0
+  while (offset < size) {
+    const len = Math.min(CHUNK_SIZE, size - offset)
+    // RNFS read with length + position (base64 → bytes)
+    const base64 = await RNFS.read(filePath, len, offset, "base64")
+    const bytes = base64ToBytes(base64)
+    const put = await uploadChunk(uploadId, index, bytes as unknown as Uint8Array)
+    if (!put.ok) throw new Error(`Chunk ${index} failed`)
+    offset += len
+    index++
+  }
+
+  // 4) complete → server returns AudioFile (id, etc.)
+  const comp = await completeUpload({
+    uploadId,
+    totalChunks: index,
+    durationMs: opts.durationMs,
+    sampleRate: opts.sampleRate,
+  })
+  if (!comp.ok || !comp.data) throw new Error("Complete upload failed")
+  const saved: any = comp.data
+
+  // 5) build play URL via the same base used by client/api
+  const url = streamUrl(saved.id) // e.g. http://.../api/media/audio/{id}/stream
+  return { ok: true, url }
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  // fast base64 decoder (no atob dependency)
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  let i = 0,
+    out: number[] = []
+  b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "")
+  while (i < b64.length) {
+    const e1 = chars.indexOf(b64[i++])
+    const e2 = chars.indexOf(b64[i++])
+    const e3 = chars.indexOf(b64[i++])
+    const e4 = chars.indexOf(b64[i++])
+    const c1 = (e1 << 2) | (e2 >> 4)
+    const c2 = ((e2 & 15) << 4) | (e3 >> 2)
+    const c3 = ((e3 & 3) << 6) | e4
+    out.push(c1)
+    if (e3 !== 64) out.push(c2)
+    if (e4 !== 64) out.push(c3)
+  }
+  return Uint8Array.from(out)
+}
+// curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0YTY3MDgzMy1jYWZkLTQyMTItYTlkYy1iOGRlNTFmM2I1MmYiLCJpYXQiOjE3NTY2NDM0NDIsImV4cCI6MTc1NjY0NzA0MiwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5NzYyMjc5NjY3In0.hGYj-b-qzlYeZe7Usz9t0y11KamkVCpBwxABAH3oXls" \
+//   http://localhost:8080/api/media/audio/my
+
+//  curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0YTY3MDgzMy1jYWZkLTQyMTItYTlkYy1iOGRlNTFmM2I1MmYiLCJpYXQiOjE3NTY2NDM0NDIsImV4cCI6MTc1NjY0NzA0MiwidHlwIjoiYWNjZXNzIiwicGhvbmUiOiIrOTE5NzYyMjc5NjY3In0.hGYj-b-qzlYeZe7Usz9t0y11KamkVCpBwxABAH3oXls" \
+//      http://localhost:8080/api/media/audio/72da3149-7b0a-416b-9739-bdc6e6bb1914/stream \
+//      --output sample.m4a
+===== END FILE: app/audio/uploadAudio.ts =====
+
+
 ===== BEGIN FILE: app/theme/colors.ts =====
 const palette = {
   neutral100: "#FFFFFF",
@@ -11967,63 +12715,215 @@ export function useForegroundLocation() {
 
 
 ===== BEGIN FILE: app/hooks/useAudioRecorder.ts =====
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av"
 import { useEffect, useRef, useState } from "react"
-import { Audio } from "expo-av"
+import { Platform, PermissionsAndroid } from "react-native"
 
-export function useAudioRecorder(maxSeconds: number = 30) {
-  const recordingRef = useRef<Audio.Recording | null>(null)
+type State = "idle" | "recording" | "stopped"
+export function useAudioRecorder(maxSeconds = 30) {
+  const [state, setState] = useState<State>("idle")
   const [uri, setUri] = useState<string | null>(null)
-  const [recording, setRecording] = useState<boolean>(false)
-  const [durationSec, setDurationSec] = useState<number>(0)
+  const [durationSec, setDurationSec] = useState(0)
+  const recRef = useRef<Audio.Recording | null>(null)
+  const tickRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    let interval: any
-    if (recording) {
-      interval = setInterval(() => setDurationSec((s) => s + 1), 1000)
-    } else {
-      clearInterval(interval)
+  // request mic permission (Android 12/13 emulator can be picky)
+  const askPermission = async () => {
+    if (Platform.OS === "android") {
+      // If you’re bare RN without Expo managed perms, request at runtime:
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        )
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) return false
+      } catch {
+        return false
+      }
     }
-    return () => clearInterval(interval)
-  }, [recording])
+    const perm = await Audio.requestPermissionsAsync()
+    return perm.granted
+  }
 
   const start = async () => {
-    const perm = await Audio.requestPermissionsAsync()
-    if (perm.status !== "granted") throw new Error("Audio permission denied")
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
-    const rec = new Audio.Recording()
-    await rec.prepareToRecordAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
-    )
-    await rec.startAsync()
-    recordingRef.current = rec
+    // clean previous recording
+    if (recRef.current) {
+      try {
+        await recRef.current.stopAndUnloadAsync()
+      } catch {}
+      recRef.current = null
+    }
+    setUri(null)
     setDurationSec(0)
-    setRecording(true)
+
+    const ok = await askPermission()
+    if (!ok) return
+
+    // set audio mode
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+    })
+
+    const recording = new Audio.Recording()
+    try {
+      await recording.prepareToRecordAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY, // AAC/M4A on both platforms
+      )
+      await recording.startAsync()
+      recRef.current = recording
+      setState("recording")
+
+      // poll duration
+      tickRef.current = setInterval(async () => {
+        const status = await recording.getStatusAsync()
+        if (!status.isRecording) return
+        const secs = Math.floor((status.durationMillis ?? 0) / 1000)
+        setDurationSec(secs)
+        if (secs >= maxSeconds) {
+          await stop()
+        }
+      }, 250)
+    } catch (e) {
+      // common emulator failure: no mic route; fail gracefully
+      setState("idle")
+      try {
+        await recording.stopAndUnloadAsync()
+      } catch {}
+      recRef.current = null
+    }
   }
 
   const stop = async () => {
-    const rec = recordingRef.current
-    if (!rec) return null
-    await rec.stopAndUnloadAsync()
-    const u = rec.getURI()
-    setUri(u ?? null)
-    setRecording(false)
-    return u
+    if (!recRef.current) return
+    try {
+      if (tickRef.current) {
+        clearInterval(tickRef.current)
+        tickRef.current = null
+      }
+      await recRef.current.stopAndUnloadAsync()
+      const out = recRef.current.getURI()
+      setUri(out ?? null)
+      setState("stopped")
+    } catch {
+      // ignore
+    }
   }
 
   const reset = () => {
-    recordingRef.current = null
+    if (tickRef.current) {
+      clearInterval(tickRef.current)
+      tickRef.current = null
+    }
     setUri(null)
     setDurationSec(0)
-    setRecording(false)
+    setState("idle")
+    try {
+      recRef.current?.stopAndUnloadAsync()
+    } catch {}
+    recRef.current = null
   }
 
-  useEffect(() => {
-    if (recording && durationSec >= maxSeconds) stop()
-  }, [recording, durationSec, maxSeconds])
+  useEffect(
+    () => () => {
+      if (tickRef.current) clearInterval(tickRef.current as any)
+      try {
+        recRef.current?.stopAndUnloadAsync()
+      } catch {}
+    },
+    [],
+  )
 
-  return { start, stop, reset, uri, recording, durationSec }
+  return { uri, start, stop, recording: state === "recording", durationSec, reset }
 }
 ===== END FILE: app/hooks/useAudioRecorder.ts =====
+
+
+===== BEGIN FILE: app/api/audio.ts =====
+// app/api/audio.ts
+// Unified audio API helpers that plug into the existing Apisauce client and token/refresh stack.
+// This module supports BOTH server-buffered chunk uploads and (optional) presigned S3 multipart.
+
+import type { ApisauceInstance } from "apisauce"
+import { api as DefaultApi } from "@/api/client"
+
+export type InitUploadReq = { filename: string; mimeType: string; size: number; requestId?: string }
+export type InitUploadResp = { uploadId: string }
+export type CompleteUploadReq = {
+  uploadId: string
+  totalChunks: number
+  durationMs?: number
+  sampleRate?: number
+}
+
+const getApi = (maybe?: ApisauceInstance) => (maybe ? maybe : (DefaultApi as ApisauceInstance))
+
+// ---------- Phase 1: server-buffered chunk upload ----------
+export const initUpload = (payload: InitUploadReq, a?: ApisauceInstance) =>
+  getApi(a).post<InitUploadResp>("/media/audio/init", payload)
+
+export const uploadChunk = (
+  uploadId: string,
+  chunkIndex: number,
+  bytes: Uint8Array,
+  a?: ApisauceInstance,
+) =>
+  getApi(a).put(`/media/audio/${uploadId}/chunk?index=${chunkIndex}` as any, bytes, {
+    headers: { "Content-Type": "application/octet-stream" },
+  })
+
+export const completeUpload = (payload: CompleteUploadReq, a?: ApisauceInstance) =>
+  getApi(a).post("/media/audio/complete", payload)
+
+export const listMyRecordings = (a?: ApisauceInstance) => getApi(a).get("/media/audio/my")
+export const deleteRecording = (id: string, a?: ApisauceInstance) =>
+  getApi(a).delete(`/media/audio/${id}`)
+
+export const streamUrl = (id: string, a?: ApisauceInstance) => {
+  const base = getApi(a)?.getBaseURL?.() || ""
+  // Ensure single slash join
+  const trimmed = base.replace(/\/+$/, "")
+  return `${trimmed}/media/audio/${id}/stream`
+}
+
+// ---------- Phase 2: direct-to-S3 multipart (optional) ----------
+export type MpuCreateResp = { uploadId: string; objectKey: string }
+export type MpuPart = { partNumber: number; url: string }
+export type MpuCompleteReq = {
+  uploadId: string
+  objectKey: string
+  parts: { partNumber: number; eTag: string }[]
+}
+
+export const mpuCreate = (filename: string, mimeType = "audio/m4a", a?: ApisauceInstance) =>
+  getApi(a).post<MpuCreateResp>("/media/audio/mpu/create", { filename, mimeType })
+
+export const mpuSignPart = (
+  uploadId: string,
+  objectKey: string,
+  partNumber: number,
+  a?: ApisauceInstance,
+) => getApi(a).post<MpuPart>("/media/audio/mpu/sign-part", { uploadId, objectKey, partNumber })
+
+export const mpuComplete = (data: MpuCompleteReq, a?: ApisauceInstance) =>
+  getApi(a).post("/media/audio/mpu/complete", data)
+
+export const mpuAbort = (uploadId: string, objectKey: string, a?: ApisauceInstance) =>
+  getApi(a).post("/media/audio/mpu/abort", { uploadId, objectKey })
+
+// ---------- Utility: tiny guard to validate Apisauce responses ----------
+export function ensureOk<T = any>(res: { ok?: boolean; status?: number; data?: T }) {
+  if (!res || res.ok !== true) {
+    const code = (res && res.status) || "NO_STATUS"
+    throw new Error(`Request failed (${code})`)
+  }
+  return res.data as T
+}
+===== END FILE: app/api/audio.ts =====
 
 
 ===== BEGIN FILE: app/api/client.ts =====
@@ -12316,6 +13216,13 @@ export type Page<T> = {
   sort?: any
 }
 
+export type ReportPayload = {
+  taskId?: string
+  targetUserId?: string
+  reason: "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
+  text?: string
+}
+
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
@@ -12380,8 +13287,7 @@ export const OolshikApi = {
     api.post("/reviews", payload),
 
   // Reports
-  report: (payload: { targetUserId?: string; taskId?: string; reason: string; text?: string }) =>
-    api.post("/reports", payload),
+  report: (payload: ReportPayload) => api.post("/reports", payload),
 
   // Device token (push)
   registerDevice: (token: string) => api.post("/users/device", { token }),
@@ -12400,6 +13306,9 @@ export const OolshikApi = {
   refresh: (refreshToken: string) =>
     api.post<{ accessToken: string; refreshToken?: string }>("/auth/refresh", { refreshToken }),
   // ---------- /NEW ----------
+
+  revealPhone: (id: string) => api.post(`/requests/${id}/revealPhone`, {}),
+  // Expect { phoneNumber: string revealCount: number }
 }
 // Optional helper: call this after successful OTP verify to persist tokens
 export function setLoginTokens(accessToken?: string | null, refreshToken?: string | null) {
@@ -12495,6 +13404,12 @@ export const MockOolshikApi = {
       data: { uploadUrl: "mock://skip-upload", fileUrl: "https://mock.local/files/new-audio.m4a" },
     }
   },
+  report: async () => ({ ok: true as const }),
+
+  revealPhone: async (id: string) => ({
+    ok: true as const,
+    data: { phoneNumber: "+910000000000", revealCount: 2 },
+  }),
 
   async createTask(payload: Partial<Task>) {
     await wait(120)
@@ -13351,6 +14266,14 @@ const en = {
     alreadyAssigned: "Already Assigned",
     distanceAway: "{{km}} km away",
     emptyNearby: "No nearby tasks yet — try a larger radius.",
+    nearbyForYouHeader: "Nearby for You",
+    myRequestsHeader: "My Requests",
+    tabForYou: "For You",
+    tabMyRequests: "My Requests",
+    emptyForYou: "No nearby requests right now.",
+    emptyMine: "You haven't created any requests yet.",
+    distanceFilter: "Distance",
+    statusFilter: "Status",
   },
   common: {
     ok: "OK!",
@@ -15201,6 +16124,14 @@ const mr = {
     alreadyAssigned: "आधीच नेमणूक झाले",
     distanceAway: "{{km}} कि.मी. अंतरावर",
     emptyNearby: "सध्या जवळ कोणतीही कामे नाहीत — मोठा परिघ निवडा.",
+    nearbyForYouHeader: "तुमच्यासाठी जवळील",
+    myRequestsHeader: "माझ्या विनंत्या",
+    tabForYou: "तुमच्यासाठी",
+    tabMyRequests: "माझ्या विनंत्या",
+    emptyForYou: "सध्या जवळ कोणतीही विनंत्या नाहीत.",
+    emptyMine: "तुम्ही अजून कोणतीही विनंत्या तयार केलेल्या नाहीत.",
+    distanceFilter: "अंतर",
+    statusFilter: "स्थिती",
   },
 }
 export default mr
@@ -18274,6 +19205,7 @@ dependencies {
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
