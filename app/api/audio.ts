@@ -5,7 +5,7 @@
 import type { ApisauceInstance } from "apisauce"
 import { api as DefaultApi } from "@/api/client"
 
-export type InitUploadReq = { filename: string; mimeType: string; size: number; requestId?: string }
+export type InitUploadReq = { filename: string; mimeType: string; size: number; requestId: string }
 export type InitUploadResp = { uploadId: string }
 export type CompleteUploadReq = {
   uploadId: string

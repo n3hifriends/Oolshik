@@ -117,41 +117,37 @@ export default function CreateTaskScreen({ navigation }: any) {
     setSubmitting(true)
     try {
       // Decide if we will actually upload a recorded file
-      const wantRealUpload = false && !!uri && audioAccepted
+      // const wantRealUpload = false && !!uri && audioAccepted
 
       const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
       let finalVoiceUrl = fallbackVoice
 
-      if (!wantRealUpload) {
-        // inside handlePost:
-        let voiceUrl: string | undefined
+      // if (!wantRealUpload) {
+      // inside handlePost:
+      let voiceUrl: string | undefined
 
-        if (uri && audioAccepted) {
-          const res = await uploadAudioSmart({
-            uri,
-            filename: `voice_${Date.now()}.m4a`,
-            mimeType: "audio/m4a",
-            durationMs: durationSec * 1000,
-          })
-          if (!res.ok) {
-            Alert.alert("Upload failed", "Please try again.")
-            setSubmitting(false)
-            return
-          }
-          voiceUrl = res.url
+      if (uri && audioAccepted) {
+        const res = await uploadAudioSmart({
+          uri,
+          filename: `voice_${Date.now()}.m4a`,
+          mimeType: "audio/m4a",
+          durationMs: durationSec * 1000,
+        })
+        if (!res.ok) {
+          Alert.alert("Upload failed", "Please try again.")
+          setSubmitting(false)
+          return
         }
-        finalVoiceUrl = "" + voiceUrl
+        voiceUrl = res.url
       }
+      finalVoiceUrl = "" + voiceUrl
+      // }
 
       // 3) create (mock returns ok with fake task; real hits backend)
       const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
-        voiceUrl: wantRealUpload
-          ? finalVoiceUrl
-          : FLAGS.USE_MOCK_UPLOAD_CREATE
-            ? finalVoiceUrl
-            : undefined,
+        voiceUrl: finalVoiceUrl,
         latitude: coords.latitude,
         longitude: coords.longitude,
         radiusMeters: radiusKm * 1000,
