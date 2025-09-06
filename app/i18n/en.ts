@@ -44,6 +44,13 @@ const en = {
     emptyMine: "You haven't created any requests yet.",
     distanceFilter: "Distance",
     statusFilter: "Status",
+    yourExperience: "Your Experience",
+    leftRightExperience: "(Left: Bad • Right: Great)",
+    ratingBad: "Bad",
+    ratingPoor: "Poor",
+    ratingOkay: "Okay",
+    ratingGood: "Good",
+    ratingGreat: "Great",
   },
   common: {
     ok: "OK!",
