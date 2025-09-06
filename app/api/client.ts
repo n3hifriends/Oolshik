@@ -271,6 +271,8 @@ export type ServerTask = {
   updatedAt?: string
   requesterName?: string
   requesterPhoneNumber?: string
+  ratingValue?: number | null
+  helperAvgRating?: number | null
 }
 
 export type Page<T> = {
@@ -314,6 +316,9 @@ const toClientTask = (t: ServerTask): Task => ({ ...t })
 export const OolshikApi = {
   // Create Request
   createTask: (payload: CreateTaskPayload) => api.post("/requests", payload),
+
+  // Nearby
+  findTaskByTaskId: (taskId: string) => api.get(`/requests/${taskId}`),
 
   // Nearby
   async nearbyTasks(

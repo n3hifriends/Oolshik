@@ -269,6 +269,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       }}
       createdByName={t.createdByName ?? t.requesterName}
       createdAt={t.createdAt}
+      helperAvgRating={t.helperAvgRating}
     />
   )
 

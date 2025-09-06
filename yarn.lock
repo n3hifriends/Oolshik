@@ -2580,6 +2580,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-community/slider@npm:^5.0.1":
+  version: 5.0.1
+  resolution: "@react-native-community/slider@npm:5.0.1"
+  checksum: 10c0/b2e712bf97057704ebbd00506de3b6df69b41da111234dfda94926641dd27fdd2186b31b3ba6d8b63e9804411eba7a70b74e293a4eefd3d433561bc61b5b5c3b
+  languageName: node
+  linkType: hard
+
 "@react-native/assets-registry@npm:0.79.4":
   version: 0.79.4
   resolution: "@react-native/assets-registry@npm:0.79.4"
@@ -9309,6 +9316,7 @@ __metadata:
     "@babel/runtime": "npm:^7.20.0"
     "@expo-google-fonts/space-grotesk": "npm:^0.4.0"
     "@expo/metro-runtime": "npm:~5.0.4"
+    "@react-native-community/slider": "npm:^5.0.1"
     "@react-navigation/bottom-tabs": "npm:^7.2.0"
     "@react-navigation/native": "npm:^7.0.14"
     "@react-navigation/native-stack": "npm:^7.2.0"

@@ -14,6 +14,8 @@ type Task = {
   createdByName?: string
   createdAt?: string // ISO
   createdByPhoneNumber?: string
+  ratingValue?: number | null
+  helperAvgRating?: number | null
 }
 
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"

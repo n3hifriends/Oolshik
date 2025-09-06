@@ -5,6 +5,7 @@ import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
 import { Audio } from "expo-av"
+import { RatingBadge } from "./RatingBadge"
 
 type Props = {
   id: string
@@ -16,6 +17,7 @@ type Props = {
   onPress?: () => void
   createdByName?: string
   createdAt?: string
+  helperAvgRating?: number | null
 }
 
 function getInitials(name?: string) {
@@ -56,6 +58,7 @@ export function TaskCard({
   onPress,
   createdByName,
   createdAt,
+  helperAvgRating = 2.5,
 }: Props) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
@@ -221,6 +224,7 @@ export function TaskCard({
         >
           <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
         </View>
+        <RatingBadge value={helperAvgRating} />
       </View>
     </View>
   )
