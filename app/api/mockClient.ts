@@ -58,11 +58,11 @@ export const MockOolshikApi = {
 
     const withDistances = dummyTasks.map((t) => ({
       ...t,
-      distanceKm: kmBetween(lat, lon, t.latitude, t.longitude),
+      distanceMtr: kmBetween(lat, lon, t.latitude, t.longitude),
     }))
     const filtered = withDistances
-      .filter((t) => (t.distanceKm ?? Infinity) <= radiusMeters)
-      .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+      .filter((t) => (t.distanceMtr ?? Infinity) <= radiusMeters)
+      .sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
 
     return { ok: true as const, data: filtered }
   },

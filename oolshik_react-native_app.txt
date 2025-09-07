@@ -2,7 +2,7 @@
 # Root: /Users/nitinkalokhe/Ni3/Oolshik
 # Included: ['.bash', '.bat', '.c', '.cfg', '.cjs', '.conf', '.cpp', '.css', '.dart', '.editorconfig', '.env', '.gitattributes', '.gitignore', '.go', '.gradle', '.groovy', '.h', '.hpp', '.htm', '.html', '.ini', '.java', '.js', '.json', '.jsonc', '.jsx', '.kt', '.kts', '.less', '.lua', '.m', '.md', '.mdx', '.mjs', '.mm', '.php', '.properties', '.proto', '.ps1', '.py', '.rb', '.rs', '.scss', '.sh', '.sql', '.swift', '.ts', '.tsx', '.txt', '.xml', '.yaml', '.yml', '.zsh']
 # Excluded dirs: ['.expo', '.git', '.gradle', '.idea', '.next', '.venv', '.vscode', 'Pods', 'android/build', 'build', 'coverage', 'dist', 'ios/build', 'node_modules', 'venv']
-# Git ignored entries skipped: 59231 (if repo)
+# Git ignored entries skipped: 59406 (if repo)
 # ---
 
 
@@ -615,6 +615,7 @@ web-build/
   "dependencies": {
     "@expo-google-fonts/space-grotesk": "^0.4.0",
     "@expo/metro-runtime": "~5.0.4",
+    "@react-native-community/slider": "^5.0.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/native-stack": "^7.2.0",
@@ -1003,7 +1004,7 @@ export type MockTask = {
   id: string
   voiceUrl?: string | null
   description?: string
-  distanceKm?: number
+  distanceMtr?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED"
   createdById: string
   createdByName: string
@@ -1014,7 +1015,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1001",
     description: "Switch on motor",
-    distanceKm: 0.3,
+    distanceMtr: 0.3,
     status: "PENDING",
     voiceUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     createdById: "U-01",
@@ -1024,7 +1025,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1002",
     description: "Bring 1L milk",
-    distanceKm: 0.9,
+    distanceMtr: 0.9,
     status: "PENDING",
     voiceUrl: null,
     createdById: "U-01",
@@ -1034,7 +1035,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1003",
     description: "Parcel pickup at main gate",
-    distanceKm: 1.6,
+    distanceMtr: 1.6,
     status: "PENDING",
     voiceUrl: null,
     createdById: "U-01",
@@ -1044,7 +1045,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1004",
     description: "Need help lifting a box",
-    distanceKm: 2.4,
+    distanceMtr: 2.4,
     status: "PENDING",
     voiceUrl: null,
     createdById: "U-01",
@@ -2502,8 +2503,8 @@ export default function MyTasksScreen() {
 
 
 ===== BEGIN FILE: app/screens/TaskDetailScreen.tsx =====
-import React from "react"
-import { View, ActivityIndicator, Pressable, Linking } from "react-native"
+import React, { useState, useCallback } from "react"
+import { View, ActivityIndicator, Pressable, Linking, Alert } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -2514,7 +2515,9 @@ import { OolshikApi } from "@/api"
 import { Audio } from "expo-av"
 import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
-import { $styles } from "@/theme/styles"
+import { SmileySlider } from "@/components/SmileySlider"
+import { RatingBadge } from "@/components/RatingBadge"
+import { Task } from "@/api/client"
 
 type RouteParams = { id: string }
 
@@ -2611,6 +2614,9 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const current = task || taskFromStore || null
 
+  const [rating, setRating] = useState<number>(2.5) // center default (neutral)
+  const [submitting, setSubmitting] = useState(false)
+
   React.useEffect(() => {
     if (current?.createdByPhoneNumber) {
       setFullPhone(String(current.createdByPhoneNumber))
@@ -2645,21 +2651,9 @@ export default function TaskDetailScreen({ navigation }: any) {
       if (taskFromStore) return
       setLoading(true)
       try {
-        // mock mode: nearbyTasks() returns in-memory dummyTasks (no args needed)
-        // real mode: pass actual coords/radius
-        const res = FLAGS.USE_MOCK_NEARBY
-          ? await OolshikApi.nearbyTasks(23, 322, 32)
-          : await OolshikApi.nearbyTasks(
-              coords?.latitude ?? 0,
-              coords?.longitude ?? 0,
-              radiusMeters ?? 3,
-            )
-
-        const list = res?.ok ? (res.data ?? []) : []
-        console.log("🚀 ~ load ~ res:", res)
-        const found = list.find?.((t: any) => String(t.id) === String(taskId)) ?? null
-
-        if (!cancelled) setTask(found)
+        const res = await OolshikApi.findTaskByTaskId(taskId)
+        const fetchedTask = res?.ok ? (res.data as Task | null) : null
+        if (!cancelled) setTask(fetchedTask)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -2753,6 +2747,7 @@ export default function TaskDetailScreen({ navigation }: any) {
     }
   }
 
+  const showRatings = normalizedStatus === "COMPLETED" ? true : false
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
@@ -2864,13 +2859,12 @@ export default function TaskDetailScreen({ navigation }: any) {
             <View
               style={{
                 flexDirection: "row",
-                alignItems: "center",
                 justifyContent: "space-between",
               }}
             >
-              {typeof current.distanceKm === "number" ? (
+              {typeof current.distanceMtr === "number" ? (
                 <Text
-                  text={`${current.distanceKm.toFixed(1)} km away`}
+                  text={`${current.distanceMtr.toFixed(1)} km away`}
                   size="xs"
                   style={{ color: neutral700 }}
                 />
@@ -2888,10 +2882,12 @@ export default function TaskDetailScreen({ navigation }: any) {
               >
                 <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
               </View>
+              {showRatings && <RatingBadge value={current.ratingValue} />}
             </View>
           </View>
         )}
       </View>
+      <View style={{ height: 12 }} />
 
       {/* Bottom actions / success banner */}
       {current && (
@@ -2899,11 +2895,8 @@ export default function TaskDetailScreen({ navigation }: any) {
           {normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
             <View
               style={{
-                position: "absolute",
-                left: 16,
-                right: 16,
-                bottom: 16,
                 flexDirection: "row",
+                marginHorizontal: 16,
                 gap: spacing.sm,
               }}
             >
@@ -2914,11 +2907,30 @@ export default function TaskDetailScreen({ navigation }: any) {
                   style={{ flex: 2, paddingVertical: spacing.xs }}
                 />
               ) : (
-                <Button
-                  text="Mark as Complete"
-                  onPress={onComplete}
-                  style={{ flex: 2, paddingVertical: spacing.xs }}
-                />
+                <View
+                  style={{
+                    gap: spacing.md,
+                    paddingHorizontal: spacing.sm,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.palette.neutral300,
+                    backgroundColor: colors.palette.neutral100,
+                    flex: 1,
+                    paddingBottom: 32,
+                  }}
+                >
+                  <Text tx="oolshik:yourExperience" preset="subheading" />
+                  <SmileySlider disabled={false} value={rating} onChange={setRating} />
+                  <Text style={{ textAlign: "center", marginTop: 6, opacity: 0.6 }}>
+                    {rating.toFixed(1)} / 5.0
+                  </Text>
+
+                  <Button
+                    text="Mark as Complete"
+                    onPress={onComplete}
+                    style={{ flex: 2, paddingVertical: spacing.xs }}
+                  />
+                </View>
               )}
             </View>
           ) : null}
@@ -2935,11 +2947,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               }}
             >
               <Text text="Task completed ✓" weight="bold" style={{ color: success }} />
-              <Text
-                style={{ marginBottom: 5 }}
-                text="Thanks for helping! Returning to list..."
-                size="xs"
-              />
+              <Text style={{ marginBottom: 5 }} text="Thanks for helping!" size="xs" />
               <Button
                 text="Ok"
                 onPress={() => navigation.goBack()}
@@ -3289,7 +3297,8 @@ export default function HomeFeedScreen({ navigation }: any) {
   const { logout, user } = useAuth() as any
 
   // Who am I? Try common shapes; keep it simple & resilient
-  const myId: string | undefined = user?.id ?? user?.userId ?? user?.uid ?? user?.sub
+  // const myId: string | undefined = user?.id ?? user?.userId ?? user?.uid ?? user?.sub
+  const myId: string | undefined = user?.id
 
   // Status filter (default = OPEN + ASSIGNED)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -3322,7 +3331,8 @@ export default function HomeFeedScreen({ navigation }: any) {
   const isMine = useCallback(
     (t: any) => {
       if (!myId) return false
-      const owner = t?.requesterId ?? t?.createdById ?? t?.ownerId
+      // const owner = t?.requesterId ?? t?.createdById ?? t?.ownerId
+      const owner = t?.requesterId
       return owner ? String(owner) === String(myId) : false
     },
     [myId],
@@ -3330,6 +3340,7 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   const data = useMemo(() => {
     const list = Array.isArray(tasks) ? tasks : []
+    console.log("🚀 ~ HomeFeedScreen ~ tasks:", tasks)
 
     // de-dupe by id
     const unique = Array.from(new Map(list.map((t: any) => [t.id, t])).values())
@@ -3348,7 +3359,7 @@ export default function HomeFeedScreen({ navigation }: any) {
 
     // Sort: nearest first, then newest
     return filtered.sort((a: any, b: any) => {
-      const d = (a.distanceKm ?? 0) - (b.distanceKm ?? 0)
+      const d = (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0)
       if (d !== 0) return d
       const at = new Date(a.createdAt ?? 0).getTime()
       const bt = new Date(b.createdAt ?? 0).getTime()
@@ -3485,7 +3496,7 @@ export default function HomeFeedScreen({ navigation }: any) {
     <TaskCard
       id={t.id}
       title={t.title}
-      kmAway={t.distanceKm}
+      kmAway={t.distanceMtr}
       status={t.status}
       voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
       onAccept={
@@ -3502,6 +3513,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       }}
       createdByName={t.createdByName ?? t.requesterName}
       createdAt={t.createdAt}
+      helperAvgRating={t.helperAvgRating}
     />
   )
 
@@ -5084,41 +5096,37 @@ export default function CreateTaskScreen({ navigation }: any) {
     setSubmitting(true)
     try {
       // Decide if we will actually upload a recorded file
-      const wantRealUpload = false && !!uri && audioAccepted
+      // const wantRealUpload = false && !!uri && audioAccepted
 
       const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
       let finalVoiceUrl = fallbackVoice
 
-      if (!wantRealUpload) {
-        // inside handlePost:
-        let voiceUrl: string | undefined
+      // if (!wantRealUpload) {
+      // inside handlePost:
+      let voiceUrl: string | undefined
 
-        if (uri && audioAccepted) {
-          const res = await uploadAudioSmart({
-            uri,
-            filename: `voice_${Date.now()}.m4a`,
-            mimeType: "audio/m4a",
-            durationMs: durationSec * 1000,
-          })
-          if (!res.ok) {
-            Alert.alert("Upload failed", "Please try again.")
-            setSubmitting(false)
-            return
-          }
-          voiceUrl = res.url
+      if (uri && audioAccepted) {
+        const res = await uploadAudioSmart({
+          uri,
+          filename: `voice_${Date.now()}.m4a`,
+          mimeType: "audio/m4a",
+          durationMs: durationSec * 1000,
+        })
+        if (!res.ok) {
+          Alert.alert("Upload failed", "Please try again.")
+          setSubmitting(false)
+          return
         }
-        finalVoiceUrl = "" + voiceUrl
+        voiceUrl = res.url
       }
+      finalVoiceUrl = "" + voiceUrl
+      // }
 
       // 3) create (mock returns ok with fake task; real hits backend)
       const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
-        voiceUrl: wantRealUpload
-          ? finalVoiceUrl
-          : FLAGS.USE_MOCK_UPLOAD_CREATE
-            ? finalVoiceUrl
-            : undefined,
+        voiceUrl: finalVoiceUrl,
         latitude: coords.latitude,
         longitude: coords.longitude,
         radiusMeters: radiusKm * 1000,
@@ -8107,6 +8115,7 @@ import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
 import { Audio } from "expo-av"
+import { RatingBadge } from "./RatingBadge"
 
 type Props = {
   id: string
@@ -8118,6 +8127,7 @@ type Props = {
   onPress?: () => void
   createdByName?: string
   createdAt?: string
+  helperAvgRating?: number | null
 }
 
 function getInitials(name?: string) {
@@ -8158,9 +8168,8 @@ export function TaskCard({
   onPress,
   createdByName,
   createdAt,
+  helperAvgRating = 2.5,
 }: Props) {
-  console.log("🚀 ~ TaskCard ~ title:", title)
-  console.log("🚀 ~ TaskCard ~ theme:", voiceUrl)
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
@@ -8325,6 +8334,7 @@ export function TaskCard({
         >
           <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
         </View>
+        <RatingBadge value={helperAvgRating} />
       </View>
     </View>
   )
@@ -8995,6 +9005,32 @@ const $imageStyleBase: ImageStyle = {
   resizeMode: "contain",
 }
 ===== END FILE: app/components/Icon.tsx =====
+
+
+===== BEGIN FILE: app/components/RatingBadge.tsx =====
+import React from "react"
+import { View, StyleSheet } from "react-native"
+import { Text } from "@/components/Text"
+
+export function RatingBadge({ value }: { value?: number | null }) {
+  if (value == null) return null
+  return (
+    <View style={styles.badge}>
+      <Text style={styles.text}>{value.toFixed(1)} ⭐️</Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  badge: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 15,
+  },
+  text: { color: "#fff", fontWeight: "600", fontSize: 12 },
+})
+===== END FILE: app/components/RatingBadge.tsx =====
 
 
 ===== BEGIN FILE: app/components/TextField.tsx =====
@@ -10879,6 +10915,76 @@ const $content: ThemedStyle<TextStyle> = ({ spacing }) => ({
 ===== END FILE: app/components/EmptyState.tsx =====
 
 
+===== BEGIN FILE: app/components/SmileySlider.tsx =====
+import React, { useMemo } from "react"
+import { View, StyleSheet } from "react-native"
+import Slider from "@react-native-community/slider"
+import { Text } from "@/components/Text"
+
+// Map value (0..5) → emoji + label
+function getFace(v: number) {
+  if (v < 1) return { emoji: "😡", label: "oolshik:ratingBad" }
+  if (v < 2) return { emoji: "🙁", label: "oolshik:ratingPoor" }
+  if (v < 3) return { emoji: "😐", label: "oolshik:ratingOkay" }
+  if (v < 4) return { emoji: "🙂", label: "oolshik:ratingGood" }
+  return { emoji: "😄", label: "oolshik:ratingGreat" }
+}
+const SLIDER_COLOR = "#FF6B2C"
+
+export type SmileySliderProps = {
+  disabled?: boolean
+  value: number
+  onChange: (v: number) => void
+  onSlidingComplete?: (v: number) => void
+}
+
+export function SmileySlider({ disabled, value, onChange, onSlidingComplete }: SmileySliderProps) {
+  const face = useMemo(() => getFace(value), [value])
+
+  return (
+    <View style={styles.wrapper}>
+      <View style={styles.faceRow}>
+        <Text style={styles.faceEmoji}>{face.emoji}</Text>
+        <Text tx={face.label} style={styles.faceLabel} />
+      </View>
+
+      <View style={styles.sliderRow}>
+        <Text style={styles.edgeEmoji}>😡</Text>
+        <View style={{ flex: 1 }}>
+          <Slider
+            disabled={disabled}
+            value={value}
+            onValueChange={onChange}
+            onSlidingComplete={onSlidingComplete}
+            minimumValue={0}
+            maximumValue={5}
+            step={1}
+            minimumTrackTintColor={SLIDER_COLOR} // green-ish
+            maximumTrackTintColor="#d1d5db" // gray-300
+            thumbTintColor={SLIDER_COLOR} // emerald-500
+            accessibilityLabel="Rate your experience"
+          />
+        </View>
+        <Text style={styles.edgeEmoji}>😄</Text>
+      </View>
+
+      <Text tx="oolshik:leftRightExperience" style={styles.helperText} />
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  wrapper: { gap: 8 },
+  faceRow: { alignItems: "center", justifyContent: "center" },
+  faceEmoji: { fontSize: 40, lineHeight: 44 },
+  faceLabel: { marginTop: 4, fontSize: 14, opacity: 0.7 },
+  sliderRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  edgeEmoji: { width: 24, textAlign: "center" },
+  helperText: { marginTop: 4, fontSize: 12, opacity: 0.6, textAlign: "center" },
+})
+===== END FILE: app/components/SmileySlider.tsx =====
+
+
 ===== BEGIN FILE: app/components/Toggle/Radio.tsx =====
 import { useEffect, useRef } from "react"
 import { StyleProp, View, ViewStyle, Animated } from "react-native"
@@ -11829,10 +11935,11 @@ const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
 
 type Opts = {
   uri: string // file://...
-  filename?: string // defaults to recording_<ts>.m4a
-  mimeType?: string // defaults to audio/m4a
-  durationMs?: number
+  filename: string // defaults to recording_<ts>.m4a
+  mimeType: string // defaults to audio/m4a
+  durationMs: number
   sampleRate?: number
+  requestId?: string // optional client-provided upload ID (for deduping)
 }
 
 /**
@@ -12851,7 +12958,7 @@ export function useAudioRecorder(maxSeconds = 30) {
 import type { ApisauceInstance } from "apisauce"
 import { api as DefaultApi } from "@/api/client"
 
-export type InitUploadReq = { filename: string; mimeType: string; size: number; requestId?: string }
+export type InitUploadReq = { filename: string; mimeType: string; size: number; requestId: string }
 export type InitUploadResp = { uploadId: string }
 export type CompleteUploadReq = {
   uploadId: string
@@ -13200,6 +13307,8 @@ export type ServerTask = {
   updatedAt?: string
   requesterName?: string
   requesterPhoneNumber?: string
+  ratingValue?: number | null
+  helperAvgRating?: number | null
 }
 
 export type Page<T> = {
@@ -13243,6 +13352,9 @@ const toClientTask = (t: ServerTask): Task => ({ ...t })
 export const OolshikApi = {
   // Create Request
   createTask: (payload: CreateTaskPayload) => api.post("/requests", payload),
+
+  // Nearby
+  findTaskByTaskId: (taskId: string) => api.get(`/requests/${taskId}`),
 
   // Nearby
   async nearbyTasks(
@@ -13388,11 +13500,11 @@ export const MockOolshikApi = {
 
     const withDistances = dummyTasks.map((t) => ({
       ...t,
-      distanceKm: kmBetween(lat, lon, t.latitude, t.longitude),
+      distanceMtr: kmBetween(lat, lon, t.latitude, t.longitude),
     }))
     const filtered = withDistances
-      .filter((t) => (t.distanceKm ?? Infinity) <= radiusMeters)
-      .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+      .filter((t) => (t.distanceMtr ?? Infinity) <= radiusMeters)
+      .sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
 
     return { ok: true as const, data: filtered }
   },
@@ -13489,7 +13601,8 @@ import { FLAGS } from "@/config/flags"
 import { OolshikApi as RealOolshikApi } from "./client"
 import { MockOolshikApi } from "./mockClient"
 
-export const OolshikApi = FLAGS.USE_MOCK_UPLOAD_CREATE ? MockOolshikApi : RealOolshikApi
+// export const OolshikApi = FLAGS.USE_MOCK_UPLOAD_CREATE ? MockOolshikApi : RealOolshikApi
+export const OolshikApi = RealOolshikApi
 ===== END FILE: app/api/index.ts =====
 
 
@@ -14274,6 +14387,13 @@ const en = {
     emptyMine: "You haven't created any requests yet.",
     distanceFilter: "Distance",
     statusFilter: "Status",
+    yourExperience: "Your Experience",
+    leftRightExperience: "(Left: Bad • Right: Great)",
+    ratingBad: "Bad",
+    ratingPoor: "Poor",
+    ratingOkay: "Okay",
+    ratingGood: "Good",
+    ratingGreat: "Great",
   },
   common: {
     ok: "OK!",
@@ -16132,6 +16252,13 @@ const mr = {
     emptyMine: "तुम्ही अजून कोणतीही विनंत्या तयार केलेल्या नाहीत.",
     distanceFilter: "अंतर",
     statusFilter: "स्थिती",
+    yourExperience: "तुमचा अनुभव",
+    leftRightExperience: "(डावीकडे वाईट • उजवीकडे उत्तम)",
+    ratingBad: "वाईट",
+    ratingPoor: "ठीक नाही",
+    ratingOkay: "सरासरी",
+    ratingGood: "चांगले",
+    ratingGreat: "उत्तम",
   },
 }
 export default mr
@@ -18266,12 +18393,14 @@ type Task = {
   voiceUrl?: string | null
   title?: string
   description?: string
-  distanceKm?: number
+  distanceMtr?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
   createdByPhoneNumber?: string
+  ratingValue?: number | null
+  helperAvgRating?: number | null
 }
 
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"
@@ -18308,8 +18437,8 @@ export const useTaskStore = create<State>((set, get) => ({
           (statuses?.length ? statuses : ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
         )
         const filtered = MOCK_NEARBY_TASKS.filter(
-          (t) => (t.distanceKm ?? 0) <= r && allowed.has(t.status),
-        ).sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+          (t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status),
+        ).sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
         set({ tasks: filtered })
       } else {
         const r = get().radiusMeters

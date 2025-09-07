@@ -2,7 +2,7 @@ export type MockTask = {
   id: string
   voiceUrl?: string | null
   description?: string
-  distanceKm?: number
+  distanceMtr?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED"
   createdById: string
   createdByName: string
@@ -13,7 +13,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1001",
     description: "Switch on motor",
-    distanceKm: 0.3,
+    distanceMtr: 0.3,
     status: "PENDING",
     voiceUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     createdById: "U-01",
@@ -23,7 +23,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1002",
     description: "Bring 1L milk",
-    distanceKm: 0.9,
+    distanceMtr: 0.9,
     status: "PENDING",
     voiceUrl: null,
     createdById: "U-01",
@@ -33,7 +33,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1003",
     description: "Parcel pickup at main gate",
-    distanceKm: 1.6,
+    distanceMtr: 1.6,
     status: "PENDING",
     voiceUrl: null,
     createdById: "U-01",
@@ -43,7 +43,7 @@ export const MOCK_NEARBY_TASKS: MockTask[] = [
   {
     id: "T-1004",
     description: "Need help lifting a box",
-    distanceKm: 2.4,
+    distanceMtr: 2.4,
     status: "PENDING",
     voiceUrl: null,
     createdById: "U-01",

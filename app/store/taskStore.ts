@@ -8,7 +8,7 @@ type Task = {
   voiceUrl?: string | null
   title?: string
   description?: string
-  distanceKm?: number
+  distanceMtr?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   createdById?: string
   createdByName?: string
@@ -52,8 +52,8 @@ export const useTaskStore = create<State>((set, get) => ({
           (statuses?.length ? statuses : ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
         )
         const filtered = MOCK_NEARBY_TASKS.filter(
-          (t) => (t.distanceKm ?? 0) <= r && allowed.has(t.status),
-        ).sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+          (t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status),
+        ).sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
         set({ tasks: filtered })
       } else {
         const r = get().radiusMeters
