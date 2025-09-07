@@ -50,11 +50,11 @@ type ViewMode = "forYou" | "mine"
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
-  const { logout, user } = useAuth() as any
+  const { logout, userId } = useAuth()
 
   // Who am I? Try common shapes; keep it simple & resilient
   // const myId: string | undefined = user?.id ?? user?.userId ?? user?.uid ?? user?.sub
-  const myId: string | undefined = user?.id
+  const myId: string | undefined = userId
 
   // Status filter (default = OPEN + ASSIGNED)
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -96,8 +96,6 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   const data = useMemo(() => {
     const list = Array.isArray(tasks) ? tasks : []
-    console.log("🚀 ~ HomeFeedScreen ~ tasks:", tasks)
-
     // de-dupe by id
     const unique = Array.from(new Map(list.map((t: any) => [t.id, t])).values())
 
@@ -115,7 +113,8 @@ export default function HomeFeedScreen({ navigation }: any) {
 
     // Sort: nearest first, then newest
     return filtered.sort((a: any, b: any) => {
-      const d = (a.distanceKm ?? 0) - (b.distanceKm ?? 0)
+      console.log("🚀 ~ HomeFeedScreen ~ distanceMtr:", a.distanceMtr)
+      const d = (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0)
       if (d !== 0) return d
       const at = new Date(a.createdAt ?? 0).getTime()
       const bt = new Date(b.createdAt ?? 0).getTime()
@@ -252,7 +251,7 @@ export default function HomeFeedScreen({ navigation }: any) {
     <TaskCard
       id={t.id}
       title={t.title}
-      kmAway={t.distanceKm}
+      distanceMtr={t.distanceMtr}
       status={t.status}
       voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
       onAccept={

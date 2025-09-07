@@ -243,6 +243,10 @@ export default function TaskDetailScreen({ navigation }: any) {
   }
 
   const showRatings = normalizedStatus === "COMPLETED" ? true : false
+  const distance =
+    (current?.distanceMtr ?? 0) < 1000
+      ? `${(current?.distanceMtr ?? 0).toFixed(0)}m`
+      : `${((current?.distanceMtr ?? 0) / 1000).toFixed(1)}km`
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
@@ -357,12 +361,8 @@ export default function TaskDetailScreen({ navigation }: any) {
                 justifyContent: "space-between",
               }}
             >
-              {typeof current.distanceKm === "number" ? (
-                <Text
-                  text={`${current.distanceKm.toFixed(1)} km away`}
-                  size="xs"
-                  style={{ color: neutral700 }}
-                />
+              {typeof current.distanceMtr === "number" ? (
+                <Text text={`${distance} away`} size="xs" style={{ color: neutral700 }} />
               ) : (
                 <View />
               )}

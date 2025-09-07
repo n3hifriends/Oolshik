@@ -10,7 +10,7 @@ import { RatingBadge } from "./RatingBadge"
 type Props = {
   id: string
   title?: string
-  kmAway?: number
+  distanceMtr?: number
   onAccept?: () => void
   status?: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   voiceUrl?: string | null
@@ -51,7 +51,7 @@ function minsAgo(iso?: string) {
 
 export function TaskCard({
   title = "Voice task",
-  kmAway,
+  distanceMtr,
   onAccept,
   status = "PENDING",
   voiceUrl,
@@ -116,6 +116,11 @@ export function TaskCard({
         />
       </View>
     ) : undefined // <-- important
+
+  const distance =
+    (distanceMtr ?? 0) < 1000
+      ? `${(distanceMtr ?? 0).toFixed(0)}m`
+      : `${((distanceMtr ?? 0) / 1000).toFixed(1)}km`
 
   const HeaderRow = (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -210,9 +215,7 @@ export function TaskCard({
           gap: spacing.sm,
         }}
       >
-        {!!kmAway && (
-          <Text text={`${kmAway.toFixed(1)} km away`} size="xs" style={{ color: neutral700 }} />
-        )}
+        {<Text text={distance} size="xs" style={{ color: neutral700 }} />}
 
         <View
           style={{
