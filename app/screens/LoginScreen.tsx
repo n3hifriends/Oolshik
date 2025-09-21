@@ -326,7 +326,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       <View style={themed($card)}>
         <Pressable onPress={() => setShowEmail((v) => !v)} style={themed($cardHeader)}>
           <Text text="Email" weight="bold" />
-          <Text text={showEmail ? "–" : "+"} style={{ marginLeft: "auto" }} />
+          <Text text={showEmail ? "-" : "+"} style={{ marginLeft: "auto", fontWeight: "bold" }} />
         </Pressable>
         {showEmail && (
           <TextField
