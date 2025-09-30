@@ -5,6 +5,7 @@ import { create, ApisauceInstance } from "apisauce"
 import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import Config from "@/config"
+import auth from "@react-native-firebase/auth"
 
 // ---------- Toggleable API logs (default: true) ----------
 export let API_LOGS_ENABLED = true
@@ -255,6 +256,28 @@ export const api: ApisauceInstance = create({
   baseURL: `${BASE_URL}/api`,
   timeout: 10000,
   axiosInstance, // 👈 use our configured axios with interceptors
+})
+api.addAsyncRequestTransform(async (request) => {
+  const user = auth().currentUser
+  if (user) {
+    const idToken = await user.getIdToken() // auto-refresh if near expiry
+    request.headers = request.headers ?? {}
+    request.headers.Authorization = `Bearer ${idToken}`
+  }
+})
+
+// Optional: retry once on 401 with a forced refresh
+api.addAsyncResponseTransform(async (response) => {
+  if (response.status === 401) {
+    const user = auth().currentUser
+    if (user) {
+      try {
+        const fresh = await user.getIdToken(true)
+        setLoginTokens(fresh, undefined) // keep your helper in sync
+        // TODO: implement a retry of the original request if your API wrapper supports it
+      } catch {}
+    }
+  }
 })
 export type ServerTask = {
   id: string
