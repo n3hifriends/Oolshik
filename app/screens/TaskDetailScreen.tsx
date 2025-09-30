@@ -1,5 +1,5 @@
-import React from "react"
-import { View, ActivityIndicator, Pressable, Linking } from "react-native"
+import React, { useState, useCallback } from "react"
+import { View, ActivityIndicator, Pressable, Linking, Alert } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -10,7 +10,9 @@ import { OolshikApi } from "@/api"
 import { Audio } from "expo-av"
 import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
-import { $styles } from "@/theme/styles"
+import { SmileySlider } from "@/components/SmileySlider"
+import { RatingBadge } from "@/components/RatingBadge"
+import { Task } from "@/api/client"
 
 type RouteParams = { id: string }
 
@@ -107,6 +109,9 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const current = task || taskFromStore || null
 
+  const [rating, setRating] = useState<number>(2.5) // center default (neutral)
+  const [submitting, setSubmitting] = useState(false)
+
   React.useEffect(() => {
     if (current?.createdByPhoneNumber) {
       setFullPhone(String(current.createdByPhoneNumber))
@@ -141,21 +146,9 @@ export default function TaskDetailScreen({ navigation }: any) {
       if (taskFromStore) return
       setLoading(true)
       try {
-        // mock mode: nearbyTasks() returns in-memory dummyTasks (no args needed)
-        // real mode: pass actual coords/radius
-        const res = FLAGS.USE_MOCK_NEARBY
-          ? await OolshikApi.nearbyTasks(23, 322, 32)
-          : await OolshikApi.nearbyTasks(
-              coords?.latitude ?? 0,
-              coords?.longitude ?? 0,
-              radiusMeters ?? 3,
-            )
-
-        const list = res?.ok ? (res.data ?? []) : []
-        console.log("🚀 ~ load ~ res:", res)
-        const found = list.find?.((t: any) => String(t.id) === String(taskId)) ?? null
-
-        if (!cancelled) setTask(found)
+        const res = await OolshikApi.findTaskByTaskId(taskId)
+        const fetchedTask = res?.ok ? (res.data as Task | null) : null
+        if (!cancelled) setTask(fetchedTask)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -249,6 +242,11 @@ export default function TaskDetailScreen({ navigation }: any) {
     }
   }
 
+  const showRatings = normalizedStatus === "COMPLETED" ? true : false
+  const distance =
+    (current?.distanceMtr ?? 0) < 1000
+      ? `${(current?.distanceMtr ?? 0).toFixed(0)}m`
+      : `${((current?.distanceMtr ?? 0) / 1000).toFixed(1)}km`
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
@@ -360,16 +358,11 @@ export default function TaskDetailScreen({ navigation }: any) {
             <View
               style={{
                 flexDirection: "row",
-                alignItems: "center",
                 justifyContent: "space-between",
               }}
             >
-              {typeof current.distanceKm === "number" ? (
-                <Text
-                  text={`${current.distanceKm.toFixed(1)} km away`}
-                  size="xs"
-                  style={{ color: neutral700 }}
-                />
+              {typeof current.distanceMtr === "number" ? (
+                <Text text={`${distance} away`} size="xs" style={{ color: neutral700 }} />
               ) : (
                 <View />
               )}
@@ -384,10 +377,12 @@ export default function TaskDetailScreen({ navigation }: any) {
               >
                 <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
               </View>
+              {showRatings && <RatingBadge value={current.ratingValue} />}
             </View>
           </View>
         )}
       </View>
+      <View style={{ height: 12 }} />
 
       {/* Bottom actions / success banner */}
       {current && (
@@ -395,11 +390,8 @@ export default function TaskDetailScreen({ navigation }: any) {
           {normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
             <View
               style={{
-                position: "absolute",
-                left: 16,
-                right: 16,
-                bottom: 16,
                 flexDirection: "row",
+                marginHorizontal: 16,
                 gap: spacing.sm,
               }}
             >
@@ -410,11 +402,30 @@ export default function TaskDetailScreen({ navigation }: any) {
                   style={{ flex: 2, paddingVertical: spacing.xs }}
                 />
               ) : (
-                <Button
-                  text="Mark as Complete"
-                  onPress={onComplete}
-                  style={{ flex: 2, paddingVertical: spacing.xs }}
-                />
+                <View
+                  style={{
+                    gap: spacing.md,
+                    paddingHorizontal: spacing.sm,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.palette.neutral300,
+                    backgroundColor: colors.palette.neutral100,
+                    flex: 1,
+                    paddingBottom: 32,
+                  }}
+                >
+                  <Text tx="oolshik:yourExperience" preset="subheading" />
+                  <SmileySlider disabled={false} value={rating} onChange={setRating} />
+                  <Text style={{ textAlign: "center", marginTop: 6, opacity: 0.6 }}>
+                    {rating.toFixed(1)} / 5.0
+                  </Text>
+
+                  <Button
+                    text="Mark as Complete"
+                    onPress={onComplete}
+                    style={{ flex: 2, paddingVertical: spacing.xs }}
+                  />
+                </View>
               )}
             </View>
           ) : null}
@@ -431,11 +442,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               }}
             >
               <Text text="Task completed ✓" weight="bold" style={{ color: success }} />
-              <Text
-                style={{ marginBottom: 5 }}
-                text="Thanks for helping! Returning to list..."
-                size="xs"
-              />
+              <Text style={{ marginBottom: 5 }} text="Thanks for helping!" size="xs" />
               <Button
                 text="Ok"
                 onPress={() => navigation.goBack()}

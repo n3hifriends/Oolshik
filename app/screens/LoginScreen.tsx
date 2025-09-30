@@ -11,8 +11,16 @@ import { useAuth } from "@/context/AuthContext"
 import type { AppStackScreenProps } from "@/navigators/AppNavigator"
 import type { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
+import { getAuth, signInWithPhoneNumber, FirebaseAuthTypes } from "@react-native-firebase/auth"
 
 interface LoginScreenProps extends AppStackScreenProps<"Login"> {}
+
+function toE164(raw: string) {
+  let p = raw.trim().replace(/\s+/g, "")
+  if (p.startsWith("0")) p = p.slice(1)
+  if (!p.startsWith("+")) p = `+91${p}`
+  return p
+}
 
 // A large, tap-to-focus 6-box OTP input optimized for accessibility
 function OtpBoxes({
@@ -82,6 +90,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState<"send" | "verify" | null>(null)
   const [resendIn, setResendIn] = useState(0)
   const [showEmail, setShowEmail] = useState(false)
+  const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null)
   const [pendingTokens, setPendingTokens] = useState<{
     accessToken: string
     refreshToken: string
@@ -110,20 +119,53 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     return displayName.trim().length === 0 ? "can't be blank" : ""
   }, [displayName])
 
+  const withTimeout = <T,>(p: Promise<T>, ms = 30000) =>
+    Promise.race([
+      p,
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("OTP request timed out")), ms)),
+    ])
+
   // Real services
   async function sendOtp(p: string) {
     try {
-      return await OolshikApi.requestOtp(p)
-    } catch {
-      return { ok: false } as any
+      // Use React Native Firebase phone auth
+      const auth = getAuth()
+      const confirmation = await withTimeout(signInWithPhoneNumber(auth, toE164(p)), 30000)
+      if (!confirmation) {
+        return { ok: false, error: "Failed to get confirmation result" }
+      }
+      // Return a shape compatible with existing onSendOtp logic
+      return { ok: true, data: { confirmation } }
+    } catch (err: any) {
+      // Handle common cases
+      const msg = String(err?.message || err)
+      if (msg.includes("blocked") || msg.includes("17010")) {
+        // Show a precise message so you know it’s anti-abuse
+        throw new Error(
+          "Firebase has temporarily blocked OTP from this device. Use a test number or try a fresh emulator/real device.",
+        )
+      }
+      throw err
     }
   }
 
-  async function verifyOtp(p: string, code: string, dName?: string, email?: string) {
-    try {
-      return await OolshikApi.verifyOtp({ phone: p, code, displayName: dName, email })
-    } catch {
-      return { ok: false } as any
+  async function verifyOtp(p: string, code: string) {
+    if (!confirm) return { ok: false } as any
+    const cred = await confirm.confirm(code.trim())
+    if (!cred) {
+      throw new Error("Credential is null")
+    }
+    const user = cred.user
+    const idToken = await user.getIdToken(true) // fresh ID token
+    // Align to your existing token handling contract
+    return {
+      ok: true,
+      data: {
+        accessToken: idToken,
+        refreshToken: undefined,
+        uid: user.uid,
+        phone: user.phoneNumber,
+      },
     }
   }
 
@@ -139,7 +181,8 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     setLoading("send")
     const res = await sendOtp(phone)
     setLoading(null)
-    if (res.ok) {
+    if (res.ok && res.data?.confirmation) {
+      setConfirm(res.data.confirmation as FirebaseAuthTypes.ConfirmationResult)
       setOtpSent(true)
       setOtp("")
       setOtpVerified(false)
@@ -153,11 +196,14 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     if (!otpSent) return
     if (!/^\d{6}$/.test(otp)) return
     setLoading("verify")
-    const res = await verifyOtp(phone, otp, displayName || undefined, authEmail || undefined)
+    const res = await verifyOtp(phone, otp)
     setLoading(null)
     if (res.ok && res.data?.accessToken) {
       // Do not persist tokens here to avoid auto-navigation.
-      setPendingTokens({ accessToken: res.data.accessToken, refreshToken: res.data.refreshToken })
+      setPendingTokens({
+        accessToken: res.data.accessToken,
+        refreshToken: res.data.refreshToken as any,
+      })
       setOtpVerified(true)
     } else {
       alert("Invalid OTP")
@@ -177,13 +223,13 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         return
       }
       setLoading("verify")
-      const res = await verifyOtp(phone, otp, displayName || undefined, authEmail || undefined)
+      const res = await verifyOtp(phone, otp)
       setLoading(null)
       if (!(res.ok && res.data?.accessToken)) {
         alert("Invalid OTP")
         return
       }
-      tokens = { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken }
+      tokens = { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken as any }
       setPendingTokens(tokens)
       setOtpVerified(true)
     }
@@ -326,7 +372,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       <View style={themed($card)}>
         <Pressable onPress={() => setShowEmail((v) => !v)} style={themed($cardHeader)}>
           <Text text="Email" weight="bold" />
-          <Text text={showEmail ? "–" : "+"} style={{ marginLeft: "auto" }} />
+          <Text text={showEmail ? "-" : "+"} style={{ marginLeft: "auto", fontWeight: "bold" }} />
         </Pressable>
         {showEmail && (
           <TextField

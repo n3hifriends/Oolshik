@@ -51,6 +51,13 @@ const mr = {
     emptyMine: "तुम्ही अजून कोणतीही विनंत्या तयार केलेल्या नाहीत.",
     distanceFilter: "अंतर",
     statusFilter: "स्थिती",
+    yourExperience: "तुमचा अनुभव",
+    leftRightExperience: "(डावीकडे वाईट • उजवीकडे उत्तम)",
+    ratingBad: "वाईट",
+    ratingPoor: "ठीक नाही",
+    ratingOkay: "सरासरी",
+    ratingGood: "चांगले",
+    ratingGreat: "उत्तम",
   },
 }
 export default mr
