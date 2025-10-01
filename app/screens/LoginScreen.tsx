@@ -243,7 +243,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     // Fetch profile after token is set
     try {
       // Create the user if needed
-      const prof = await OolshikApi.complete(displayName.trim(), authEmail?.trim())
+      const prof = await OolshikApi.complete(displayName.trim(), authEmail?.trim() || "")
       if (prof?.ok && prof.data) {
         // Profile complete success
         const prof = await OolshikApi.me()
