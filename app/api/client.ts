@@ -376,7 +376,9 @@ export const OolshikApi = {
   },
 
   // Accept
-  acceptTask: (taskId: string) => api.post(`/requests/${taskId}/accept`, {}),
+  acceptTask: (taskId: string, payload: { latitude: number; longitude: number }) => {
+    return api.post(`/requests/${taskId}/accept`, payload)
+  },
 
   // Complete
   completeTask: (taskId: string) => api.post(`/requests/${taskId}/complete`, {}),
@@ -399,6 +401,8 @@ export const OolshikApi = {
   requestOtp: (phone: string) => api.post("/auth/otp/request", { phone }),
   verifyOtp: (payload: { phone: string; code: string; displayName?: string; email?: string }) =>
     api.post<{ accessToken: string; refreshToken: string }>("/auth/otp/verify", payload),
+  complete: (displayName: string, email: string) =>
+    api.post("/auth/complete", { displayName, email }),
   me: () => api.get("/auth/me"),
 
   // ---------- NEW: refresh endpoint ----------

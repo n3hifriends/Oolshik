@@ -29,7 +29,7 @@ type State = {
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
   fetchNearby: (lat: number, lng: number, statuses?: string[]) => Promise<void>
-  accept: (id: string) => Promise<"OK" | "ALREADY" | "ERROR">
+  accept: (id: string, latitude: number, longitude: number) => Promise<"OK" | "ALREADY" | "ERROR">
   complete: (id: string) => Promise<"OK" | "FORBIDDEN" | "ERROR">
 }
 
@@ -65,7 +65,7 @@ export const useTaskStore = create<State>((set, get) => ({
     }
   },
 
-  accept: async (id) => {
+  accept: async (id: string, latitude: number, longitude: number) => {
     if (FLAGS.USE_MOCK_NEARBY) {
       // optimistic accept in mock mode
       set((s) => ({
@@ -73,7 +73,7 @@ export const useTaskStore = create<State>((set, get) => ({
       }))
       return "OK"
     } else {
-      const res = await OolshikApi.acceptTask(id)
+      const res = await OolshikApi.acceptTask(id, { latitude, longitude })
       if (res.ok) {
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "ASSIGNED" } : t)),
