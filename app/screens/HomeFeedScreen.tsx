@@ -67,6 +67,24 @@ export default function HomeFeedScreen({ navigation }: any) {
     }, [coords?.latitude, coords?.longitude, radiusMeters, selectedStatuses]),
   )
 
+  const onAcceptPress = async (taskId: string) => {
+    if (!coords) {
+      alert("Location not available")
+      return
+    }
+    const res = await accept(taskId, coords.latitude, coords.longitude)
+    if (res != "OK") {
+      alert("Failed to accept")
+      return
+    }
+
+    // refresh nearby list so UI reflects ASSIGNED
+    if (coords) {
+      // reuse your existing fetchNearby
+      await fetchNearby(coords.latitude, coords.longitude)
+    }
+  }
+
   const renderItem: ListRenderItem<any> = useCallback(
     ({ item: t }) => (
       <TaskCard
@@ -78,9 +96,7 @@ export default function HomeFeedScreen({ navigation }: any) {
         onAccept={
           viewMode === "forYou" && t.status === "OPEN"
             ? async () => {
-                const res = await accept(t.id)
-                if (res === "ALREADY") alert("Already assigned")
-                if (coords) fetchNearby(coords.latitude, coords.longitude)
+                await onAcceptPress(t.id)
               }
             : undefined
         }

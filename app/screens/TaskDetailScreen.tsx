@@ -172,6 +172,7 @@ export default function TaskDetailScreen({ navigation }: any) {
       const res = await OolshikApi.revealPhone(current.id as any)
       if (res?.ok) {
         const num = res.data?.phoneNumber ?? fullPhone
+        // const num = (res.data as { phoneNumber?: string })?.phoneNumber ?? fullPhone
         if (num) setFullPhone(String(num))
         setIsRevealed(true)
       } else {
@@ -204,17 +205,21 @@ export default function TaskDetailScreen({ navigation }: any) {
   }
 
   const onAccept = async () => {
+    if (!coords) {
+      alert("Location not available")
+      return
+    }
     if (!current) return
-    const result = await accept(current.id)
+    const result = await accept(current.id, coords.latitude, coords.longitude)
     if (result === "ALREADY") {
       alert("Already assigned")
     } else if (result === "OK") {
       alert("Task accepted")
+      setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
     } else {
-      alert("Error accepting task")
+      alert("Error accepting task / Requester can't accept this task")
     }
     // reflect status locally
-    setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
   }
 
   const onComplete = async () => {
