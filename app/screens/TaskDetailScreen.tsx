@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react"
-import { View, ActivityIndicator, Pressable, Linking, Alert } from "react-native"
+import { View, ActivityIndicator, Pressable, Linking, Platform } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -222,6 +222,13 @@ export default function TaskDetailScreen({ navigation }: any) {
     // reflect status locally
   }
 
+  function openInMaps(lat: number, lon: number, label = "Task") {
+    const g = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}&q=(${encodeURIComponent(label)})`
+    // const g = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${label} @${lat},${lon}`)}`
+    const a = `http://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(label)}`
+    Linking.openURL(Platform.OS === "ios" ? a : g)
+  }
+
   const onComplete = async () => {
     if (!current) return
     const res = await OolshikApi.completeTask(current.id as any)
@@ -372,6 +379,19 @@ export default function TaskDetailScreen({ navigation }: any) {
                 <View />
               )}
 
+              <Pressable
+                onPress={() => openInMaps(current.latitude || 0, current.longitude || 0)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.xxs,
+                  borderRadius: 999,
+                  backgroundColor: colors.palette.neutral200,
+                }}
+              >
+                <Text text="Let's Go 🚗" size="xs" weight="medium" style={{ color: neutral700 }} />
+              </Pressable>
               <View
                 style={{
                   paddingHorizontal: spacing.sm,

@@ -20,6 +20,8 @@ To make things work on your local simulator, or on your phone, you need first to
 yarn build:ios:sim # build for ios simulator
 yarn build:ios:dev # build for ios device
 yarn build:ios:prod # build for ios device
+
+for Firebase Auth testing use 999999999999999
 ```
 
 ### `./assets` directory
