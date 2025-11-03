@@ -35,7 +35,9 @@ export type AppStackParamList = {
   Login: undefined // @demo remove-current-line
   Demo: NavigatorScreenParams<DemoTabParamList> // @demo remove-current-line
   // 🔥 Your screens go here
-  // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
+  QrScanner: undefined
+	PaymentPay: undefined
+	// IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
   Oolshik: undefined
 }
 

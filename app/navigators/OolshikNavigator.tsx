@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
+import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import OnboardingConsentScreen from "@/screens/OnboardingConsentScreen"
 import HomeFeedScreen from "@/screens/HomeFeedScreen"
 import CreateTaskScreen from "@/screens/CreateTaskScreen"
@@ -10,6 +11,8 @@ import ProfileScreen from "@/screens/ProfileScreen"
 import ReportScreen from "@/screens/ReportScreen"
 import { useMMKVString } from "react-native-mmkv"
 import { storage } from "@/utils/storage"
+import { QrScannerScreen } from "@/screens/QrScannerScreen"
+import { PaymentPayScreen } from "@/screens/PaymentPayScreen"
 
 /**
  * IMPORTANT
@@ -34,7 +37,14 @@ export type OolshikParamList = {
   OolshikChat: { taskId: string }
   OolshikProfile: undefined
   OolshikReport: { taskId?: string; targetUserId?: string }
+  QrScanner: { taskId: string }
+  PaymentPay: { taskId: string }
 }
+
+export type OolshikStackScreenProps<T extends keyof OolshikParamList> = NativeStackScreenProps<
+  OolshikParamList,
+  T
+>
 
 const Stack = createNativeStackNavigator<OolshikParamList>()
 
@@ -74,6 +84,8 @@ export function OolshikNavigator() {
       <Stack.Screen name="OolshikChat" component={ChatScreen} />
       <Stack.Screen name="OolshikProfile" component={ProfileScreen} />
       <Stack.Screen name="OolshikReport" component={ReportScreen} />
+      <Stack.Screen name="QrScanner" component={QrScannerScreen} />
+      <Stack.Screen name="PaymentPay" component={PaymentPayScreen} />
     </Stack.Navigator>
   )
 }

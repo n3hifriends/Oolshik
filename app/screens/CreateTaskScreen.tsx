@@ -105,6 +105,11 @@ export default function CreateTaskScreen({ navigation }: any) {
   }
 
   const handlePost = async () => {
+    // if (true) {
+    //   navigation.navigate("PaymentPay", { taskId: 3 })
+    //   return
+    // }
+
     if (!coords) {
       Alert.alert("Location not ready", "Please enable location to post your request.")
       return
