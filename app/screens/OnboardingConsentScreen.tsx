@@ -94,7 +94,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
       ],
       declarationTitle: "✅ User Declaration",
       declarationBody:
-        "I have read and understood this consent. By tapping “I Agree and Continue”, I voluntarily provide my consent for Oolshik to collect, store, and process my data as described above.",
+        "I have read and understood this consent. By tapping “I Agree and Continue (Ok)”, I voluntarily provide my consent for Oolshik to collect, store, and process my data as described above.",
     },
     mr: {
       preface: "पुढे चालू ठेवल्यास, आपण खालील बाबींना मान्य करून संमती देत आहात:",
@@ -222,7 +222,13 @@ export default function OnboardingConsentScreen({ navigation }: any) {
 
         {/* Consent checkbox */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-          <Checkbox value={accepted} onToggle={() => setAccepted((v) => !v)} />
+          <Checkbox
+            value={accepted}
+            onToggle={() => {
+              setShowConsent(true)
+              setAccepted((v) => !v)
+            }}
+          />
           <Pressable
             onPress={() => {
               setAccepted((v) => !v)
