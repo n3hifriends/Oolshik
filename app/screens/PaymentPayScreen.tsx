@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Alert, Linking, StyleSheet, View, ViewStyle } from "react-native"
-import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
+import type {
+  OolshikStackScreenProps,
+  PaymentScanPayload,
+  PaymentTaskContext,
+} from "@/navigators/OolshikNavigator"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { OolshikApi } from "@/api/client"
-
-const USE_PAYMENT_DEMO = true
 
 type PaymentBreakdownItem = {
   label: string
@@ -23,15 +25,15 @@ type PaymentHighlight = {
 
 type PaymentSnapshot = {
   id?: string
-  payeeName: string
-  payeeVpa: string
-  amountRequested: number
-  note?: string
-  dueDate?: string
-  status?: string
-  lastUpdated?: string
-  contactNumber?: string
-  paymentWindow?: string
+  payeeName?: string | null
+  payeeVpa?: string | null
+  amountRequested?: number | null
+  note?: string | null
+  dueDate?: string | null
+  status?: string | null
+  lastUpdated?: string | null
+  contactNumber?: string | null
+  paymentWindow?: string | null
   breakdown?: PaymentBreakdownItem[]
   highlights?: PaymentHighlight[]
   disclaimers?: string[]
@@ -43,46 +45,117 @@ type PaymentRequestPayload = {
   snapshot: PaymentSnapshot
 }
 
-const DEMO_PAYMENT_REQUEST: PaymentRequestPayload = {
-  upiIntent: "upi://pay?pa=raghav@ybl&pn=Raghav%20Khanna&am=1350.00&cu=INR&tn=Fuel%20reimbursement",
-  supportLink: "https://help.oolshik.com/payments/demo",
-  snapshot: {
-    id: "demo-req-1042",
-    payeeName: "Raghav Khanna",
-    payeeVpa: "raghav@ybl",
-    amountRequested: 1350,
-    note: "Fuel reimbursement for the Navi Mumbai drop-off run.",
-    dueDate: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
-    status: "Awaiting payment",
-    lastUpdated: new Date().toISOString(),
-    contactNumber: "+91 98765 43210",
-    paymentWindow: "Complete within 24 hours",
-    breakdown: [
-      { label: "Task payout", amount: 1100 },
-      { label: "Travel allowance", amount: 200 },
-      { label: "Platform fee", amount: 50 },
-    ],
-    highlights: [
-      { label: "Task", value: "Delivery • #DLV-2759" },
-      { label: "Assigned by", value: "Netra Patil" },
-    ],
-    disclaimers: [
-      "Transfers are only accepted from the registered bank account.",
-      "If your UPI app does not redirect back, upload the proof in Payments.",
-      "For discrepancies contact support before marking the request as paid.",
-    ],
-  },
+type BuildSeedArgs = {
+  paymentRequestId?: string
+  scanPayload: PaymentScanPayload
+  taskContext?: PaymentTaskContext
+}
+
+const DEFAULT_STATUS = "Awaiting payment"
+
+const ensureStringArray = (list?: string[] | null) => (list && list.length ? [...list] : undefined)
+
+const mergeHighlights = (a?: PaymentHighlight[], b?: PaymentHighlight[]) => {
+  const combined = [...(a ?? []), ...(b ?? [])]
+  const seen = new Set<string>()
+  const result: PaymentHighlight[] = []
+  combined.forEach((item) => {
+    if (!item?.label && !item?.value) return
+    const key = `${item.label ?? ""}|${item.value ?? ""}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(item)
+    }
+  })
+  return result.length ? result : undefined
+}
+
+const buildSeedPayment = ({ paymentRequestId, scanPayload, taskContext }: BuildSeedArgs) => {
+  const amount =
+    typeof scanPayload.amount === "number" && !Number.isNaN(scanPayload.amount)
+      ? scanPayload.amount
+      : null
+
+  const highlights: PaymentHighlight[] = []
+  if (taskContext?.title) {
+    highlights.push({ label: "Task", value: taskContext.title })
+  }
+  if (taskContext?.createdByName) {
+    highlights.push({ label: "Requester", value: taskContext.createdByName })
+  }
+
+  const snapshot: PaymentSnapshot = {
+    id: paymentRequestId,
+    payeeName: scanPayload.payeeName ?? taskContext?.createdByName ?? null,
+    payeeVpa: scanPayload.payeeVpa ?? null,
+    amountRequested: amount,
+    note: scanPayload.note ?? null,
+    status: DEFAULT_STATUS,
+    lastUpdated: scanPayload.scannedAt ?? null,
+    contactNumber: taskContext?.createdByPhoneNumber ?? null,
+    paymentWindow: null,
+    breakdown: [],
+    highlights: highlights.length ? highlights : undefined,
+    disclaimers: ensureStringArray(scanPayload.guidelines),
+  }
+
+  return {
+    upiIntent:
+      scanPayload.format === "upi-uri" || scanPayload.rawPayload.startsWith("upi://")
+        ? scanPayload.rawPayload
+        : undefined,
+    supportLink: undefined,
+    snapshot,
+  }
+}
+
+const mergePaymentPayload = (
+  base: PaymentRequestPayload | null,
+  next: PaymentRequestPayload | null,
+): PaymentRequestPayload | null => {
+  if (!base) return next
+  if (!next) return base
+
+  const mergedSnapshot: PaymentSnapshot = {
+    ...base.snapshot,
+    ...next.snapshot,
+  }
+
+  mergedSnapshot.amountRequested =
+    next.snapshot.amountRequested ?? base.snapshot.amountRequested ?? null
+  mergedSnapshot.payeeName = next.snapshot.payeeName ?? base.snapshot.payeeName ?? null
+  mergedSnapshot.payeeVpa = next.snapshot.payeeVpa ?? base.snapshot.payeeVpa ?? null
+  mergedSnapshot.note = next.snapshot.note ?? base.snapshot.note ?? null
+  mergedSnapshot.status = next.snapshot.status ?? base.snapshot.status ?? DEFAULT_STATUS
+  mergedSnapshot.lastUpdated = next.snapshot.lastUpdated ?? base.snapshot.lastUpdated ?? null
+  mergedSnapshot.contactNumber = next.snapshot.contactNumber ?? base.snapshot.contactNumber ?? null
+  mergedSnapshot.paymentWindow = next.snapshot.paymentWindow ?? base.snapshot.paymentWindow ?? null
+  mergedSnapshot.breakdown = next.snapshot.breakdown ?? base.snapshot.breakdown
+  mergedSnapshot.highlights = mergeHighlights(base.snapshot.highlights, next.snapshot.highlights)
+  const disclaimers = next.snapshot.disclaimers ?? base.snapshot.disclaimers
+  mergedSnapshot.disclaimers = ensureStringArray(disclaimers)
+
+  return {
+    upiIntent: next.upiIntent ?? base.upiIntent,
+    supportLink: next.supportLink ?? base.supportLink,
+    snapshot: mergedSnapshot,
+  }
 }
 
 interface PaymentPayScreenProps extends OolshikStackScreenProps<"PaymentPay"> {}
 
 export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => {
-  const { taskId } = route.params
+  const { taskId, paymentRequestId, scanPayload, taskContext } = route.params
   const { theme } = useAppTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
 
-  const [loading, setLoading] = useState(true)
-  const [payment, setPayment] = useState<PaymentRequestPayload | null>(null)
+  const seedPayment = useMemo(
+    () => buildSeedPayment({ paymentRequestId, scanPayload, taskContext }),
+    [paymentRequestId, scanPayload, taskContext],
+  )
+
+  const [payment, setPayment] = useState<PaymentRequestPayload | null>(seedPayment)
+  const [loading, setLoading] = useState<boolean>(Boolean(paymentRequestId))
   const [error, setError] = useState<string | null>(null)
   const [isLaunchingPayment, setIsLaunchingPayment] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
@@ -90,30 +163,27 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
 
   const loadPayment = useCallback(async () => {
     const requestId = ++requestIdRef.current
-    setLoading(true)
     setError(null)
+    if (!paymentRequestId) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
     try {
-      if (USE_PAYMENT_DEMO) {
-        await delay(320)
-        if (requestId !== requestIdRef.current) return
-        setPayment(DEMO_PAYMENT_REQUEST)
-      } else {
-        const response = await OolshikApi.getPaymentRequest(taskId)
-        if (requestId !== requestIdRef.current) return
-        const normalized = normalizePaymentResponse(response)
-        if (!normalized) throw new Error("Payment snapshot missing")
-        setPayment(normalized)
-      }
+      const response = await OolshikApi.getPaymentRequest(paymentRequestId)
+      if (requestId !== requestIdRef.current) return
+      const normalized = normalizePaymentResponse(response)
+      if (!normalized) throw new Error("Payment snapshot missing")
+      setPayment((prev) => mergePaymentPayload(prev ?? seedPayment, normalized))
     } catch (err) {
       if (requestId !== requestIdRef.current) return
-      setPayment(null)
       setError(extractErrorMessage(err))
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false)
       }
     }
-  }, [taskId])
+  }, [paymentRequestId, seedPayment])
 
   useEffect(() => {
     loadPayment()
@@ -127,63 +197,71 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
   }, [loadPayment])
 
   const handleLaunchUpi = useCallback(async () => {
-    if (!payment?.upiIntent) {
+    const upiIntent = payment?.upiIntent ?? seedPayment?.upiIntent
+    if (!upiIntent) {
       Alert.alert("Unavailable", "We couldn't find a UPI link for this request.")
       return
     }
     setIsLaunchingPayment(true)
     try {
-      if (!USE_PAYMENT_DEMO) {
-        await OolshikApi.initiatePayment(taskId)
+      const identifier =
+        paymentRequestId ?? payment?.snapshot.id ?? seedPayment?.snapshot.id ?? taskId
+      if (identifier) {
+        await OolshikApi.initiatePayment(identifier)
       }
-      const isSupported = await Linking.canOpenURL(payment.upiIntent)
+      const isSupported = await Linking.canOpenURL(upiIntent)
       if (!isSupported) {
         Alert.alert(
           "No UPI app found",
-          "Install any UPI compatible app to continue or copy the link:\n\n" + payment.upiIntent,
+          "Install any UPI compatible app to continue or copy the link:\n\n" + upiIntent,
         )
         return
       }
-      await Linking.openURL(payment.upiIntent)
+      await Linking.openURL(upiIntent)
     } catch (err) {
       Alert.alert("Failed to start payment", extractErrorMessage(err))
     } finally {
       setIsLaunchingPayment(false)
     }
-  }, [payment, taskId])
+  }, [payment, paymentRequestId, seedPayment])
 
   const handleMarkPaid = useCallback(async () => {
+    const identifier =
+      paymentRequestId ?? payment?.snapshot.id ?? seedPayment?.snapshot.id ?? taskId
+    if (!identifier) {
+      Alert.alert("Unavailable", "We don't have a payment request reference yet.")
+      return
+    }
     setIsConfirming(true)
     try {
-      if (!USE_PAYMENT_DEMO) {
-        await OolshikApi.markPaid(taskId, {})
-      }
+      await OolshikApi.markPaid(identifier, {})
       Alert.alert("Thanks!", "We'll mark this request as paid.")
     } catch (err) {
       Alert.alert("Unable to mark as paid", extractErrorMessage(err))
     } finally {
       setIsConfirming(false)
     }
-  }, [taskId])
+  }, [payment, paymentRequestId, seedPayment])
 
   const handleSupportPress = useCallback(async () => {
-    if (!payment?.supportLink) return
+    const supportLink = payment?.supportLink ?? seedPayment?.supportLink
+    if (!supportLink) return
     try {
-      const supported = await Linking.canOpenURL(payment.supportLink)
+      const supported = await Linking.canOpenURL(supportLink)
       if (!supported) {
         Alert.alert(
           "Unable to open support link",
-          "Copy and open this link manually:\n\n" + payment.supportLink,
+          "Copy and open this link manually:\n\n" + supportLink,
         )
         return
       }
-      await Linking.openURL(payment.supportLink)
+      await Linking.openURL(supportLink)
     } catch (err) {
       Alert.alert("Unable to open support", extractErrorMessage(err))
     }
-  }, [payment])
+  }, [payment, seedPayment])
 
-  if (loading) {
+  if (loading && !payment) {
     return (
       <Screen style={$root} preset="fixed">
         <View style={styles.loadingState}>
@@ -194,7 +272,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
     )
   }
 
-  if (error) {
+  if (error && !payment) {
     return (
       <Screen style={$root} preset="fixed">
         <View style={styles.fallbackState}>
@@ -237,11 +315,13 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
     month: "short",
     year: "numeric",
   })
-  const updatedDisplay = formatDate(snapshot.lastUpdated)
+  const updatedDisplay = formatDate(snapshot.lastUpdated ?? scanPayload.scannedAt)
   const breakdown = snapshot.breakdown ?? []
   const highlights = snapshot.highlights ?? []
-  const disclaimers = snapshot.disclaimers ?? []
+  const disclaimers = snapshot.disclaimers ?? scanPayload.guidelines ?? []
   const breakdownTotal = breakdown.reduce((sum, item) => sum + (item.amount ?? 0), 0)
+  const inlineError = error && payment ? error : null
+  const supportLink = payment?.supportLink ?? seedPayment?.supportLink
 
   return (
     <Screen style={$root} preset="scroll" contentContainerStyle={styles.content}>
@@ -252,7 +332,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
           <View style={styles.heroChip}>
             <Text
               style={styles.heroChipText}
-              text={(snapshot.status ?? "Awaiting payment").toUpperCase()}
+              text={(snapshot.status ?? DEFAULT_STATUS).toUpperCase()}
             />
           </View>
           {dueDisplay ? <Text style={styles.heroMetaText} text={`Due ${dueDisplay}`} /> : null}
@@ -262,22 +342,18 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
 
       <View style={styles.card}>
         <Text style={styles.cardTitle} text="Payee details" />
-        {snapshot.payeeName ? (
-          <View style={styles.row}>
-            <Text style={styles.rowLabel} text="Recipient" />
-            <Text style={styles.rowValue} numberOfLines={1} text={snapshot.payeeName} />
-          </View>
-        ) : null}
-        {snapshot.payeeVpa ? (
-          <View style={styles.row}>
-            <Text style={styles.rowLabel} text="UPI ID" />
-            <Text
-              style={[styles.rowValue, styles.monoValue]}
-              numberOfLines={1}
-              text={snapshot.payeeVpa}
-            />
-          </View>
-        ) : null}
+        <View style={styles.row}>
+          <Text style={styles.rowLabel} text="Recipient" />
+          <Text style={styles.rowValue} numberOfLines={1} text={snapshot.payeeName ?? "—"} />
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel} text="UPI ID" />
+          <Text
+            style={[styles.rowValue, styles.monoValue]}
+            numberOfLines={1}
+            text={snapshot.payeeVpa ?? "—"}
+          />
+        </View>
         {snapshot.paymentWindow ? (
           <View style={styles.row}>
             <Text style={styles.rowLabel} text="Payment window" />
@@ -287,7 +363,11 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
         {snapshot.contactNumber ? (
           <View style={styles.row}>
             <Text style={styles.rowLabel} text="Contact" />
-            <Text style={styles.rowValue} numberOfLines={1} text={snapshot.contactNumber} />
+            <Text
+              style={styles.rowValue}
+              numberOfLines={1}
+              text={snapshot.contactNumber ?? undefined}
+            />
           </View>
         ) : null}
         {snapshot.id ? (
@@ -335,6 +415,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
         <Text style={styles.cardSupport}>
           Use your preferred UPI app to complete the transfer and return to Oolshik to confirm.
         </Text>
+        {loading && paymentRequestId ? (
+          <Text style={styles.statusText}>Refreshing payment request…</Text>
+        ) : null}
+        {inlineError ? <Text style={styles.errorText}>{inlineError}</Text> : null}
         <View style={styles.actions}>
           <Button
             text={isLaunchingPayment ? "Opening UPI…" : "Pay with UPI"}
@@ -344,7 +428,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
             disabled={isLaunchingPayment}
           />
           <Button
-            text={isConfirming ? "Marking…" : "I've paid already"}
+            text={isConfirming ? "Marking…" : "Mark paid already"}
             onPress={handleMarkPaid}
             style={styles.secondaryButton}
             textStyle={styles.secondaryButtonText}
@@ -365,7 +449,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
         </View>
       ) : null}
 
-      {payment.supportLink ? (
+      {supportLink ? (
         <Text style={styles.supportLink} onPress={handleSupportPress}>
           Need help? Contact support
         </Text>
@@ -382,9 +466,7 @@ const $root: ViewStyle = {
   flex: 1,
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const formatCurrency = (value?: number) => {
+const formatCurrency = (value?: number | null) => {
   if (typeof value !== "number" || Number.isNaN(value)) return "—"
   return `₹${value.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -392,7 +474,7 @@ const formatCurrency = (value?: number) => {
   })}`
 }
 
-const formatDate = (value?: string, overrides?: Intl.DateTimeFormatOptions) => {
+const formatDate = (value?: string | null, overrides?: Intl.DateTimeFormatOptions) => {
   if (!value) return undefined
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return undefined
@@ -415,10 +497,22 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
       ? response.data
       : (response?.data ?? null)
   if (!candidate?.snapshot) return null
+  const snapshotData = candidate.snapshot ?? {}
+  const highlights = Array.isArray(snapshotData.highlights) ? snapshotData.highlights : undefined
+  const disclaimers = Array.isArray(snapshotData.disclaimers)
+    ? snapshotData.disclaimers
+    : Array.isArray(candidate.snapshot?.guidelines)
+      ? candidate.snapshot.guidelines
+      : undefined
+
   return {
     upiIntent: candidate.upiIntent ?? response?.upiIntent ?? response?.data?.upiIntent,
     supportLink: candidate.supportLink ?? response?.supportLink ?? response?.data?.supportLink,
-    snapshot: candidate.snapshot,
+    snapshot: {
+      ...snapshotData,
+      highlights,
+      disclaimers: ensureStringArray(disclaimers),
+    },
   }
 }
 
@@ -575,6 +669,16 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textDim,
       fontFamily: theme.typography.primary.normal,
       lineHeight: 20,
+    },
+    statusText: {
+      fontSize: 13,
+      color: theme.colors.textDim,
+      fontFamily: theme.typography.primary.medium,
+    },
+    errorText: {
+      fontSize: 13,
+      color: theme.colors.palette.angry500 ?? "#EF4444",
+      fontFamily: theme.typography.primary.medium,
     },
     actions: {
       gap: theme.spacing.sm,

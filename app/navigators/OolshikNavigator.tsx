@@ -38,13 +38,40 @@ export type OolshikParamList = {
   OolshikProfile: undefined
   OolshikReport: { taskId?: string; targetUserId?: string }
   QrScanner: { taskId: string }
-  PaymentPay: { taskId: string }
+  PaymentPay: PaymentPayParams
 }
 
 export type OolshikStackScreenProps<T extends keyof OolshikParamList> = NativeStackScreenProps<
   OolshikParamList,
   T
 >
+
+export type PaymentScanPayload = {
+  rawPayload: string
+  format: string
+  payeeVpa?: string | null
+  payeeName?: string | null
+  amount?: number | null
+  currency?: string | null
+  note?: string | null
+  scanLocation?: { lat: number; lon: number } | null
+  scannedAt: string
+  guidelines?: string[]
+}
+
+export type PaymentTaskContext = {
+  id: string
+  title?: string | null
+  createdByName?: string | null
+  createdByPhoneNumber?: string | null
+}
+
+export type PaymentPayParams = {
+  taskId: string
+  paymentRequestId?: string
+  scanPayload: PaymentScanPayload
+  taskContext?: PaymentTaskContext
+}
 
 const Stack = createNativeStackNavigator<OolshikParamList>()
 
