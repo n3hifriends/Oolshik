@@ -9,7 +9,11 @@ import {
   View,
   ViewStyle,
 } from "react-native"
-import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
+import type {
+  OolshikStackScreenProps,
+  PaymentScanPayload,
+  PaymentTaskContext,
+} from "@/navigators/OolshikNavigator"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import * as Location from "expo-location"
@@ -19,9 +23,27 @@ import { CameraView, useCameraPermissions } from "expo-camera"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { useTaskStore } from "@/store/taskStore"
 
 interface QrScannerScreenProps extends OolshikStackScreenProps<"QrScanner"> {}
 type Params = { taskId?: string }
+
+const DEFAULT_PAYMENT_GUIDELINES = [
+  "Transfers are only accepted from the registered bank account.",
+  "If your UPI app does not redirect back, upload the proof in Payments.",
+  "For discrepancies contact support before marking the request as paid.",
+]
+
+const USE_QR_DEMO = true
+const DEMO_QR_PAYLOAD =
+  "upi://pay?pa=raghav@ybl&pn=Raghav%20Khanna&am=1350.00&cu=INR&tn=Fuel%20reimbursement"
+const DEMO_PAYMENT_REQUEST_ID = "demo-payment-req"
+const DEMO_TASK_CONTEXT: PaymentTaskContext = {
+  id: "demo-task",
+  title: "Delivery • #DLV-2759",
+  createdByName: "Netra Patil",
+  createdByPhoneNumber: "+91 98765 43210",
+}
 
 export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const { params } = useRoute<any>() as { params: Params }
@@ -31,9 +53,11 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const handledRef = useRef(false)
+  const demoTriggeredRef = useRef(false)
   const { theme } = useAppTheme()
   const insets = useSafeAreaInsets()
   const styles = useMemo(() => createStyles(theme), [theme])
+  const tasks = useTaskStore((state) => state.tasks)
 
   useEffect(() => {
     if (permission?.granted) {
@@ -46,25 +70,55 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   }, [permission])
 
   function parseUpiUri(uri: string) {
-    const i = uri.indexOf("?")
-    if (i < 0) return { format: "unknown" as const, raw: uri }
-    const paramsQR = Object.fromEntries(
-      uri
-        .slice(i + 1)
-        .split("&")
-        .map((kv) => {
-          const [k, v = ""] = kv.split("=")
-          return [decodeURIComponent(k), decodeURIComponent(v)]
-        }),
-    )
+    const qIndex = uri.indexOf("?")
+    if (qIndex < 0) {
+      return { format: "unknown" as const, raw: uri }
+    }
+
+    const query = uri.slice(qIndex + 1)
+    const params: Record<string, string> = Object.create(null)
+
+    const decode = (value: string) => {
+      if (value.length === 0) return ""
+      if (value.indexOf("+") !== -1) {
+        value = value.split("+").join(" ")
+      }
+      try {
+        return decodeURIComponent(value)
+      } catch {
+        return value
+      }
+    }
+
+    let start = 0
+    for (let i = 0; i <= query.length; i++) {
+      if (i === query.length || query.charCodeAt(i) === 38 /* & */) {
+        if (i > start) {
+          const segment = query.slice(start, i)
+          const eqIdx = segment.indexOf("=")
+          const key = eqIdx === -1 ? segment : segment.slice(0, eqIdx)
+          const rawValue = eqIdx === -1 ? "" : segment.slice(eqIdx + 1)
+          params[decode(key)] = decode(rawValue)
+        }
+        start = i + 1
+      }
+    }
+
+    const payeeVpa = params.pa?.trim()
+    const payeeName = params.pn?.trim()
+    const currency = params.cu?.trim()
+    const note = params.tn?.trim()
+    const amountRaw = params.am?.trim()
+    const amountNumber = amountRaw && amountRaw.length > 0 ? Number(amountRaw) : Number.NaN
+
     return {
       format: "upi-uri" as const,
       raw: uri,
-      payeeVpa: paramsQR.pa || null,
-      payeeName: paramsQR.pn || null,
-      amount: paramsQR.am ? Number(paramsQR.am) : null,
-      currency: paramsQR.cu || "INR",
-      note: paramsQR.tn || null,
+      payeeVpa: payeeVpa && payeeVpa.length > 0 ? payeeVpa : null,
+      payeeName: payeeName && payeeName.length > 0 ? payeeName : null,
+      amount: Number.isFinite(amountNumber) ? amountNumber : null,
+      currency: currency && currency.length > 0 ? currency : "INR",
+      note: note && note.length > 0 ? note : null,
     }
   }
 
@@ -76,6 +130,29 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
       }
     }, []),
   )
+
+  function whoWillPayConfirmation(payerLabel: string) {
+    const label = payerLabel?.trim().length ? payerLabel.trim() : "Neta"
+    return new Promise<"You" | "Neta" | "Cancel">((resolve) => {
+      let resolved = false
+      const safeResolve = (value: "You" | "Neta" | "Cancel") => {
+        if (resolved) return
+        resolved = true
+        resolve(value)
+      }
+
+      Alert.alert(
+        "Transaction fee",
+        "Who will pay the transaction fee?",
+        [
+          { text: "You", onPress: () => safeResolve("You") },
+          { text: label, onPress: () => safeResolve("Neta") },
+          { text: "Cancel", style: "cancel", onPress: () => safeResolve("Cancel") },
+        ],
+        { cancelable: true, onDismiss: () => safeResolve("Cancel") },
+      )
+    })
+  }
 
   const onScanned = useCallback(
     async ({ data }: { data: string }) => {
@@ -99,8 +176,58 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
         }
 
-        // TODO: inject real values from your auth/task state
         const taskId = params?.taskId || "unknown-task-id"
+        const task = tasks.find((t) => String(t.id) === String(taskId))
+
+        const scanPayload: PaymentScanPayload = {
+          rawPayload: data,
+          format: parsed.format,
+          payeeVpa: (parsed as any).payeeVpa ?? null,
+          payeeName: (parsed as any).payeeName ?? null,
+          amount: typeof (parsed as any).amount === "number" ? (parsed as any).amount : null,
+          currency: (parsed as any).currency ?? null,
+          note: (parsed as any).note ?? null,
+          scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : null,
+          scannedAt: new Date().toISOString(),
+          guidelines: DEFAULT_PAYMENT_GUIDELINES,
+        }
+
+        const taskContext: PaymentTaskContext | undefined = task
+          ? {
+              id: task.id,
+              title: task.title ?? task.description ?? null,
+              createdByName: task.createdByName ?? null,
+              createdByPhoneNumber: task.createdByPhoneNumber
+                ? String(task.createdByPhoneNumber)
+                : null,
+            }
+          : USE_QR_DEMO
+            ? DEMO_TASK_CONTEXT
+            : undefined
+
+        const netaLabel = taskContext?.createdByName ?? task?.createdByName ?? "Neta"
+        const payerChoice = await whoWillPayConfirmation(netaLabel)
+
+        if (payerChoice === "You") {
+          setProcessing(false)
+          setStatusMessage("Align the QR code inside the frame")
+          setErrorMessage(null)
+          navigation.navigate("PaymentPay", {
+            taskId,
+            paymentRequestId: USE_QR_DEMO ? DEMO_PAYMENT_REQUEST_ID : undefined,
+            scanPayload,
+            taskContext,
+          })
+          return
+        }
+
+        if (payerChoice === "Cancel") {
+          handledRef.current = false
+          setProcessing(false)
+          setStatusMessage("Align the QR code inside the frame")
+          setErrorMessage(null)
+          return
+        }
 
         const body = {
           taskId,
@@ -127,13 +254,9 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
             requestId ? `Share this ID with Neta:\n${requestId}` : "Payment request captured.",
             [
               {
-                text: "View request",
-                onPress: () =>
-                  navigation.navigate("PaymentPay", {
-                    taskId: requestId ?? taskId,
-                  }),
+                text: "Close & proceed",
+                onPress: () => navigation.goBack(),
               },
-              { text: "Close" },
             ],
           )
         } else {
@@ -146,8 +269,8 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         Alert.alert("Scan failed", e.message ?? String(e))
       } finally {
         setProcessing(false)
-        handledRef.current = false
         if (hadError) {
+          handledRef.current = false
           setStatusMessage(null)
         } else {
           setStatusMessage("Align the QR code inside the frame")
@@ -155,8 +278,15 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         }
       }
     },
-    [processing, params?.taskId, navigation],
+    [processing, params?.taskId, navigation, tasks],
   )
+
+  useEffect(() => {
+    if (USE_QR_DEMO && permission?.granted && !demoTriggeredRef.current) {
+      demoTriggeredRef.current = true
+      onScanned({ data: DEMO_QR_PAYLOAD })
+    }
+  }, [permission?.granted, onScanned])
 
   if (!permission) {
     // ask on first render

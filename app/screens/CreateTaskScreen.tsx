@@ -105,10 +105,10 @@ export default function CreateTaskScreen({ navigation }: any) {
   }
 
   const handlePost = async () => {
-    // if (true) {
-    //   navigation.navigate("PaymentPay", { taskId: 3 })
-    //   return
-    // }
+    if (true) {
+      navigation.navigate("QrScanner", { taskId: 3 })
+      return
+    }
 
     if (!coords) {
       Alert.alert("Location not ready", "Please enable location to post your request.")
@@ -313,7 +313,7 @@ export default function CreateTaskScreen({ navigation }: any) {
       <Button
         text={submitting ? "Posting..." : "Post"}
         onPress={handlePost}
-        disabled={submitting || !coords}
+        // disabled={submitting || !coords}
       />
     </Screen>
   )
