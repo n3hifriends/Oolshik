@@ -34,7 +34,7 @@ const DEFAULT_PAYMENT_GUIDELINES = [
   "For discrepancies contact support before marking the request as paid.",
 ]
 
-const USE_QR_DEMO = true
+const USE_QR_DEMO = false
 const DEMO_QR_PAYLOAD =
   "upi://pay?pa=raghav@ybl&pn=Raghav%20Khanna&am=1350.00&cu=INR&tn=Fuel%20reimbursement"
 const DEMO_PAYMENT_REQUEST_ID = "demo-payment-req"
@@ -58,6 +58,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets()
   const styles = useMemo(() => createStyles(theme), [theme])
   const tasks = useTaskStore((state) => state.tasks)
+  const [cameraActive, setCameraActive] = useState(false)
 
   useEffect(() => {
     if (permission?.granted) {
@@ -125,8 +126,10 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       handledRef.current = false
+      setCameraActive(true)
       return () => {
         handledRef.current = true
+        setCameraActive(false)
       }
     }, []),
   )
@@ -212,19 +215,6 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         const netaLabel = taskContext?.createdByName ?? task?.createdByName ?? "Neta"
         const payerChoice = await whoWillPayConfirmation(netaLabel)
 
-        if (payerChoice === "You") {
-          setProcessing(false)
-          setStatusMessage("Align the QR code inside the frame")
-          setErrorMessage(null)
-          navigation.navigate("PaymentPay", {
-            taskId,
-            paymentRequestId: USE_QR_DEMO ? DEMO_PAYMENT_REQUEST_ID : undefined,
-            scanPayload,
-            taskContext,
-          })
-          return
-        }
-
         if (payerChoice === "Cancel") {
           handledRef.current = false
           setProcessing(false)
@@ -247,26 +237,48 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           deviceId: "device-qr",
         }
 
-        const res = await OolshikApi.createPaymentRequest(body)
-        if (res?.ok) {
-          const payload = (res.data as any) ?? {}
-          const requestId =
-            payload.id ?? payload.requestId ?? payload.data?.id ?? payload.data?.requestId ?? null
-          setStatusMessage("Payment request generated")
-          Alert.alert(
-            "Payment requested",
-            requestId ? `Share this ID with Neta:\n${requestId}` : "Payment request captured.",
-            [
-              {
-                text: "Close & proceed",
-                onPress: () => navigation.goBack(),
-              },
-            ],
-          )
+        let requestId: string | undefined
+        let upiIntentOverride: string | undefined
+
+        if (!USE_QR_DEMO) {
+          const res = await OolshikApi.createPaymentRequest(body)
+          if (!res?.ok || !res.data) {
+            const serverMessage =
+              (res?.data as any)?.message ?? res?.problem ?? "Server did not accept this QR code."
+            throw new Error(serverMessage)
+          }
+          const payload = res.data as any
+          requestId = payload.id ?? payload?.snapshot?.id ?? undefined
+          upiIntentOverride = payload.upiIntent ?? undefined
+          if (!requestId) {
+            throw new Error("Payment request reference missing from server response.")
+          }
         } else {
-          const serverMessage = (res?.data as any)?.message ?? "Server did not accept this QR code."
-          throw new Error(serverMessage)
+          upiIntentOverride = data.startsWith("upi://") ? data : undefined
         }
+
+        if (payerChoice === "You") {
+          setCameraActive(false)
+          navigation.replace("PaymentPay", {
+            taskId,
+            paymentRequestId: requestId,
+            scanPayload,
+            taskContext,
+            upiIntentOverride,
+          })
+          return
+        }
+
+        setStatusMessage("Payment request generated")
+        const message = requestId
+          ? `Share this ID with Neta:\n${requestId}`
+          : "Payment request captured."
+        Alert.alert("Payment requested", message, [
+          {
+            text: "Close & proceed",
+            onPress: () => navigation.goBack(),
+          },
+        ])
       } catch (e: any) {
         hadError = true
         setErrorMessage(e?.message ?? "Unable to process this QR code.")
@@ -343,6 +355,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           facing="back"
           enableTorch={torchEnabled}
+          isActive={cameraActive}
           onBarcodeScanned={(evt) => {
             if (evt?.data) onScanned({ data: evt.data })
           }}

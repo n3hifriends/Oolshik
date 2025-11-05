@@ -71,6 +71,7 @@ export type PaymentPayParams = {
   paymentRequestId?: string
   scanPayload: PaymentScanPayload
   taskContext?: PaymentTaskContext
+  upiIntentOverride?: string
 }
 
 const Stack = createNativeStackNavigator<OolshikParamList>()

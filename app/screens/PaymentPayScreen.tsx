@@ -144,15 +144,15 @@ const mergePaymentPayload = (
 
 interface PaymentPayScreenProps extends OolshikStackScreenProps<"PaymentPay"> {}
 
-export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => {
-  const { taskId, paymentRequestId, scanPayload, taskContext } = route.params
+export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navigation }) => {
+  const { taskId, paymentRequestId, scanPayload, taskContext, upiIntentOverride } = route.params
   const { theme } = useAppTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
 
-  const seedPayment = useMemo(
-    () => buildSeedPayment({ paymentRequestId, scanPayload, taskContext }),
-    [paymentRequestId, scanPayload, taskContext],
-  )
+  const seedPayment = useMemo(() => {
+    const base = buildSeedPayment({ paymentRequestId, scanPayload, taskContext })
+    return upiIntentOverride ? { ...base, upiIntent: upiIntentOverride } : base
+  }, [paymentRequestId, scanPayload, taskContext, upiIntentOverride])
 
   const [payment, setPayment] = useState<PaymentRequestPayload | null>(seedPayment)
   const [loading, setLoading] = useState<boolean>(Boolean(paymentRequestId))
@@ -232,15 +232,38 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route }) => 
       Alert.alert("Unavailable", "We don't have a payment request reference yet.")
       return
     }
-    setIsConfirming(true)
-    try {
-      await OolshikApi.markPaid(identifier, {})
-      Alert.alert("Thanks!", "We'll mark this request as paid.")
-    } catch (err) {
-      Alert.alert("Unable to mark as paid", extractErrorMessage(err))
-    } finally {
-      setIsConfirming(false)
-    }
+    Alert.alert(
+      "Confirm payment received?",
+      "Only use this when the transfer is complete and verified.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, mark as paid",
+          style: "default",
+          onPress: async () => {
+            setIsConfirming(true)
+            try {
+              await OolshikApi.markPaid(identifier, {})
+              Alert.alert(
+                "Marked as paid",
+                "Thanks! We'll notify the requester that payment is complete.",
+                [
+                  {
+                    text: "Close",
+                    onPress: () => navigation.goBack(),
+                  },
+                ],
+              )
+            } catch (err) {
+              Alert.alert("Unable to mark as paid", extractErrorMessage(err))
+            } finally {
+              setIsConfirming(false)
+            }
+          },
+        },
+      ],
+      { cancelable: true },
+    )
   }, [payment, paymentRequestId, seedPayment])
 
   const handleSupportPress = useCallback(async () => {
