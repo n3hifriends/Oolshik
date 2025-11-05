@@ -69,7 +69,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     setUserNameMMKV("")
     // ✅ clear Authorization header in the HTTP client
     setLoginTokens(undefined, undefined)
-    // (navigation back to Login is handled by your app’s routing on isAuthenticated=false)
+    // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV])
 
   // ✅ on mount & whenever authToken changes (e.g., app relaunch), sync header once

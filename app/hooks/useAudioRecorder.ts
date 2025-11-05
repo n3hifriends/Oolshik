@@ -13,7 +13,7 @@ export function useAudioRecorder(maxSeconds = 30) {
   // request mic permission (Android 12/13 emulator can be picky)
   const askPermission = async () => {
     if (Platform.OS === "android") {
-      // If you’re bare RN without Expo managed perms, request at runtime:
+      // If you're bare RN without Expo managed perms, request at runtime:
       try {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
