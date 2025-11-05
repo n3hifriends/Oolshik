@@ -100,7 +100,7 @@ export function TaskCard({
     })
   }
 
-  // Footer: type as ReactElement | undefined to satisfy Card’s prop
+  // Footer: type as ReactElement | undefined to satisfy Card's prop
   const FooterComponent =
     status === "PENDING" && onAccept ? (
       <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>

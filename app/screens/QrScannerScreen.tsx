@@ -168,12 +168,16 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           ? parseUpiUri(data)
           : { format: "unknown" as const, raw: data }
         let coords: { latitude: number; longitude: number } | undefined
-        const locPerm = await Location.requestForegroundPermissionsAsync()
-        if (locPerm.status === "granted") {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          })
-          coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+        try {
+          const locPerm = await Location.requestForegroundPermissionsAsync()
+          if (locPerm.status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            })
+            coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+          }
+        } catch {
+          // ignore location errors
         }
 
         const taskId = params?.taskId || "unknown-task-id"
@@ -267,6 +271,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         hadError = true
         setErrorMessage(e?.message ?? "Unable to process this QR code.")
         Alert.alert("Scan failed", e.message ?? String(e))
+        navigation.goBack()
       } finally {
         setProcessing(false)
         if (hadError) {
@@ -281,6 +286,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
     [processing, params?.taskId, navigation, tasks],
   )
 
+  // make hardcoded demo scan on load
   useEffect(() => {
     if (USE_QR_DEMO && permission?.granted && !demoTriggeredRef.current) {
       demoTriggeredRef.current = true
@@ -369,7 +375,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         <View style={[styles.bottomCard, { paddingBottom: insets.bottom + theme.spacing.lg }]}>
           <Text preset="heading" style={styles.bottomTitle} text="Scan QR to request payment" />
           <Text style={styles.bottomSubtitle}>
-            Place the code inside the frame. We’ll attach the location and task details
+            Place the code inside the frame. We'll attach the location and task details
             automatically.
           </Text>
           {statusMessage ? <Text style={styles.statusText}>{statusMessage}</Text> : null}

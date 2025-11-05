@@ -140,7 +140,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       // Handle common cases
       const msg = String(err?.message || err)
       if (msg.includes("blocked") || msg.includes("17010")) {
-        // Show a precise message so you know it’s anti-abuse
+        // Show a precise message so you know it's anti-abuse
         throw new Error(
           "Firebase has temporarily blocked OTP from this device. Use a test number or try a fresh emulator/real device.",
         )
