@@ -6,6 +6,7 @@ import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import Config from "@/config"
 import auth from "@react-native-firebase/auth"
+import { init } from "i18next"
 
 // ---------- Toggleable API logs (default: true) ----------
 export let API_LOGS_ENABLED = true
@@ -412,6 +413,16 @@ export const OolshikApi = {
 
   revealPhone: (id: string) => api.post(`/requests/${id}/revealPhone`, {}),
   // Expect { phoneNumber: string revealCount: number }
+
+  // Payment APIs (if any) can go here
+  createPaymentRequest: (body: any) => api.post("/payments/qr-scan", body),
+
+  getPaymentRequest: (id: string) => api.get(`/payments/${id}`),
+
+  initiatePayment: (id: string) => api.post(`/payments/${id}/initiate`, {}),
+
+  markPaid: (id: string, payload: { paidAmount?: number; proofUrl?: string }) =>
+    api.post(`/payments/${id}/mark-paid`, payload),
 }
 // Optional helper: call this after successful OTP verify to persist tokens
 export function setLoginTokens(accessToken?: string | null, refreshToken?: string | null) {
