@@ -1,5 +1,5 @@
-import React from "react"
-import { Pressable, TextInput, View } from "react-native"
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import { Animated, Easing, Pressable, TextInput, View } from "react-native"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
 import { typography } from "@/theme/typography"
@@ -21,6 +21,42 @@ export const ExpandableSearch: React.FC<Props> = ({
   onClear,
   inputRef,
 }) => {
+  const anim = useRef(new Animated.Value(open ? 1 : 0)).current
+  const [renderOpen, setRenderOpen] = useState(open)
+
+  useEffect(() => {
+    if (open) setRenderOpen(true)
+    Animated.timing(anim, {
+      toValue: open ? 1 : 0,
+      duration: 280,
+      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      if (!open) setRenderOpen(false)
+    })
+  }, [open, anim])
+
+  const panelStyle = useMemo(
+    () => ({
+      opacity: anim,
+      transform: [
+        {
+          scale: anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.85, 1],
+          }),
+        },
+        {
+          translateY: anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-10, 0],
+          }),
+        },
+      ],
+    }),
+    [anim],
+  )
+
   return (
     <>
       {!open && (
@@ -44,50 +80,52 @@ export const ExpandableSearch: React.FC<Props> = ({
         </Pressable>
       )}
 
-      {open && (
-        <SectionCard style={{ marginTop: 8, width: "80%", paddingVertical: 6 }}>
-          <View
-            style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8 }}
-          >
-            <Text text="🔍" style={{ fontSize: 16, lineHeight: 16 }} />
-            <TextInput
-              ref={inputRef}
-              value={value}
-              onChangeText={onChangeText}
-              placeholder="Search title, description, name, phone, distance…"
-              placeholderTextColor="#9CA3AF"
-              returnKeyType="search"
-              style={{
-                flex: 1,
-                paddingVertical: 10,
-                fontSize: 16,
-                fontFamily: typography.primary.normal,
-              }}
-            />
-            {value?.length ? (
-              <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel="Clear">
-                <Text text="✕" style={{ fontSize: 16, color: "#6B7280" }} />
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => {
-                onClear()
-                setOpen(false)
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Close search"
-              style={{
-                marginLeft: 2,
-                paddingHorizontal: 8,
-                paddingVertical: 6,
-                borderRadius: 8,
-                backgroundColor: "#F3F4F6",
-              }}
+      {renderOpen && (
+        <Animated.View style={[{ width: "100%", marginTop: 8 }, panelStyle]}>
+          <SectionCard style={{ width: "100%", paddingVertical: 6 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8 }}
             >
-              <Text text="Cancel" style={{ color: "#111827", fontWeight: "600" }} />
-            </Pressable>
-          </View>
-        </SectionCard>
+              <Text text="🔍" style={{ fontSize: 16, lineHeight: 16 }} />
+              <TextInput
+                ref={inputRef}
+                value={value}
+                onChangeText={onChangeText}
+                placeholder="Search title, description, name, phone, distance…"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="search"
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  fontSize: 16,
+                  fontFamily: typography.primary.normal,
+                }}
+              />
+              {value?.length ? (
+                <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel="Clear">
+                  <Text text="✕" style={{ fontSize: 16, color: "#6B7280" }} />
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  onClear()
+                  setOpen(false)
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Close search"
+                style={{
+                  marginLeft: 2,
+                  paddingHorizontal: 8,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  backgroundColor: "#F3F4F6",
+                }}
+              >
+                <Text text="Cancel" style={{ color: "#111827", fontWeight: "600" }} />
+              </Pressable>
+            </View>
+          </SectionCard>
+        </Animated.View>
       )}
     </>
   )
