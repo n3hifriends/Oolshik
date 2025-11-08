@@ -110,13 +110,13 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   // Validation
   const phoneError = useMemo(() => {
     const t = phone.replace(/\D/g, "")
-    if (t.length === 0) return "can't be blank"
+    if (t.length === 0) return "Can't be blank"
     if (t.length < 10) return "must be 10 digits"
     return ""
   }, [phone])
 
   const nameError = useMemo(() => {
-    return displayName.trim().length === 0 ? "can't be blank" : ""
+    return displayName.trim().length === 0 ? "Can't be blank" : ""
   }, [displayName])
 
   const withTimeout = <T,>(p: Promise<T>, ms = 30000) =>

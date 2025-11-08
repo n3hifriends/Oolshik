@@ -10,6 +10,8 @@ This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way 
 ## Getting Started
 
 ```bash
+open \"Android Studio from node directory i.e. cd to "which node" dir, and open studio\"
+e.g. cd /Users/nitinkalokhe/.nvm/versions/node/v22.18.0/bin/node and hit /Applications/Android\ Studio app/Contents/MacOS/studio
 yarn install
 yarn start
 ```
