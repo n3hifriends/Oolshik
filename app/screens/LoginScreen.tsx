@@ -192,11 +192,12 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     }
   }
 
-  const onVerifyOtp = async () => {
-    if (!otpSent) return
-    if (!/^\d{6}$/.test(otp)) return
+  const onVerifyOtp = async (code?: string) => {
+    if (!otpSent || loading === "verify") return
+    const entered = (code ?? otp).trim()
+    if (!/^\d{6}$/.test(entered)) return
     setLoading("verify")
-    const res = await verifyOtp(phone, otp)
+    const res = await verifyOtp(phone, entered)
     setLoading(null)
     if (res.ok && res.data?.accessToken) {
       // Do not persist tokens here to avoid auto-navigation.
@@ -339,13 +340,22 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           ) : null}
         </View>
 
-        <OtpBoxes value={otp} onChange={setOtp} editable={otpSent && !otpVerified} />
+        <OtpBoxes
+          value={otp}
+          onChange={async (value) => {
+            setOtp(value)
+            if (value.length === 6 && otpSent && !otpVerified && loading !== "verify") {
+              await onVerifyOtp(value)
+            }
+          }}
+          editable={otpSent && !otpVerified}
+        />
 
         {!otpVerified && (
           <View style={{ marginTop: spacing.sm }}>
             <Button
               text={loading === "verify" ? "Verifying…" : "Verify"}
-              onPress={onVerifyOtp}
+              onPress={() => onVerifyOtp()}
               disabled={!otpSent || otp.length !== 6 || loading === "verify"}
               style={{ marginTop: spacing.md, paddingVertical: spacing.xs }}
             />
