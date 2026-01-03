@@ -1,0 +1,707 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
+import Animated, {
+  Easing,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated"
+
+import { Button } from "@/components/Button"
+import { Icon } from "@/components/Icon"
+import { Text } from "@/components/Text"
+import { useAppTheme } from "@/theme/context"
+
+import { transcribeAudio } from "./transcription"
+import { useReduceMotion } from "./useReduceMotion"
+import { useVoiceRecorder } from "./useVoiceRecorder"
+
+type ComposerState =
+  | "idle"
+  | "opening"
+  | "voice_recording"
+  | "transcribing"
+  | "editing"
+  | "submitting"
+  | "closing"
+
+type ComposerMode = "voice" | "type"
+
+export interface SpotlightComposerProps {
+  onSubmitTask?: (text: string, mode: ComposerMode) => Promise<void> | void
+}
+
+const FAB_SIZE = 56
+const FAB_OFFSET = 12
+const PILL_HEIGHT = 62
+const PILL_RADIUS = 24
+const TOP_SPACING = 28
+
+const GlassFallback: React.ComponentType<any> = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("@react-native-community/blur").BlurView
+  } catch {
+    return View
+  }
+})()
+const hasBlurSupport = GlassFallback !== View
+
+const HAPTIC = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("react-native-haptic-feedback")
+  } catch {
+    return null
+  }
+})()
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
+  const { theme } = useAppTheme()
+  const reduceMotion = useReduceMotion()
+  const insets = useSafeAreaInsets()
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
+
+  const [state, setState] = useState<ComposerState>("idle")
+  const [mode, setMode] = useState<ComposerMode | null>(null)
+  const [text, setText] = useState("")
+
+  const textInputRef = useRef<TextInput>(null)
+  const isMounted = useRef(true)
+  const setEditingState = useCallback(() => setState("editing"), [])
+
+  const recorder = useVoiceRecorder()
+
+  const selectedMode = useSharedValue<ComposerMode>("voice")
+  const openProgress = useSharedValue(0)
+  const suggestionsProgress = useSharedValue(0)
+  const pulse = useSharedValue(1)
+  const hideMicFab = useSharedValue(0)
+  const hidePenFab = useSharedValue(0)
+  const scrimOpacity = useSharedValue(0)
+
+  const startVoiceX = useSharedValue(0)
+  const startVoiceY = useSharedValue(0)
+  const startTypeX = useSharedValue(0)
+  const startTypeY = useSharedValue(0)
+  const targetX = useSharedValue(0)
+  const targetY = useSharedValue(0)
+  const targetWidth = useSharedValue(0)
+
+  const durationOpen = reduceMotion ? 160 : 260
+  const durationClose = reduceMotion ? 140 : 220
+  const durationScrim = reduceMotion ? 120 : 200
+
+  const pillWidth = useMemo(() => Math.min(screenWidth * 0.92, 920), [screenWidth])
+
+  useEffect(() => {
+    isMounted.current = true
+    return () => {
+      isMounted.current = false
+      recorder.reset()
+    }
+  }, [recorder])
+
+  useEffect(() => {
+    const micCenterX = insets.left + theme.spacing.md + FAB_SIZE / 2
+    const micCenterY = screenHeight - insets.bottom - theme.spacing.md - FAB_SIZE / 2
+    const penCenterX = micCenterX + FAB_OFFSET
+    const penCenterY = micCenterY - FAB_OFFSET
+    const destY = insets.top + TOP_SPACING + PILL_HEIGHT / 2
+
+    startVoiceX.value = micCenterX
+    startVoiceY.value = micCenterY
+    startTypeX.value = penCenterX
+    startTypeY.value = penCenterY
+    targetX.value = screenWidth / 2
+    targetY.value = destY
+    targetWidth.value = pillWidth
+  }, [
+    insets.bottom,
+    insets.left,
+    insets.top,
+    pillWidth,
+    screenHeight,
+    screenWidth,
+    startTypeX,
+    startTypeY,
+    startVoiceX,
+    startVoiceY,
+    targetWidth,
+    targetX,
+    targetY,
+    theme.spacing.md,
+  ])
+
+  useEffect(() => {
+    if (state === "voice_recording") {
+      pulse.value = withRepeat(
+        withTiming(reduceMotion ? 1.05 : 1.18, {
+          duration: reduceMotion ? 600 : 820,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        -1,
+        true,
+      )
+    } else {
+      pulse.value = withTiming(1, { duration: 180 })
+    }
+  }, [pulse, reduceMotion, state])
+
+  useEffect(() => {
+    if (mode) selectedMode.value = mode
+  }, [mode, selectedMode])
+
+  const triggerHaptic = useCallback((type = "impactMedium") => {
+    if (HAPTIC?.default?.trigger) {
+      HAPTIC.default.trigger(type, {
+        enableVibrateFallback: true,
+        ignoreAndroidSystemSettings: false,
+      })
+    }
+  }, [])
+
+  const focusInput = useCallback(() => {
+    setTimeout(() => {
+      textInputRef.current?.focus()
+    }, 80)
+  }, [])
+
+  const resetState = useCallback(() => {
+    setState("idle")
+    setMode(null)
+    setText("")
+    hideMicFab.value = 0
+    hidePenFab.value = 0
+    suggestionsProgress.value = 0
+    recorder.reset()
+  }, [hideMicFab, hidePenFab, recorder, suggestionsProgress])
+
+  const closeComposer = useCallback(() => {
+    setState("closing")
+    scrimOpacity.value = withTiming(0, { duration: durationScrim })
+    suggestionsProgress.value = withTiming(0, { duration: durationClose })
+    openProgress.value = withTiming(0, { duration: durationClose }, (finished) => {
+      if (finished) runOnJS(resetState)()
+    })
+  }, [durationClose, durationScrim, openProgress, resetState, scrimOpacity, suggestionsProgress])
+
+  const handleVoiceStart = useCallback(async () => {
+    setState("voice_recording")
+    triggerHaptic("impactMedium")
+    const started = await recorder.start()
+    if (!started.ok) {
+      Alert.alert(
+        "Microphone unavailable",
+        started.reason === "permission"
+          ? "Please allow microphone access to record tasks."
+          : "Unable to start recording.",
+        [{ text: "OK", onPress: closeComposer }],
+      )
+      return
+    }
+  }, [closeComposer, recorder, triggerHaptic])
+
+  const handleOpen = useCallback(
+    (nextMode: ComposerMode) => {
+      if (state !== "idle") return
+      setMode(nextMode)
+      setState("opening")
+      if (nextMode === "voice") {
+        hidePenFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
+      } else {
+        hideMicFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
+      }
+      triggerHaptic("impactLight")
+      scrimOpacity.value = withTiming(1, { duration: durationScrim })
+      openProgress.value = 0
+      openProgress.value = withSpring(
+        1,
+        {
+          damping: reduceMotion ? 18 : 14,
+          stiffness: reduceMotion ? 140 : 210,
+        },
+        (finished) => {
+      if (!finished) return
+      suggestionsProgress.value = withDelay(
+        reduceMotion ? 40 : 140,
+        withTiming(1, { duration: reduceMotion ? 150 : 260 }),
+      )
+      if (nextMode === "voice") {
+        runOnJS(handleVoiceStart)()
+      } else {
+        runOnJS(setEditingState)()
+        runOnJS(focusInput)()
+      }
+    },
+      )
+    },
+    [
+      focusInput,
+      handleVoiceStart,
+      hideMicFab,
+      hidePenFab,
+      openProgress,
+      scrimOpacity,
+      reduceMotion,
+      state,
+      suggestionsProgress,
+      triggerHaptic,
+      setEditingState,
+    ],
+  )
+
+  const handleStopRecording = useCallback(
+    async (shouldTranscribe = true) => {
+      const stopped = await recorder.stop()
+      if (!shouldTranscribe) {
+        closeComposer()
+        return
+      }
+      if (!stopped.filePath) {
+        closeComposer()
+        return
+      }
+      setState("transcribing")
+      try {
+        const transcript = await transcribeAudio(stopped.filePath)
+        if (!isMounted.current || state === "closing") return
+        setText(transcript)
+        setState("editing")
+        focusInput()
+      } catch (e) {
+        if (!isMounted.current) return
+        Alert.alert("Transcription failed", "Please try again.")
+        closeComposer()
+      }
+    },
+    [closeComposer, focusInput, recorder, state],
+  )
+
+  const handleSubmit = useCallback(async () => {
+    if (!text.trim()) return
+    setState("submitting")
+    try {
+      await onSubmitTask?.(text.trim(), mode ?? "type")
+      if (Platform.OS === "android") {
+        const ToastAndroid = require("react-native").ToastAndroid
+        ToastAndroid.show("Task submitted", ToastAndroid.SHORT)
+      } else {
+        Alert.alert("Submitted", "Task submitted")
+      }
+    } catch {
+      Alert.alert("Unable to submit", "Please try again.")
+      setState("editing")
+      return
+    }
+    closeComposer()
+  }, [closeComposer, mode, onSubmitTask, text])
+
+  const onScrimPress = useCallback(() => {
+    if (state === "voice_recording") {
+      Alert.alert("Stop recording?", "Your current recording will be discarded.", [
+        { text: "Keep recording", style: "cancel" },
+        {
+          text: "Stop",
+          style: "destructive",
+          onPress: () => handleStopRecording(false),
+        },
+      ])
+      return
+    }
+    if (state !== "idle") {
+      closeComposer()
+    }
+  }, [closeComposer, handleStopRecording, state])
+
+  const scrimStyle = useAnimatedStyle(() => ({
+    opacity: scrimOpacity.value,
+  }))
+
+  const pillStyle = useAnimatedStyle(() => {
+    const progress = openProgress.value
+    const isVoice = selectedMode.value === "voice"
+    const startX = isVoice ? startVoiceX.value : startTypeX.value
+    const startY = isVoice ? startVoiceY.value : startTypeY.value
+    const width = lerp(FAB_SIZE, targetWidth.value, progress)
+    const height = lerp(FAB_SIZE, PILL_HEIGHT, progress)
+    const translateX = lerp(startX - width / 2, targetX.value - width / 2, progress)
+    const translateY = lerp(startY - height / 2, targetY.value - height / 2, progress)
+    const borderRadius = lerp(FAB_SIZE / 2, PILL_RADIUS, progress)
+
+    return {
+      width,
+      height,
+      borderRadius,
+      transform: [{ translateX }, { translateY }],
+    }
+  })
+
+  const suggestionsStyle = useAnimatedStyle(() => ({
+    opacity: suggestionsProgress.value,
+    transform: [
+      {
+        translateY: interpolate(suggestionsProgress.value, [0, 1], [12, 0]),
+      },
+    ],
+  }))
+
+  const micFabStyle = useAnimatedStyle(() => ({
+    opacity: 1 - hideMicFab.value,
+    transform: [{ scale: withTiming(hideMicFab.value ? 0.75 : 1, { duration: 120 }) }],
+  }))
+
+  const penFabStyle = useAnimatedStyle(() => ({
+    opacity: 1 - hidePenFab.value,
+    transform: [{ scale: withTiming(hidePenFab.value ? 0.75 : 1, { duration: 120 }) }],
+  }))
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }))
+
+  const pillActiveBackground = theme.isDark
+    ? "rgba(255,255,255,0.08)"
+    : "rgba(0,0,0,0.08)"
+
+  const renderIdleFabs = () => (
+    <View
+      pointerEvents={state === "idle" ? "auto" : "none"}
+      style={[
+        styles.fabStack,
+        {
+          bottom: insets.bottom + theme.spacing.md,
+          left: insets.left + theme.spacing.md,
+        },
+      ]}
+    >
+      <Animated.View style={[styles.fab, micFabStyle]}>
+        <Pressable
+          accessibilityLabel="Record task"
+          hitSlop={theme.spacing.sm}
+          onPress={() => handleOpen("voice")}
+          style={[
+            styles.fabInner,
+            {
+              backgroundColor: theme.colors.palette.primary500,
+              shadowColor: theme.colors.palette.neutral900,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="microphone" size={26} color="#fff" />
+        </Pressable>
+      </Animated.View>
+      <Animated.View style={[styles.fab, styles.fabPen, penFabStyle]}>
+        <Pressable
+          accessibilityLabel="Type task"
+          hitSlop={theme.spacing.sm}
+          onPress={() => handleOpen("type")}
+          style={[
+            styles.fabInner,
+            {
+              backgroundColor: theme.colors.palette.neutral700,
+              shadowColor: theme.colors.palette.neutral900,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="pencil" size={24} color="#e6e6e6" />
+        </Pressable>
+      </Animated.View>
+    </View>
+  )
+
+  const renderVoiceContent = () => (
+    <View style={styles.contentRow}>
+      <Animated.View style={[styles.iconBubble, pulseStyle]}>
+        <MaterialCommunityIcons name="microphone" size={20} color="#ff6b6b" />
+      </Animated.View>
+      <Animated.View style={[styles.wave, pulseStyle]} />
+      <Text text={formatTime(recorder.durationSec)} style={styles.timerText} />
+      <Button
+        text="Stop"
+        accessibilityLabel="Stop recording"
+        onPress={() => handleStopRecording(true)}
+        style={[styles.smallButton, { marginLeft: 12, alignSelf: "flex-end" }]}
+        textStyle={{ fontSize: 14 }}
+        preset="default"
+      />
+    </View>
+  )
+
+  const renderTranscribing = () => (
+    <View style={styles.contentRow}>
+      <MaterialCommunityIcons name="microphone" size={20} color={theme.colors.text} />
+      <Text text="Transcribing…" style={styles.helperText} />
+    </View>
+  )
+
+  const renderEditing = () => (
+    <View style={styles.editRow}>
+      <MaterialCommunityIcons
+        name="microphone-outline"
+        size={20}
+        color={theme.colors.text}
+        style={{ marginRight: 10 }}
+      />
+      <TextInput
+        ref={textInputRef}
+        value={text}
+        onChangeText={setText}
+        placeholder="Type your task…"
+        placeholderTextColor={theme.colors.textDim}
+        style={[styles.input, { color: theme.colors.text }]}
+        accessibilityLabel="Task input"
+        autoFocus={false}
+        autoCapitalize="sentences"
+        keyboardAppearance={theme.isDark ? "dark" : "light"}
+        multiline={false}
+      />
+      <TouchableOpacity
+        accessibilityLabel="Submit task"
+        onPress={handleSubmit}
+        style={[
+          styles.submitPill,
+          { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
+        ]}
+      >
+        <Text text="Submit" style={styles.submitText} />
+      </TouchableOpacity>
+    </View>
+  )
+
+  const renderPillContent = () => {
+    switch (state) {
+      case "voice_recording":
+        return renderVoiceContent()
+      case "transcribing":
+        return renderTranscribing()
+      default:
+        return renderEditing()
+    }
+  }
+
+  const renderSuggestions = () => (
+    <Animated.View style={[styles.suggestionsCard, suggestionsStyle]}>
+      <View style={styles.suggestionHeader}>
+        <View style={styles.dot} />
+        <Text text="1 | 1 km" size="xs" />
+      </View>
+      <Text text="• Bring groceries" size="sm" />
+      <Text text="• Need help with motor" size="sm" />
+      <Text text="• Switch on water pump" size="sm" />
+    </Animated.View>
+  )
+
+  const showOverlay = state !== "idle"
+
+  return (
+    <>
+      {renderIdleFabs()}
+      <Animated.View
+        pointerEvents={showOverlay ? "auto" : "none"}
+        style={[StyleSheet.absoluteFillObject, { zIndex: 30 }]}
+      >
+        <Animated.View style={[styles.scrim, scrimStyle]}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={onScrimPress} />
+        </Animated.View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="box-none"
+        >
+          <Animated.View style={[styles.pillContainer, pillStyle]} pointerEvents="box-none">
+            {hasBlurSupport ? (
+              <GlassFallback
+                blurType={theme.isDark ? "dark" : "light"}
+                blurAmount={18}
+                style={StyleSheet.absoluteFillObject}
+              />
+            ) : (
+              <GlassFallback
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  { backgroundColor: "rgba(30,30,32,0.9)" },
+                ]}
+              />
+            )}
+            <View style={[styles.pillInner, { borderColor: "rgba(255,255,255,0.12)" }]}>
+              {renderPillContent()}
+              {state !== "voice_recording" && (
+                <TouchableOpacity
+                  style={styles.close}
+                  accessibilityLabel="Close composer"
+                  onPress={closeComposer}
+                >
+                  <Icon icon="x" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </Animated.View>
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.suggestionContainer,
+              { top: insets.top + TOP_SPACING + PILL_HEIGHT + theme.spacing.md },
+            ]}
+          >
+            {renderSuggestions()}
+          </View>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    </>
+  )
+}
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+}
+
+const styles = StyleSheet.create({
+  close: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  contentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#57f287",
+    marginRight: 8,
+  },
+  editRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  fab: {
+    position: "absolute",
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+  },
+  fabInner: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  fabPen: {
+    left: FAB_OFFSET,
+    top: -FAB_OFFSET,
+  },
+  fabStack: {
+    position: "absolute",
+  },
+  helperText: {
+    marginLeft: 10,
+  },
+  iconBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,0,0,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 16,
+  },
+  pillContainer: {
+    position: "absolute",
+    overflow: "hidden",
+    alignSelf: "center",
+  },
+  pillInner: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(28,28,30,0.75)",
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  smallButton: {
+    height: 34,
+    paddingHorizontal: 14,
+  },
+  submitPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  submitText: {
+    fontSize: 14,
+  },
+  suggestionContainer: {
+    position: "absolute",
+    width: "100%",
+    alignItems: "center",
+  },
+  suggestionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  suggestionsCard: {
+    width: "90%",
+    maxWidth: 520,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: "rgba(28,28,30,0.8)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.12)",
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  timerText: {
+    marginLeft: 12,
+    fontWeight: "600",
+  },
+  wave: {
+    height: 10,
+    flex: 1,
+    marginHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 107, 107, 0.35)",
+  },
+})
