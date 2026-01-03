@@ -1,7 +1,8 @@
-import { FC } from "react"
+import { FC, useCallback } from "react"
 import { Image, ImageStyle, TextStyle, View, ViewStyle } from "react-native"
 
 import { Button } from "@/components/Button" // @demo remove-current-line
+import { SpotlightComposer } from "@/components/SpotlightComposer"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuth } from "@/context/AuthContext" // @demo remove-current-line
@@ -26,6 +27,9 @@ export const WelcomeScreen: FC<WelcomeScreenProps> = function WelcomeScreen(
   // @demo remove-block-start
   const { navigation } = _props
   const { logout } = useAuth()
+  const handleSubmitTask = useCallback(async (value: string, mode: "voice" | "type") => {
+    console.log("Submitted task", value, mode)
+  }, [])
 
   function goNext() {
     navigation.navigate("Demo", { screen: "DemoShowroom", params: {} })
@@ -72,6 +76,8 @@ export const WelcomeScreen: FC<WelcomeScreenProps> = function WelcomeScreen(
         />
         {/* @demo remove-block-end */}
       </View>
+
+      <SpotlightComposer onSubmitTask={handleSubmitTask} />
     </Screen>
   )
 }
