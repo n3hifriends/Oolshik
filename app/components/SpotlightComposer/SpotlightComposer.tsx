@@ -400,8 +400,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   }))
 
   const pillActiveBackground = theme.isDark
-    ? "rgba(255,255,255,0.08)"
-    : "rgba(0,0,0,0.08)"
+    ? "rgba(255,255,255,0.06)"
+    : "rgba(0,0,0,0.04)"
 
   const renderIdleFabs = () => (
     <View
@@ -409,8 +409,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       style={[
         styles.fabStack,
         {
-          bottom: insets.bottom + theme.spacing.xxl,
-          left: insets.left + theme.spacing.xxl,
+          bottom: insets.bottom + theme.spacing.md,
+          left: insets.left + theme.spacing.md,
         },
       ]}
     >
@@ -422,7 +422,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           style={[
             styles.fabInner,
             {
-              backgroundColor: theme.colors.palette.primary500,
+              backgroundColor: theme.colors.tint,
               shadowColor: theme.colors.palette.neutral900,
             },
           ]}
@@ -438,7 +438,9 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           style={[
             styles.fabInner,
             {
-              backgroundColor: theme.colors.palette.neutral700,
+              backgroundColor: theme.isDark
+                ? "rgba(255,255,255,0.18)"
+                : theme.colors.palette.neutral400,
               shadowColor: theme.colors.palette.neutral900,
             },
           ]}
@@ -451,11 +453,24 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 
   const renderVoiceContent = () => (
     <View style={styles.contentRow}>
-      <Animated.View style={[styles.iconBubble, pulseStyle]}>
-        <MaterialCommunityIcons name="microphone" size={20} color="#ff6b6b" />
+      <Animated.View style={[styles.iconBubble, pulseStyle, { borderColor: theme.colors.tint }]}>
+        <MaterialCommunityIcons name="microphone" size={20} color={theme.colors.tint} />
       </Animated.View>
-      <Animated.View style={[styles.wave, pulseStyle]} />
-      <Text text={formatTime(recorder.durationSec)} style={styles.timerText} />
+      <Animated.View
+        style={[
+          styles.wave,
+          pulseStyle,
+          {
+            backgroundColor: theme.isDark
+              ? "rgba(255,255,255,0.18)"
+              : "rgba(0,0,0,0.08)",
+          },
+        ]}
+      />
+      <Text
+        text={formatTime(recorder.durationSec)}
+        style={[styles.timerText, { color: theme.colors.text }]}
+      />
       <Button
         text="Stop"
         accessibilityLabel="Stop recording"
@@ -532,9 +547,25 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   }
 
   const renderSuggestions = () => (
-    <Animated.View style={[styles.suggestionsCard, suggestionsStyle]}>
+    <Animated.View
+      style={[
+        styles.suggestionsCard,
+        suggestionsStyle,
+        {
+          backgroundColor: theme.isDark
+            ? "rgba(22,22,26,0.88)"
+            : "rgba(255,255,255,0.9)",
+          borderColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+        },
+      ]}
+    >
       <View style={styles.suggestionHeader}>
-        <View style={styles.dot} />
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: theme.colors.tint },
+          ]}
+        />
         <Text text="1 | 1 km" size="xs" style={{ color: theme.colors.text }} />
       </View>
       <Text text="• Bring groceries" size="sm" style={{ color: theme.colors.text }} />
@@ -571,11 +602,27 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
             <RNView
               style={[
                 StyleSheet.absoluteFillObject,
-                { backgroundColor: "rgba(30,30,32,0.9)" },
+                {
+                  backgroundColor: theme.isDark
+                    ? "rgba(20,20,24,0.92)"
+                    : "rgba(245,245,248,0.92)",
+                },
               ]}
             />
           )}
-          <RNView style={[styles.pillInner, { borderColor: "rgba(255,255,255,0.12)" }]}>
+          <RNView
+            style={[
+              styles.pillInner,
+              {
+                borderColor: theme.isDark
+                  ? "rgba(255,255,255,0.12)"
+                  : "rgba(0,0,0,0.08)",
+                backgroundColor: theme.isDark
+                  ? "rgba(24,24,28,0.82)"
+                  : "rgba(255,255,255,0.94)",
+              },
+            ]}
+          >
             {renderPillContent()}
             {state !== "voice_recording" && (
               <TouchableOpacity
@@ -688,7 +735,8 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "rgba(255,0,0,0.08)",
+    backgroundColor: "transparent",
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
@@ -709,7 +757,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(28,28,30,0.75)",
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
@@ -760,6 +807,5 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 12,
     borderRadius: 6,
-    backgroundColor: "rgba(255, 107, 107, 0.35)",
   },
 })
