@@ -24,6 +24,7 @@ import { StatusChip } from "@/components/StatusChip"
 import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { useTaskFiltering, Status } from "@/hooks/useTaskFiltering"
 import { getDistanceMeters } from "@/utils/distance"
+import { SpotlightComposer } from "@/components/SpotlightComposer"
 
 type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
@@ -109,9 +110,19 @@ export default function HomeFeedScreen({ navigation }: any) {
     [accept, coords, fetchNearby, navigation, viewMode],
   )
 
+  const handleSubmitTask = useCallback(async (value: string, mode: "voice" | "type") => {
+    console.log("Submitted task", value, mode)
+  }, [])
+
+  // return (
+  //   <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
+  //       <SpotlightComposer onSubmitTask={handleSubmitTask} />
+  //   </Screen>
+  // )
+
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
-      {/* Floating Logout */}
+      
       <Pressable
         onPress={() =>
           Alert.alert("Logout", "Are you sure you want to logout?", [

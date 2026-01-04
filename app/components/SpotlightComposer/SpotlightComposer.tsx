@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
   View,
   useWindowDimensions,
 } from "react-native"
@@ -54,15 +55,15 @@ const PILL_HEIGHT = 62
 const PILL_RADIUS = 24
 const TOP_SPACING = 28
 
-const GlassFallback: React.ComponentType<any> = (() => {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require("@react-native-community/blur").BlurView
-  } catch {
-    return View
-  }
-})()
-const hasBlurSupport = GlassFallback !== View
+let BlurComponent: React.ComponentType<any> | null = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require("@react-native-community/blur")
+  BlurComponent = mod?.BlurView ?? mod?.default ?? null
+} catch {
+  BlurComponent = null
+}
+const hasBlurSupport = !!BlurComponent
 
 const HAPTIC = (() => {
   try {
@@ -73,7 +74,10 @@ const HAPTIC = (() => {
   }
 })()
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+const lerp = (a: number, b: number, t: number): number => {
+  'worklet'
+  return a + (b - a) * t
+}
 
 export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const { theme } = useAppTheme()
@@ -217,6 +221,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           : "Unable to start recording.",
         [{ text: "OK", onPress: closeComposer }],
       )
+      closeComposer()
       return
     }
   }, [closeComposer, recorder, triggerHaptic])
@@ -389,8 +394,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       style={[
         styles.fabStack,
         {
-          bottom: insets.bottom + theme.spacing.md,
-          left: insets.left + theme.spacing.md,
+          bottom: insets.bottom + theme.spacing.xxl,
+          left: insets.left + theme.spacing.xxl,
         },
       ]}
     >
@@ -451,6 +456,11 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     <View style={styles.contentRow}>
       <MaterialCommunityIcons name="microphone" size={20} color={theme.colors.text} />
       <Text text="Transcribing…" style={styles.helperText} />
+      <ActivityIndicator
+        size="small"
+        color={theme.colors.tint}
+        style={{ marginLeft: theme.spacing.sm }}
+      />
     </View>
   )
 
@@ -461,6 +471,13 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         size={20}
         color={theme.colors.text}
         style={{ marginRight: 10 }}
+        onPress={() => {
+          // optional affordance to switch into live recording
+          if (state === "editing") {
+            setMode("voice")
+            handleVoiceStart()
+          }
+        }}
       />
       <TextInput
         ref={textInputRef}
@@ -503,11 +520,11 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     <Animated.View style={[styles.suggestionsCard, suggestionsStyle]}>
       <View style={styles.suggestionHeader}>
         <View style={styles.dot} />
-        <Text text="1 | 1 km" size="xs" />
+        <Text text="1 | 1 km" size="xs" style={{ color: theme.colors.text }} />
       </View>
-      <Text text="• Bring groceries" size="sm" />
-      <Text text="• Need help with motor" size="sm" />
-      <Text text="• Switch on water pump" size="sm" />
+      <Text text="• Bring groceries" size="sm" style={{ color: theme.colors.text }} />
+      <Text text="• Need help with motor" size="sm" style={{ color: theme.colors.text }} />
+      <Text text="• Switch on water pump" size="sm" style={{ color: theme.colors.text }} />
     </Animated.View>
   )
 
@@ -529,14 +546,14 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           pointerEvents="box-none"
         >
           <Animated.View style={[styles.pillContainer, pillStyle]} pointerEvents="box-none">
-            {hasBlurSupport ? (
-              <GlassFallback
+            {hasBlurSupport && BlurComponent ? (
+              <BlurComponent
                 blurType={theme.isDark ? "dark" : "light"}
                 blurAmount={18}
                 style={StyleSheet.absoluteFillObject}
               />
             ) : (
-              <GlassFallback
+              <View
                 style={[
                   StyleSheet.absoluteFillObject,
                   { backgroundColor: "rgba(30,30,32,0.9)" },
@@ -622,6 +639,8 @@ const styles = StyleSheet.create({
   },
   fabStack: {
     position: "absolute",
+    zIndex: 50,
+    elevation: 20,
   },
   helperText: {
     marginLeft: 10,

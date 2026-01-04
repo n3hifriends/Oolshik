@@ -77,7 +77,7 @@ export const WelcomeScreen: FC<WelcomeScreenProps> = function WelcomeScreen(
         {/* @demo remove-block-end */}
       </View>
 
-      <SpotlightComposer onSubmitTask={handleSubmitTask} />
+      {/* <SpotlightComposer onSubmitTask={handleSubmitTask} /> */}
     </Screen>
   )
 }

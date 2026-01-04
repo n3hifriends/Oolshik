@@ -1,15 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Platform } from "react-native"
-import AudioRecorderPlayer from "react-native-audio-recorder-player"
+let AudioRecorderPlayerModule: any = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require("react-native-audio-recorder-player")
+  AudioRecorderPlayerModule = mod?.default ?? mod
+} catch {
+  AudioRecorderPlayerModule = null
+}
 import { check, PERMISSIONS, request, RESULTS } from "react-native-permissions"
-
 type StartResult = { ok: true } | { ok: false; reason: "permission" | "error" }
 type StopResult = { filePath?: string | null; durationSec: number }
 
 export function useVoiceRecorder() {
-  const recorder = useRef(new AudioRecorderPlayer()).current
-  const backListener = useRef<ReturnType<AudioRecorderPlayer["addRecordBackListener"]> | null>(null)
-
+  const recorderRef = useRef<any | null>(null)
+  if (recorderRef.current == null) {
+    if (AudioRecorderPlayerModule) {
+      recorderRef.current =
+        typeof AudioRecorderPlayerModule === "function"
+          ? new AudioRecorderPlayerModule()
+          : AudioRecorderPlayerModule
+    } else {
+      recorderRef.current = {
+        startRecorder: async () => null,
+        stopRecorder: async () => null,
+        addRecordBackListener: (_cb?: any) => () => {},
+      }
+    }
+  }
+  const recorder = recorderRef.current
+  const backListener = useRef<(() => void) | null>(null)
   const [durationSec, setDurationSec] = useState(0)
   const [filePath, setFilePath] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -42,7 +62,7 @@ export function useVoiceRecorder() {
       setIsRecording(true)
       const uri = await recorder.startRecorder()
       setFilePath(uri ?? null)
-      backListener.current = recorder.addRecordBackListener((e) => {
+      backListener.current = recorder.addRecordBackListener((e: { currentPosition?: number }) => {
         setDurationSec(Math.floor((e.currentPosition ?? 0) / 1000))
       })
       return { ok: true }
