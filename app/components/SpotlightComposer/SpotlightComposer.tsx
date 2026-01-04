@@ -8,8 +8,10 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  View,
   useWindowDimensions,
+  Modal,
+  View as RNView,
+  View,
 } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -33,6 +35,19 @@ import { useAppTheme } from "@/theme/context"
 import { transcribeAudio } from "./transcription"
 import { useReduceMotion } from "./useReduceMotion"
 import { useVoiceRecorder } from "./useVoiceRecorder"
+
+let Portal: any = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require("react-native-portal")
+  const candidate = mod?.Portal ?? mod?.default ?? mod
+  const isLegacy = !!(candidate && (candidate as any).childContextTypes)
+  Portal = isLegacy ? null : candidate
+} catch {
+  Portal = null
+}
+const ResolvedPortal =
+  typeof Portal === "function" ? Portal : typeof Portal?.Portal === "function" ? Portal.Portal : null
 
 type ComposerState =
   | "idle"
@@ -246,18 +261,18 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           stiffness: reduceMotion ? 140 : 210,
         },
         (finished) => {
-      if (!finished) return
-      suggestionsProgress.value = withDelay(
-        reduceMotion ? 40 : 140,
-        withTiming(1, { duration: reduceMotion ? 150 : 260 }),
-      )
-      if (nextMode === "voice") {
-        runOnJS(handleVoiceStart)()
-      } else {
-        runOnJS(setEditingState)()
-        runOnJS(focusInput)()
-      }
-    },
+          if (!finished) return
+          suggestionsProgress.value = withDelay(
+            reduceMotion ? 40 : 140,
+            withTiming(1, { duration: reduceMotion ? 150 : 260 }),
+          )
+          if (nextMode === "voice") {
+            runOnJS(handleVoiceStart)()
+          } else {
+            runOnJS(setEditingState)()
+            runOnJS(focusInput)()
+          }
+        },
       )
     },
     [
@@ -530,60 +545,84 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 
   const showOverlay = state !== "idle"
 
+  // overlay content (only the scrim + pill + suggestions); don't include FABs here
+  const overlayContent = (
+    <Animated.View
+      pointerEvents={showOverlay ? "auto" : "none"}
+      style={[StyleSheet.absoluteFillObject, { zIndex: 9999, elevation: 9999 }]}
+    >
+      <Animated.View style={[styles.scrim, scrimStyle]}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onScrimPress} />
+      </Animated.View>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="box-none"
+      >
+        <Animated.View style={[styles.pillContainer, pillStyle]} pointerEvents="box-none">
+          {hasBlurSupport && BlurComponent ? (
+            <BlurComponent
+              blurType={theme.isDark ? "dark" : "light"}
+              blurAmount={18}
+              style={StyleSheet.absoluteFillObject}
+            />
+          ) : (
+            <RNView
+              style={[
+                StyleSheet.absoluteFillObject,
+                { backgroundColor: "rgba(30,30,32,0.9)" },
+              ]}
+            />
+          )}
+          <RNView style={[styles.pillInner, { borderColor: "rgba(255,255,255,0.12)" }]}>
+            {renderPillContent()}
+            {state !== "voice_recording" && (
+              <TouchableOpacity
+                style={styles.close}
+                accessibilityLabel="Close composer"
+                onPress={closeComposer}
+              >
+                <Icon icon="x" />
+              </TouchableOpacity>
+            )}
+          </RNView>
+        </Animated.View>
+
+        <RNView
+          pointerEvents="box-none"
+          style={[
+            styles.suggestionContainer,
+            { top: insets.top + TOP_SPACING + PILL_HEIGHT + theme.spacing.md },
+          ]}
+        >
+          {renderSuggestions()}
+        </RNView>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  )
+
+  // Render: idle FABs always in-place; overlay only when active and rendered into Portal/Modal
   return (
     <>
       {renderIdleFabs()}
-      <Animated.View
-        pointerEvents={showOverlay ? "auto" : "none"}
-        style={[StyleSheet.absoluteFillObject, { zIndex: 30 }]}
-      >
-        <Animated.View style={[styles.scrim, scrimStyle]}>
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={onScrimPress} />
-        </Animated.View>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="box-none"
-        >
-          <Animated.View style={[styles.pillContainer, pillStyle]} pointerEvents="box-none">
-            {hasBlurSupport && BlurComponent ? (
-              <BlurComponent
-                blurType={theme.isDark ? "dark" : "light"}
-                blurAmount={18}
-                style={StyleSheet.absoluteFillObject}
-              />
-            ) : (
-              <View
-                style={[
-                  StyleSheet.absoluteFillObject,
-                  { backgroundColor: "rgba(30,30,32,0.9)" },
-                ]}
-              />
-            )}
-            <View style={[styles.pillInner, { borderColor: "rgba(255,255,255,0.12)" }]}>
-              {renderPillContent()}
-              {state !== "voice_recording" && (
-                <TouchableOpacity
-                  style={styles.close}
-                  accessibilityLabel="Close composer"
-                  onPress={closeComposer}
-                >
-                  <Icon icon="x" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </Animated.View>
-          <View
-            pointerEvents="box-none"
-            style={[
-              styles.suggestionContainer,
-              { top: insets.top + TOP_SPACING + PILL_HEIGHT + theme.spacing.md },
-            ]}
+
+      {showOverlay &&
+        (ResolvedPortal ? (
+          <ResolvedPortal>{overlayContent}</ResolvedPortal>
+        ) : (
+          <Modal
+            visible={showOverlay}
+            transparent
+            animationType="none"
+            onRequestClose={() => {}}
+            statusBarTranslucent
           >
-            {renderSuggestions()}
-          </View>
-        </KeyboardAvoidingView>
-      </Animated.View>
+            <RNView style={{ flex: 1 }} pointerEvents="box-none">
+              {overlayContent}
+            </RNView>
+          </Modal>
+        ))}
     </>
   )
 }

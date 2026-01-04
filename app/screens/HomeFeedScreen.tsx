@@ -122,7 +122,8 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
-      
+      <SpotlightComposer onSubmitTask={handleSubmitTask} />
+
       <Pressable
         onPress={() =>
           Alert.alert("Logout", "Are you sure you want to logout?", [

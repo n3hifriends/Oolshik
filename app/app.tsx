@@ -25,6 +25,18 @@ import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
 import { AuthProvider } from "./context/AuthContext" // @demo remove-current-line
+// runtime-detect portal provider so we don't hard-depend on it
+let PortalProvider: any = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require("react-native-portal")
+  const candidate = mod?.PortalProvider ?? mod?.Provider ?? mod?.default ?? null
+  const isLegacy = !!(candidate && (candidate as any).childContextTypes)
+  PortalProvider = isLegacy ? null : candidate
+} catch {
+  PortalProvider = null
+}
+
 import { initI18n } from "./i18n"
 import { AppNavigator } from "./navigators/AppNavigator"
 import { useNavigationPersistence } from "./navigators/navigationUtilities"
@@ -100,11 +112,21 @@ export function App() {
         <AuthProvider>
           {/* @demo remove-block-end */}
           <ThemeProvider>
-            <AppNavigator
-              linking={linking}
-              initialState={initialNavigationState}
-              onStateChange={onNavigationStateChange}
-            />
+            {PortalProvider && typeof PortalProvider === "function" ? (
+              <PortalProvider>
+                <AppNavigator
+                  linking={linking}
+                  initialState={initialNavigationState}
+                  onStateChange={onNavigationStateChange}
+                />
+              </PortalProvider>
+            ) : (
+              <AppNavigator
+                linking={linking}
+                initialState={initialNavigationState}
+                onStateChange={onNavigationStateChange}
+              />
+            )}
           </ThemeProvider>
           {/* @demo remove-block-start */}
         </AuthProvider>
