@@ -65,10 +65,11 @@ export interface SpotlightComposerProps {
 }
 
 const FAB_SIZE = 56
-const FAB_OFFSET = 12
-const PILL_HEIGHT = 62
-const PILL_RADIUS = 24
-const TOP_SPACING = 28
+const FAB_OFFSET_X = 14
+const FAB_OFFSET_Y = 10
+const PILL_HEIGHT = 66
+const PILL_RADIUS = 26
+const TOP_SPACING = 32
 
 let BlurComponent: React.ComponentType<any> | null = null
 try {
@@ -143,8 +144,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   useEffect(() => {
     const micCenterX = insets.left + theme.spacing.md + FAB_SIZE / 2
     const micCenterY = screenHeight - insets.bottom - theme.spacing.md - FAB_SIZE / 2
-    const penCenterX = micCenterX + FAB_OFFSET
-    const penCenterY = micCenterY - FAB_OFFSET
+    const penCenterX = micCenterX + FAB_OFFSET_X
+    const penCenterY = micCenterY - FAB_OFFSET_Y
     const destY = insets.top + TOP_SPACING + PILL_HEIGHT / 2
 
     startVoiceX.value = micCenterX
@@ -409,11 +410,29 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       style={[
         styles.fabStack,
         {
-          bottom: insets.bottom + theme.spacing.md,
-          left: insets.left + theme.spacing.md,
+          bottom: insets.bottom + theme.spacing.xxxl,
+          left: insets.left + theme.spacing.lg,
         },
       ]}
     >
+      <Animated.View style={[styles.fab, styles.fabPen, penFabStyle]}>
+        <Pressable
+          accessibilityLabel="Type task"
+          hitSlop={theme.spacing.sm}
+          onPress={() => handleOpen("type")}
+          style={[
+            styles.fabInner,
+            {
+              backgroundColor: theme.isDark
+                ? "rgba(255,255,255,0.2)"
+                : theme.colors.palette.neutral300,
+              shadowColor: theme.colors.palette.neutral900,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="pencil" size={24} color="#a78e8eff" />
+        </Pressable>
+      </Animated.View>
       <Animated.View style={[styles.fab, micFabStyle]}>
         <Pressable
           accessibilityLabel="Record task"
@@ -430,31 +449,24 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           <MaterialCommunityIcons name="microphone" size={26} color="#fff" />
         </Pressable>
       </Animated.View>
-      <Animated.View style={[styles.fab, styles.fabPen, penFabStyle]}>
-        <Pressable
-          accessibilityLabel="Type task"
-          hitSlop={theme.spacing.sm}
-          onPress={() => handleOpen("type")}
-          style={[
-            styles.fabInner,
-            {
-              backgroundColor: theme.isDark
-                ? "rgba(255,255,255,0.18)"
-                : theme.colors.palette.neutral400,
-              shadowColor: theme.colors.palette.neutral900,
-            },
-          ]}
-        >
-          <MaterialCommunityIcons name="pencil" size={24} color="#e6e6e6" />
-        </Pressable>
-      </Animated.View>
     </View>
   )
 
   const renderVoiceContent = () => (
     <View style={styles.contentRow}>
-      <Animated.View style={[styles.iconBubble, pulseStyle, { borderColor: theme.colors.tint }]}>
-        <MaterialCommunityIcons name="microphone" size={20} color={theme.colors.tint} />
+      <Animated.View
+        style={[
+          styles.iconBubble,
+          pulseStyle,
+          {
+            borderColor: theme.colors.tint,
+            backgroundColor: theme.isDark
+              ? "rgba(255,255,255,0.08)"
+              : "rgba(0,0,0,0.06)",
+          },
+        ]}
+      >
+        <MaterialCommunityIcons name="microphone" size={22} color={theme.colors.tint} />
       </Animated.View>
       <Animated.View
         style={[
@@ -618,8 +630,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
                   ? "rgba(255,255,255,0.12)"
                   : "rgba(0,0,0,0.08)",
                 backgroundColor: theme.isDark
-                  ? "rgba(24,24,28,0.82)"
-                  : "rgba(255,255,255,0.94)",
+                  ? "rgba(24,24,28,0.9)"
+                  : "rgba(255,255,255,0.96)",
               },
             ]}
           >
@@ -701,12 +713,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    paddingVertical: 6,
   },
   fab: {
     position: "absolute",
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
+    zIndex: 2,
   },
   fabInner: {
     width: FAB_SIZE,
@@ -720,8 +734,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   fabPen: {
-    left: FAB_OFFSET,
-    top: -FAB_OFFSET,
+    left: FAB_OFFSET_X+30,
+    top: -FAB_OFFSET_Y+30,
   },
   fabStack: {
     position: "absolute",
@@ -745,11 +759,13 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#fff",
     fontSize: 16,
+    paddingVertical: 0,
   },
   pillContainer: {
     position: "absolute",
     overflow: "hidden",
     alignSelf: "center",
+    paddingHorizontal: 4,
   },
   pillInner: {
     flex: 1,

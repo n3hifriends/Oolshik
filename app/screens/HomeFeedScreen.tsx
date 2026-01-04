@@ -97,8 +97,8 @@ export default function HomeFeedScreen({ navigation }: any) {
         onAccept={
           viewMode === "forYou" && t.status === "OPEN"
             ? async () => {
-                await onAcceptPress(t.id)
-              }
+              await onAcceptPress(t.id)
+            }
             : undefined
         }
         onPress={() => navigation.navigate("OolshikDetail", { id: t.id })}
@@ -262,11 +262,18 @@ export default function HomeFeedScreen({ navigation }: any) {
 
       {/* Create */}
       <View style={{ position: "absolute", left: 16, right: 16, bottom: 0 }}>
-        <Button
-          tx="oolshik:create"
-          onPress={() => navigation.navigate("OolshikCreate")}
-          style={{ width: "100%", marginBottom: 0 }}
-        />
+        <View style={{ flex: 1, flexDirection: "row", justifyContent: "center" }}>
+          <View style={{ flex: 0.5, flexDirection: "row", justifyContent: "center" }}>
+
+          </View>
+          <View style={{ flex: 0.5, flexDirection: "row", justifyContent: "center" }}>
+            <Button
+              tx="oolshik:create"
+              onPress={() => navigation.navigate("OolshikCreate")}
+              style={{ width: "100%", marginBottom: 0 }}
+            />
+          </View>
+        </View>
       </View>
     </Screen>
   )
