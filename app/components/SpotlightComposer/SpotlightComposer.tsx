@@ -230,13 +230,13 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     triggerHaptic("impactMedium")
     const started = await recorder.start()
     if (!started.ok) {
-      Alert.alert(
-        "Microphone unavailable",
+      const message =
         started.reason === "permission"
           ? "Please allow microphone access to record tasks."
-          : "Unable to start recording.",
-        [{ text: "OK", onPress: closeComposer }],
-      )
+          : started.reason === "module"
+            ? "Audio recorder module is unavailable. Please install react-native-audio-recorder-player and rebuild."
+            : "Unable to start recording."
+      Alert.alert("Microphone unavailable", message, [{ text: "OK", onPress: closeComposer }])
       closeComposer()
       return
     }
@@ -294,6 +294,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const handleStopRecording = useCallback(
     async (shouldTranscribe = true) => {
       const stopped = await recorder.stop()
+      console.log("🚀 ~ SpotlightComposer ~ stopped:", stopped)
       if (!shouldTranscribe) {
         closeComposer()
         return
@@ -689,6 +690,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
+    
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
 }
 
