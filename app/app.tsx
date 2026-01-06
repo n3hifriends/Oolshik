@@ -25,6 +25,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
 import { AuthProvider } from "./context/AuthContext" // @demo remove-current-line
+import { AlertOverrideProvider } from "./components/AlertDialog/AlertOverrideProvider"
 // runtime-detect portal provider so we don't hard-depend on it
 let PortalProvider: any = null
 try {
@@ -114,18 +115,22 @@ export function App() {
           <ThemeProvider>
             {PortalProvider && typeof PortalProvider === "function" ? (
               <PortalProvider>
+                <AlertOverrideProvider>
+                  <AppNavigator
+                    linking={linking}
+                    initialState={initialNavigationState}
+                    onStateChange={onNavigationStateChange}
+                  />
+                </AlertOverrideProvider>
+              </PortalProvider>
+            ) : (
+              <AlertOverrideProvider>
                 <AppNavigator
                   linking={linking}
                   initialState={initialNavigationState}
                   onStateChange={onNavigationStateChange}
                 />
-              </PortalProvider>
-            ) : (
-              <AppNavigator
-                linking={linking}
-                initialState={initialNavigationState}
-                onStateChange={onNavigationStateChange}
-              />
+              </AlertOverrideProvider>
             )}
           </ThemeProvider>
           {/* @demo remove-block-start */}
