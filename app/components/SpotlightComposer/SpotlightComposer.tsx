@@ -31,10 +31,10 @@ import { Button } from "@/components/Button"
 import { Icon } from "@/components/Icon"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
+import { useAudioRecorder } from "@/hooks/useAudioRecorder"
 
 import { transcribeAudio } from "./transcription"
 import { useReduceMotion } from "./useReduceMotion"
-import { useVoiceRecorder } from "./useVoiceRecorder"
 
 let Portal: any = null
 try {
@@ -64,8 +64,17 @@ type ComposerState =
 
 type ComposerMode = "voice" | "type"
 
+type ComposerSubmitPayload = {
+  text: string
+  mode: ComposerMode
+  voiceNote?: {
+    filePath: string
+    durationSec: number
+  }
+}
+
 export interface SpotlightComposerProps {
-  onSubmitTask?: (text: string, mode: ComposerMode) => Promise<void> | void
+  onSubmitTask?: (payload: ComposerSubmitPayload) => Promise<void> | void
 }
 
 const FAB_SIZE = 56
@@ -108,12 +117,17 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const [state, setState] = useState<ComposerState>("idle")
   const [mode, setMode] = useState<ComposerMode | null>(null)
   const [text, setText] = useState("")
+  const [voiceNote, setVoiceNote] = useState<ComposerSubmitPayload["voiceNote"]>(undefined)
 
   const textInputRef = useRef<TextInput>(null)
   const isMounted = useRef(true)
   const setEditingState = useCallback(() => setState("editing"), [])
 
-  const recorder = useVoiceRecorder()
+  const { uri, start, stop, reset, recording, durationSec } = useAudioRecorder(30)
+  const latestRecording = useRef<{ uri: string | null; durationSec: number }>({
+    uri: null,
+    durationSec: 0,
+  })
 
   const selectedMode = useSharedValue<ComposerMode>("voice")
   const openProgress = useSharedValue(0)
@@ -141,9 +155,13 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     isMounted.current = true
     return () => {
       isMounted.current = false
-      recorder.reset()
+      // reset()
     }
-  }, [recorder])
+  }, [reset])
+
+  useEffect(() => {
+    latestRecording.current = { uri, durationSec }
+  }, [durationSec, uri])
 
   useEffect(() => {
     const micCenterX = insets.left + theme.spacing.md + FAB_SIZE / 2
@@ -214,11 +232,12 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     setState("idle")
     setMode(null)
     setText("")
+    setVoiceNote(undefined)
     hideMicFab.value = 0
     hidePenFab.value = 0
     suggestionsProgress.value = 0
-    recorder.reset()
-  }, [hideMicFab, hidePenFab, recorder, suggestionsProgress])
+    reset()
+  }, [hideMicFab, hidePenFab, reset, suggestionsProgress])
 
   const closeComposer = useCallback(() => {
     setState("closing")
@@ -231,20 +250,22 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 
   const handleVoiceStart = useCallback(async () => {
     setState("voice_recording")
+    setVoiceNote(undefined)
     triggerHaptic("impactMedium")
-    const started = await recorder.start()
-    if (!started.ok) {
-      const message =
-        started.reason === "permission"
-          ? "Please allow microphone access to record tasks."
-          : started.reason === "module"
-            ? "Audio recorder module is unavailable. Please install react-native-audio-recorder-player and rebuild."
-            : "Unable to start recording."
-      Alert.alert("Microphone unavailable", message, [{ text: "OK", onPress: closeComposer }])
+    try {
+      setTimeout(() => {
+        async function startRecording() {
+          await start()
+        }
+        startRecording()
+      }, 100)
+    } catch {
+      Alert.alert("Microphone unavailable", "Please allow microphone access and try again.", [
+        { text: "OK", onPress: closeComposer },
+      ])
       closeComposer()
-      return
     }
-  }, [closeComposer, recorder, triggerHaptic])
+  }, [closeComposer, start, triggerHaptic])
 
   const handleOpen = useCallback(
     (nextMode: ComposerMode) => {
@@ -297,19 +318,25 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 
   const handleStopRecording = useCallback(
     async (shouldTranscribe = true) => {
-      const stopped = await recorder.stop()
-      console.log("🚀 ~ SpotlightComposer ~ stopped:", stopped)
+      await stop()
       if (!shouldTranscribe) {
         closeComposer()
         return
       }
-      if (!stopped.filePath) {
+      let { uri: filePath, durationSec: recordedDuration } = latestRecording.current
+      if (!filePath) {
+        // allow state to flush
+        await new Promise((r) => setTimeout(r, 50))
+        ;({ uri: filePath, durationSec: recordedDuration } = latestRecording.current)
+      }
+      if (!filePath) {
         closeComposer()
         return
       }
+      setVoiceNote({ filePath, durationSec: recordedDuration })
       setState("transcribing")
       try {
-        const transcript = await transcribeAudio(stopped.filePath)
+        const transcript = await transcribeAudio(filePath)
         if (!isMounted.current || state === "closing") return
         setText(transcript)
         setState("editing")
@@ -320,14 +347,18 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         closeComposer()
       }
     },
-    [closeComposer, focusInput, recorder, state],
+    [closeComposer, focusInput, state, stop],
   )
 
   const handleSubmit = useCallback(async () => {
     if (!text.trim()) return
     setState("submitting")
     try {
-      await onSubmitTask?.(text.trim(), mode ?? "type")
+      await onSubmitTask?.({
+        text: text.trim(),
+        mode: mode ?? "type",
+        voiceNote: voiceNote ?? undefined,
+      })
       if (Platform.OS === "android") {
         const ToastAndroid = require("react-native").ToastAndroid
         ToastAndroid.show("Task submitted", ToastAndroid.SHORT)
@@ -340,7 +371,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       return
     }
     closeComposer()
-  }, [closeComposer, mode, onSubmitTask, text])
+  }, [closeComposer, mode, onSubmitTask, text, voiceNote])
 
   const onScrimPress = useCallback(() => {
     if (state === "voice_recording") {
@@ -489,7 +520,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         ]}
       />
       <Text
-        text={formatTime(recorder.durationSec)}
+        text={formatTime(durationSec)}
         style={[styles.timerText, { color: theme.colors.text }]}
       />
       <Button

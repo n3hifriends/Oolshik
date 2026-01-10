@@ -13,7 +13,6 @@ import { RadioGroup } from "@/components/RadioGroup"
 import { useAuth } from "@/context/AuthContext"
 import { FLAGS } from "@/config/flags"
 import { useTaskStore } from "@/store/taskStore"
-import { Task } from "@/api/client"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
@@ -32,7 +31,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const { uri, start, stop, recording, durationSec, reset } = useAudioRecorder(30)
   const { coords } = useForegroundLocation()
   const { userId, userName } = useAuth()
-  const { tasks } = useTaskStore()
+  const { fetchNearby } = useTaskStore()
 
   // Load/unload preview sound when a new recording is available
   useEffect(() => {
@@ -104,55 +103,49 @@ export default function CreateTaskScreen({ navigation }: any) {
     reset()
   }
 
-  const handlePost = async () => {
-    // if (true) {
-    //   navigation.navigate("QrScanner", { taskId: "d2a2ab3d-3c45-4f71-b663-18bef2f8355b" })
-    //   return
-    // }
+  const uploadVoiceIfNeeded = async () => {
+    if (!uri || !audioAccepted) return undefined
+    const res = await uploadAudioSmart({
+      uri,
+      filename: `voice_${Date.now()}.m4a`,
+      mimeType: "audio/m4a",
+      durationMs: durationSec * 1000,
+    })
+    if (!res.ok) {
+      throw new Error("Upload failed. Please try again.")
+    }
+    return res.url
+  }
 
+  const resetAudioPreview = async () => {
+    try {
+      await soundRef.current?.unloadAsync()
+    } catch {}
+    soundRef.current = null
+    setAudioAccepted(false)
+    setIsPlaying(false)
+    setPlaybackSecs(0)
+    reset()
+  }
+
+  const handleSubmitTask = async () => {
     if (!coords) {
       Alert.alert("Location not ready", "Please enable location to post your request.")
       return
     }
-    if (!title.trim()) {
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle) {
       Alert.alert("Missing title", "Please enter a title for your request.")
       return
     }
 
     setSubmitting(true)
     try {
-      // Decide if we will actually upload a recorded file
-      // const wantRealUpload = false && !!uri && audioAccepted
-
-      const fallbackVoice = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-      let finalVoiceUrl = fallbackVoice
-
-      // if (!wantRealUpload) {
-      // inside handlePost:
-      let voiceUrl: string | undefined
-
-      if (uri && audioAccepted) {
-        const res = await uploadAudioSmart({
-          uri,
-          filename: `voice_${Date.now()}.m4a`,
-          mimeType: "audio/m4a",
-          durationMs: durationSec * 1000,
-        })
-        if (!res.ok) {
-          Alert.alert("Upload failed", "Please try again.")
-          setSubmitting(false)
-          return
-        }
-        voiceUrl = res.url
-      }
-      finalVoiceUrl = "" + voiceUrl
-      // }
-
-      // 3) create (mock returns ok with fake task; real hits backend)
+      const voiceUrl = await uploadVoiceIfNeeded()
       const payload = {
-        title: title.trim(),
+        title: trimmedTitle,
         description: description.trim() || undefined,
-        voiceUrl: finalVoiceUrl,
+        voiceUrl,
         latitude: coords.latitude,
         longitude: coords.longitude,
         radiusMeters: radiusKm * 1000,
@@ -162,28 +155,24 @@ export default function CreateTaskScreen({ navigation }: any) {
       }
 
       const res = await OolshikApi.createTask(payload)
-
-      if (res.ok && res.data) {
-        try {
-          await soundRef.current?.unloadAsync()
-        } catch {}
-        soundRef.current = null
-        setAudioAccepted(false)
-        setIsPlaying(false)
-        setPlaybackSecs(0)
-        reset()
-        tasks.unshift(res.data as Task)
-        Alert.alert("Posted", "Your request has been created successfully.", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ])
-      } else {
+      if (!res.ok || !res.data) {
         const errMsg =
           (res as any)?.data?.message ||
           (res as any)?.problem ||
           (res as any)?.originalError?.message ||
           "Please try again."
-        Alert.alert("Create failed", errMsg)
+        throw new Error(errMsg)
       }
+
+      await resetAudioPreview()
+      // refresh nearby list so the new task shows up when returning
+      try {
+        await fetchNearby(coords.latitude, coords.longitude)
+      } catch {}
+
+      Alert.alert("Posted", "Your request has been created successfully.", [
+        { text: "OK", onPress: () => navigation.goBack() },
+      ])
     } catch (e: any) {
       Alert.alert("Create failed", e?.message ?? "Unexpected error occurred.")
     } finally {
@@ -312,7 +301,7 @@ export default function CreateTaskScreen({ navigation }: any) {
       {/* Submit */}
       <Button
         text={submitting ? "Posting..." : "Post"}
-        onPress={handlePost}
+        onPress={handleSubmitTask}
         // disabled={submitting || !coords}
       />
     </Screen>
