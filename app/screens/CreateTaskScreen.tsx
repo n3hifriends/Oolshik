@@ -105,10 +105,10 @@ export default function CreateTaskScreen({ navigation }: any) {
   }
 
   const handlePost = async () => {
-    if (true) {
-      navigation.navigate("QrScanner", { taskId: "d2a2ab3d-3c45-4f71-b663-18bef2f8355b" })
-      return
-    }
+    // if (true) {
+    //   navigation.navigate("QrScanner", { taskId: "d2a2ab3d-3c45-4f71-b663-18bef2f8355b" })
+    //   return
+    // }
 
     if (!coords) {
       Alert.alert("Location not ready", "Please enable location to post your request.")

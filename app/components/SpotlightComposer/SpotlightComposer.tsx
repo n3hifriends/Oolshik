@@ -47,7 +47,11 @@ try {
   Portal = null
 }
 const ResolvedPortal =
-  typeof Portal === "function" ? Portal : typeof Portal?.Portal === "function" ? Portal.Portal : null
+  typeof Portal === "function"
+    ? Portal
+    : typeof Portal?.Portal === "function"
+      ? Portal.Portal
+      : null
 
 type ComposerState =
   | "idle"
@@ -91,7 +95,7 @@ const HAPTIC = (() => {
 })()
 
 const lerp = (a: number, b: number, t: number): number => {
-  'worklet'
+  "worklet"
   return a + (b - a) * t
 }
 
@@ -349,6 +353,16 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         },
       ])
       return
+    } else if (state === "editing" && text.trim().length > 0) {
+      Alert.alert("Discard changes?", "Your current changes will be discarded.", [
+        { text: "Keep editing", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => closeComposer(),
+        },
+      ])
+      return
     }
     if (state !== "idle") {
       closeComposer()
@@ -367,7 +381,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     const width = lerp(FAB_SIZE, targetWidth.value, progress)
     const height = lerp(FAB_SIZE, PILL_HEIGHT, progress)
     const translateX = lerp(startX - width / 2, targetX.value - width / 2, progress)
-    const translateY = lerp(startY - height / 2, targetY.value - height / 2, progress)
+    const translateY = lerp(startY - height / 2, targetY.value - height / 2, progress / 2)
     const borderRadius = lerp(FAB_SIZE / 2, PILL_RADIUS, progress)
 
     return {
@@ -401,9 +415,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     transform: [{ scale: pulse.value }],
   }))
 
-  const pillActiveBackground = theme.isDark
-    ? "rgba(255,255,255,0.06)"
-    : "rgba(0,0,0,0.04)"
+  const pillActiveBackground = theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"
 
   const renderIdleFabs = () => (
     <View
@@ -461,9 +473,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           pulseStyle,
           {
             borderColor: theme.colors.tint,
-            backgroundColor: theme.isDark
-              ? "rgba(255,255,255,0.08)"
-              : "rgba(0,0,0,0.06)",
+            backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
           },
         ]}
       >
@@ -474,9 +484,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
           styles.wave,
           pulseStyle,
           {
-            backgroundColor: theme.isDark
-              ? "rgba(255,255,255,0.18)"
-              : "rgba(0,0,0,0.08)",
+            backgroundColor: theme.isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.08)",
           },
         ]}
       />
@@ -565,20 +573,13 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         styles.suggestionsCard,
         suggestionsStyle,
         {
-          backgroundColor: theme.isDark
-            ? "rgba(22,22,26,0.88)"
-            : "rgba(255,255,255,0.9)",
+          backgroundColor: theme.isDark ? "rgba(22,22,26,0.88)" : "rgba(255,255,255,0.9)",
           borderColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
         },
       ]}
     >
       <View style={styles.suggestionHeader}>
-        <View
-          style={[
-            styles.dot,
-            { backgroundColor: theme.colors.tint },
-          ]}
-        />
+        <View style={[styles.dot, { backgroundColor: theme.colors.tint }]} />
         <Text text="1 | 1 km" size="xs" style={{ color: theme.colors.text }} />
       </View>
       <Text text="• Bring groceries" size="sm" style={{ color: theme.colors.text }} />
@@ -616,9 +617,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
               style={[
                 StyleSheet.absoluteFillObject,
                 {
-                  backgroundColor: theme.isDark
-                    ? "rgba(20,20,24,0.92)"
-                    : "rgba(245,245,248,0.92)",
+                  backgroundColor: theme.isDark ? "rgba(20,20,24,0.92)" : "rgba(245,245,248,0.92)",
                 },
               ]}
             />
@@ -627,12 +626,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
             style={[
               styles.pillInner,
               {
-                borderColor: theme.isDark
-                  ? "rgba(255,255,255,0.12)"
-                  : "rgba(0,0,0,0.08)",
-                backgroundColor: theme.isDark
-                  ? "rgba(24,24,28,0.9)"
-                  : "rgba(255,255,255,0.96)",
+                borderColor: theme.isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+                backgroundColor: theme.isDark ? "rgba(24,24,28,0.9)" : "rgba(255,255,255,0.96)",
               },
             ]}
           >
@@ -656,7 +651,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
             { top: insets.top + TOP_SPACING + PILL_HEIGHT + theme.spacing.md },
           ]}
         >
-          {renderSuggestions()}
+          {/* {renderSuggestions()} */}
         </RNView>
       </KeyboardAvoidingView>
     </Animated.View>
@@ -673,7 +668,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         ) : (
           <Modal
             visible={showOverlay}
-            transparent
+            // transparent
             animationType="none"
             onRequestClose={() => {}}
             statusBarTranslucent
@@ -690,7 +685,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
-    
+
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
 }
 
@@ -736,8 +731,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   fabPen: {
-    left: FAB_OFFSET_X+30,
-    top: -FAB_OFFSET_Y+30,
+    left: FAB_OFFSET_X + 30,
+    top: -FAB_OFFSET_Y + 30,
   },
   fabStack: {
     position: "absolute",
