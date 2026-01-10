@@ -25,6 +25,8 @@ import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { useTaskFiltering, Status } from "@/hooks/useTaskFiltering"
 import { getDistanceMeters } from "@/utils/distance"
 import { SpotlightComposer } from "@/components/SpotlightComposer"
+import { OolshikApi } from "@/api"
+import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
@@ -33,12 +35,13 @@ const LOGOUT_COLOR = "#FF6B2C"
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
-  const { logout, userId } = useAuth()
+  const { logout, userId, userName } = useAuth()
 
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
     new Set(["OPEN", "ASSIGNED"]),
   )
   const [viewMode, setViewMode] = useState<ViewMode>("forYou")
+  const [creatingTask, setCreatingTask] = useState(false)
 
   // search
   const [searchOpen, setSearchOpen] = useState(false)
@@ -110,9 +113,82 @@ export default function HomeFeedScreen({ navigation }: any) {
     [accept, coords, fetchNearby, navigation, viewMode],
   )
 
-  const handleSubmitTask = useCallback(async (value: string, mode: "voice" | "type") => {
-    console.log("Submitted task", value, mode)
-  }, [])
+  const handleSubmitTask = useCallback(
+    async ({
+      text,
+      mode,
+      voiceNote,
+    }: {
+      text: string
+      mode: "voice" | "type"
+      voiceNote?: { filePath: string; durationSec: number }
+    }) => {
+      const title = text.trim()
+      const isVoice = mode === "voice"
+      if (!title) {
+        throw new Error("Please enter a title.")
+      }
+      if (!coords) {
+        throw new Error("Location not available. Please enable location and try again.")
+      }
+      if (isVoice && !voiceNote) {
+        throw new Error("Recording not found. Please record again.")
+      }
+      if (creatingTask) {
+        throw new Error("Already submitting, please wait.")
+      }
+
+      const uploadVoiceIfNeeded = async () => {
+        if (!voiceNote) return undefined
+        const res = await uploadAudioSmart({
+          uri: voiceNote.filePath,
+          filename: `voice_${Date.now()}.m4a`,
+          mimeType: "audio/m4a",
+          durationMs: voiceNote.durationSec * 1000,
+        })
+        if (!res.ok) {
+          throw new Error("Upload failed. Please try again.")
+        }
+        return res.url
+      }
+
+      setCreatingTask(true)
+      try {
+        const voiceUrl = await uploadVoiceIfNeeded()
+        const payload = {
+          title,
+          description: undefined, // extend when composer provides description/audio
+          voiceUrl,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          radiusMeters: radiusMeters * 1000,
+          createdById: userId,
+          createdByName: userName,
+          createdAt: new Date().toISOString(),
+        }
+
+        const res = await OolshikApi.createTask(payload)
+        if (!res.ok || !res.data) {
+          const errMsg =
+            (res as any)?.data?.message ||
+            (res as any)?.problem ||
+            (res as any)?.originalError?.message ||
+            "Please try again."
+          throw new Error(errMsg)
+        }
+
+        // Refresh nearby feed so the new task appears
+        try {
+          await fetchNearby(coords.latitude, coords.longitude)
+        } catch {
+          // best-effort refresh; no need to block success
+        }
+      } finally {
+        setCreatingTask(false)
+      }
+    },
+    [coords, creatingTask, fetchNearby, radiusMeters, userId, userName],
+  )
 
   // return (
   //   <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>

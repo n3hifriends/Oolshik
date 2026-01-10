@@ -357,7 +357,7 @@ export type ReportPayload = {
 export type Task = ServerTask
 
 type CreateTaskPayload = {
-  voiceUrl: string
+  voiceUrl?: string
   description?: string
   radiusMeters: number
   createdById?: string
