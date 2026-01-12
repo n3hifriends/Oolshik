@@ -4,6 +4,9 @@ import { api as Api } from "@/api/client"
 import { initUpload, uploadChunk, completeUpload, ensureOk, streamUrl } from "@/api/audio"
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
+const PRESIGN_RETRY_COOLDOWN_MS = 10 * 60 * 1000
+let presignState: "unknown" | "supported" | "unsupported" = "unknown"
+let lastPresignAttemptAt = 0
 
 type Opts = {
   uri: string // file://...
@@ -24,27 +27,38 @@ export async function uploadAudioSmart(opts: Opts): Promise<{ ok: true; url: str
   const mimeType = opts.mimeType ?? "audio/m4a"
   const filename = opts.filename ?? `recording_${Date.now()}.m4a`
 
-  // Try presigned S3 first (will 501/500 on local → we catch and fallback)
-  try {
-    const pres = await Api.post<{ uploadUrl: string; fileUrl: string; objectKey: string }>(
-      "/media/pre-signed",
-      { contentType: mimeType },
-    )
-    if (pres.ok && pres.data) {
-      const { uploadUrl, fileUrl } = pres.data
-      // Upload file as binary (no base64) using RNFS
-      const stat = await RNFS.stat(opts.uri.replace("file://", ""))
-      const data = await RNFS.readFile(opts.uri, "base64")
-      const res = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": mimeType },
-        body: Buffer.from(data, "base64") as any,
-      })
-      if (!res.ok) throw new Error(`PUT failed ${res.status}`)
-      return { ok: true, url: fileUrl }
+  const shouldTryPresign =
+    presignState !== "unsupported" ||
+    Date.now() - lastPresignAttemptAt > PRESIGN_RETRY_COOLDOWN_MS
+
+  // Try presigned S3 first (fallback to chunked on failure)
+  if (shouldTryPresign) {
+    try {
+      lastPresignAttemptAt = Date.now()
+      const pres = await Api.post<{ uploadUrl: string; fileUrl: string; objectKey: string }>(
+        "/media/pre-signed",
+        { contentType: mimeType },
+      )
+      if (pres.ok && pres.data) {
+        presignState = "supported"
+        const { uploadUrl, fileUrl } = pres.data
+        // Upload file as binary (no base64) using RNFS
+        const data = await RNFS.readFile(opts.uri, "base64")
+        const res = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": mimeType },
+          body: Buffer.from(data, "base64") as any,
+        })
+        if (!res.ok) throw new Error(`PUT failed ${res.status}`)
+        return { ok: true, url: fileUrl }
+      }
+
+      if (pres.status && [400, 404, 405, 500, 501].includes(pres.status)) {
+        presignState = "unsupported"
+      }
+    } catch {
+      // ignore; fall back to chunked
     }
-  } catch {
-    // ignore; fall back to chunked
   }
 
   // ---- Fallback: server-buffered chunk upload (LOCAL) ----

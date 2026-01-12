@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react"
-import { View, Alert, ActivityIndicator } from "react-native"
+import { View, Alert, ActivityIndicator, Linking } from "react-native"
+import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -29,9 +30,15 @@ export default function CreateTaskScreen({ navigation }: any) {
   const MAX_DESC = 500
 
   const { uri, start, stop, recording, durationSec, reset } = useAudioRecorder(30)
-  const { coords } = useForegroundLocation()
+  const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { userId, userName } = useAuth()
   const { fetchNearby } = useTaskStore()
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh()
+    }, [refresh]),
+  )
 
   // Load/unload preview sound when a new recording is available
   useEffect(() => {
@@ -129,7 +136,8 @@ export default function CreateTaskScreen({ navigation }: any) {
   }
 
   const handleSubmitTask = async () => {
-    if (!coords) {
+    if (status !== "ready" || !coords) {
+      refresh()
       Alert.alert("Location not ready", "Please enable location to post your request.")
       return
     }
@@ -195,6 +203,29 @@ export default function CreateTaskScreen({ navigation }: any) {
       contentContainerStyle={{ padding: 16, gap: 12 }}
     >
       <Text preset="heading" text="Create Task" />
+
+      {status !== "ready" && (
+        <View style={{ gap: 10 }}>
+          {status === "loading" || status === "idle" ? (
+            <View style={{ alignItems: "center", gap: 8 }}>
+              <ActivityIndicator />
+              <Text text="Getting your location…" />
+            </View>
+          ) : status === "denied" ? (
+            <>
+              <Text preset="heading" text="Location permission denied" />
+              <Text text="Enable location to post your request." />
+              <Button text="Open Settings" onPress={() => Linking.openSettings()} />
+            </>
+          ) : (
+            <>
+              <Text preset="heading" text="Could not access location" />
+              <Text text={locationError ?? "Please try again."} />
+              <Button text="Retry" onPress={refresh} />
+            </>
+          )}
+        </View>
+      )}
 
       {/* Title */}
       <View style={{ gap: 6 }}>
