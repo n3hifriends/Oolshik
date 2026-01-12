@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react"
-import { View, ActivityIndicator, Pressable, Linking, Platform } from "react-native"
-import { useRoute } from "@react-navigation/native"
+import { View, ActivityIndicator, Pressable, Linking, Platform, Alert } from "react-native"
+import { useFocusEffect, useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -84,7 +84,7 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const [sound, setSound] = React.useState<Audio.Sound | null>(null)
   const [playing, setPlaying] = React.useState(false)
-  const { coords } = useForegroundLocation()
+  const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { radiusMeters } = useTaskStore()
   const [justCompleted, setJustCompleted] = React.useState(false)
 
@@ -111,6 +111,12 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const [rating, setRating] = useState<number>(2.5) // center default (neutral)
   const [submitting, setSubmitting] = useState(false)
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh()
+    }, [refresh]),
+  )
 
   React.useEffect(() => {
     if (current?.createdByPhoneNumber) {
@@ -205,8 +211,9 @@ export default function TaskDetailScreen({ navigation }: any) {
   }
 
   const onAccept = async () => {
-    if (!coords) {
-      alert("Location not available")
+    if (status !== "ready" || !coords) {
+      refresh()
+      Alert.alert("Location not available", "Please enable location and try again.")
       return
     }
     if (!current) return
@@ -259,6 +266,37 @@ export default function TaskDetailScreen({ navigation }: any) {
     (current?.distanceMtr ?? 0) < 1000
       ? `${(current?.distanceMtr ?? 0).toFixed(0)}m`
       : `${((current?.distanceMtr ?? 0) / 1000).toFixed(1)}km`
+
+  const renderLocationState = () => {
+    if (status === "loading" || status === "idle") {
+      return (
+        <View style={{ paddingVertical: 16, alignItems: "center", gap: 8 }}>
+          <ActivityIndicator />
+          <Text text="Getting your location…" />
+        </View>
+      )
+    }
+    if (status === "denied") {
+      return (
+        <View style={{ paddingVertical: 16, gap: 10 }}>
+          <Text preset="heading" text="Location permission denied" />
+          <Text text="Enable location to accept tasks." />
+          <Button text="Open Settings" onPress={() => Linking.openSettings()} />
+        </View>
+      )
+    }
+    if (status === "error") {
+      return (
+        <View style={{ paddingVertical: 16, gap: 10 }}>
+          <Text preset="heading" text="Could not access location" />
+          <Text text={locationError ?? "Please try again."} />
+          <Button text="Retry" onPress={refresh} />
+        </View>
+      )
+    }
+    return null
+  }
+
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
@@ -281,6 +319,8 @@ export default function TaskDetailScreen({ navigation }: any) {
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             {loading ? <ActivityIndicator /> : <Text text="Task not found" />}
           </View>
+        ) : status !== "ready" ? (
+          renderLocationState()
         ) : (
           <View style={{ gap: spacing.md }}>
             {/* Poster row */}

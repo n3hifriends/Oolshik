@@ -43,6 +43,9 @@ export const useTaskStore = create<State>((set, get) => ({
   setTab: (t) => set({ tab: t }),
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
+    console.log("🚀 ~ statuses:", statuses)
+    console.log("🚀 ~ lon:", lon)
+    console.log("🚀 ~ lat:", lat)
     set({ loading: true })
     try {
       if (FLAGS.USE_MOCK_NEARBY) {
@@ -59,6 +62,7 @@ export const useTaskStore = create<State>((set, get) => ({
         const r = get().radiusMeters
         const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
         if (res.ok) set({ tasks: res.data ?? [] })
+        console.log("🚀 ~ res.data:", res.data)
       }
     } finally {
       set({ loading: false })

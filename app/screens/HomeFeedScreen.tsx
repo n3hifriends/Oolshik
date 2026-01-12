@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   TextInput,
+  Linking,
 } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
@@ -33,9 +34,10 @@ const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
 const LOGOUT_COLOR = "#FF6B2C"
 
 export default function HomeFeedScreen({ navigation }: any) {
-  const { coords } = useForegroundLocation()
+  const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
   const { logout, userId, userName } = useAuth()
+  const lastFetchKeyRef = useRef<string | null>(null)
 
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
     new Set(["OPEN", "ASSIGNED"]),
@@ -47,6 +49,9 @@ export default function HomeFeedScreen({ navigation }: any) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [rawSearch, setRawSearch] = useState("")
   const searchInputRef = useRef<TextInput>(null)
+
+  const sortedStatuses = useMemo(() => Array.from(selectedStatuses).sort(), [selectedStatuses])
+  const statusesKey = useMemo(() => sortedStatuses.join(","), [sortedStatuses])
 
   const { filtered, setQuery } = useTaskFiltering(tasks, {
     selectedStatuses,
@@ -64,15 +69,37 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      if (coords) {
-        const statusesArg = selectedStatuses.size ? Array.from(selectedStatuses) : undefined
-        fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
-      }
-    }, [coords?.latitude, coords?.longitude, radiusMeters, selectedStatuses]),
+      refresh()
+    }, [refresh]),
+  )
+
+  useFocusEffect(
+    useCallback(() => {
+      if (status !== "ready" || !coords) return
+      const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+      const key = [
+        coords.latitude.toFixed(5),
+        coords.longitude.toFixed(5),
+        radiusMeters,
+        statusesKey,
+      ].join("|")
+      if (lastFetchKeyRef.current === key) return
+      lastFetchKeyRef.current = key
+      fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
+    }, [
+      status,
+      coords?.latitude,
+      coords?.longitude,
+      radiusMeters,
+      statusesKey,
+      fetchNearby,
+      sortedStatuses,
+    ]),
   )
 
   const onAcceptPress = async (taskId: string) => {
     if (!coords) {
+      refresh()
       alert("Location not available")
       return
     }
@@ -129,6 +156,7 @@ export default function HomeFeedScreen({ navigation }: any) {
         throw new Error("Please enter a title.")
       }
       if (!coords) {
+        refresh()
         throw new Error("Location not available. Please enable location and try again.")
       }
       if (isVoice && !voiceNote) {
@@ -187,8 +215,46 @@ export default function HomeFeedScreen({ navigation }: any) {
         setCreatingTask(false)
       }
     },
-    [coords, creatingTask, fetchNearby, radiusMeters, userId, userName],
+    [coords, creatingTask, fetchNearby, radiusMeters, refresh, userId, userName],
   )
+
+  const onOpenSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings()
+    } catch {
+      Alert.alert("Unable to open settings", "Please open Settings and enable location access.")
+    }
+  }, [])
+
+  const renderLocationState = () => {
+    if (status === "loading" || status === "idle") {
+      return (
+        <View style={{ paddingVertical: 24, alignItems: "center", gap: 8 }}>
+          <ActivityIndicator />
+          <Text text="Getting your location…" />
+        </View>
+      )
+    }
+    if (status === "denied") {
+      return (
+        <View style={{ paddingVertical: 24, gap: 12 }}>
+          <Text text="Location permission denied" preset="heading" />
+          <Text text="Enable location to see nearby tasks." />
+          <Button text="Open Settings" onPress={onOpenSettings} />
+        </View>
+      )
+    }
+    if (status === "error") {
+      return (
+        <View style={{ paddingVertical: 24, gap: 12 }}>
+          <Text text="Could not access location" preset="heading" />
+          <Text text={locationError ?? "Please try again."} />
+          <Button text="Retry" onPress={refresh} />
+        </View>
+      )
+    }
+    return null
+  }
 
   // return (
   //   <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
@@ -277,7 +343,10 @@ export default function HomeFeedScreen({ navigation }: any) {
                 key={km}
                 label={`${km} km`}
                 active={radiusMeters === km}
-                onPress={() => setRadius(km as Radius)}
+                onPress={() => {
+                  console.log("🚀 ~ onPress ~ km:", km)
+                  setRadius(km as Radius)
+                }}
               />
             ))}
           </View>
@@ -298,7 +367,9 @@ export default function HomeFeedScreen({ navigation }: any) {
 
       {/* List */}
       <View style={{ flex: 1, paddingHorizontal: 16, backgroundColor: colors.background }}>
-        {loading ? (
+        {status !== "ready" ? (
+          renderLocationState()
+        ) : loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator />
           </View>
@@ -314,10 +385,12 @@ export default function HomeFeedScreen({ navigation }: any) {
             removeClippedSubviews
             refreshing={loading}
             onRefresh={() => {
-              if (coords) {
-                const statusesArg = selectedStatuses.size ? Array.from(selectedStatuses) : undefined
-                fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
+              if (status !== "ready" || !coords) {
+                refresh()
+                return
               }
+              const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+              fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
             }}
             contentContainerStyle={{ paddingBottom: 140 }}
             ListEmptyComponent={

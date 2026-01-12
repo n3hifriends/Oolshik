@@ -1,30 +1,55 @@
 import * as Location from "expo-location"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 type LatLng = { latitude: number; longitude: number }
+type LocationStatus = "idle" | "loading" | "ready" | "denied" | "error"
 
 export function useForegroundLocation() {
   const [coords, setCoords] = useState<LatLng | null>(null)
+  const [lastKnown, setLastKnown] = useState<LatLng | null>(null)
   const [granted, setGranted] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<LocationStatus>("idle")
+  const watcherRef = useRef<Location.LocationSubscription | null>(null)
+  const [refreshToken, setRefreshToken] = useState(0)
+
+  const refresh = useCallback(() => {
+    setRefreshToken((v) => v + 1)
+  }, [])
 
   useEffect(() => {
-    let watcher: Location.LocationSubscription | null = null
     let cancelled = false
 
     async function bootstrap() {
       try {
+        watcherRef.current?.remove()
+        watcherRef.current = null
+        if (!cancelled) {
+          setError(null)
+          setStatus("loading")
+        }
+
         const { status } = await Location.requestForegroundPermissionsAsync()
         const ok = status === Location.PermissionStatus.GRANTED
         if (!cancelled) setGranted(ok)
-        if (!ok) return
+        if (!ok) {
+          if (!cancelled) {
+            setCoords(null)
+            setLastKnown(null)
+            setStatus("denied")
+          }
+          return
+        }
 
         const lastKnown = await Location.getLastKnownPositionAsync()
         if (!cancelled && lastKnown?.coords) {
-          setCoords({
+          const cached = {
             latitude: lastKnown.coords.latitude,
             longitude: lastKnown.coords.longitude,
-          })
+          }
+          setLastKnown(cached)
+          setCoords(cached)
+          setStatus("ready")
         }
 
         const current = await Location.getCurrentPositionAsync({
@@ -35,9 +60,10 @@ export function useForegroundLocation() {
             latitude: current.coords.latitude,
             longitude: current.coords.longitude,
           })
+          setStatus("ready")
         }
 
-        watcher = await Location.watchPositionAsync(
+        watcherRef.current = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
             timeInterval: 30_000,
@@ -49,10 +75,17 @@ export function useForegroundLocation() {
               latitude: update.coords.latitude,
               longitude: update.coords.longitude,
             })
+            setStatus("ready")
           },
         )
       } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Location error")
+        console.log("🚀 ~ bootstrap ~ e:", e)
+        if (!cancelled) {
+          setCoords(null)
+          setLastKnown(null)
+          setError(e?.message ?? "Location error")
+          setStatus("error")
+        }
       }
     }
 
@@ -60,9 +93,10 @@ export function useForegroundLocation() {
 
     return () => {
       cancelled = true
-      watcher?.remove()
+      watcherRef.current?.remove()
+      watcherRef.current = null
     }
-  }, [])
+  }, [refreshToken])
 
-  return { coords, granted, error }
+  return { coords, lastKnown, granted, error, status, refresh, request: refresh }
 }
