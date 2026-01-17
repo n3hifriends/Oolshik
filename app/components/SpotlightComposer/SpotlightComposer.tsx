@@ -567,7 +567,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         onChangeText={setText}
         placeholder="Type your task…"
         placeholderTextColor={theme.colors.textDim}
-        style={[styles.input, { color: theme.colors.text }]}
+        style={[styles.input, { color: theme.colors.text, display: "none" }]}
         accessibilityLabel="Task input"
         autoFocus={false}
         autoCapitalize="sentences"
@@ -740,6 +740,7 @@ const styles = StyleSheet.create({
   editRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     flex: 1,
     paddingVertical: 6,
   },
