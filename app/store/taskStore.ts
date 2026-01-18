@@ -10,12 +10,22 @@ type Task = {
   description?: string
   distanceMtr?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  latitude?: number
+  longitude?: number
+  requesterId?: string
+  helperId?: string | null
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
   createdByPhoneNumber?: string
   ratingValue?: number | null
   helperAvgRating?: number | null
+  helperAcceptedAt?: string | null
+  assignmentExpiresAt?: string | null
+  cancelledAt?: string | null
+  cancelledBy?: string | null
+  reassignedCount?: number | null
+  releasedCount?: number | null
 }
 
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"

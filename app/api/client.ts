@@ -326,6 +326,14 @@ export type ServerTask = {
   helperId?: string | null
   createdAt?: string
   updatedAt?: string
+  createdByName?: string
+  createdByPhoneNumber?: string
+  helperAcceptedAt?: string | null
+  assignmentExpiresAt?: string | null
+  cancelledAt?: string | null
+  cancelledBy?: string | null
+  reassignedCount?: number | null
+  releasedCount?: number | null
   requesterName?: string
   requesterPhoneNumber?: string
   ratingValue?: number | null
@@ -417,6 +425,19 @@ export const OolshikApi = {
   // Complete
   completeTask: (taskId: string) => api.post(`/requests/${taskId}/complete`, {}),
 
+  // Cancel / Release / Reassign
+  cancelTask: (
+    taskId: string,
+    payload?: { reasonCode: string; reasonText?: string },
+  ) => api.post(`/requests/${taskId}/cancel`, payload ?? {}),
+
+  releaseTask: (
+    taskId: string,
+    payload?: { reasonCode?: string; reasonText?: string },
+  ) => api.post(`/requests/${taskId}/release`, payload ?? {}),
+
+  reassignTask: (taskId: string) => api.post(`/requests/${taskId}/reassign`, {}),
+
   // Reviews
   addReview: (payload: { taskId: string; rating: number; comment?: string }) =>
     api.post("/reviews", payload),
@@ -444,7 +465,11 @@ export const OolshikApi = {
     api.post<{ accessToken: string; refreshToken?: string }>("/auth/refresh", { refreshToken }),
   // ---------- /NEW ----------
 
-  revealPhone: (id: string) => api.post(`/requests/${id}/revealPhone`, {}),
+  revealPhone: (id: string) =>
+    api.post<{ phoneNumber?: string; revealCount?: number; message?: string }>(
+      `/requests/${id}/revealPhone`,
+      {},
+    ),
   // Expect { phoneNumber: string revealCount: number }
 
   // Payment APIs (if any) can go here

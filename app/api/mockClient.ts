@@ -109,6 +109,30 @@ export const MockOolshikApi = {
     return { ok: true as const }
   },
 
+  async cancelTask(id: string) {
+    const t = dummyTasks.find((x) => String(x.id) === String(id))
+    if (t) t.status = "CANCELLED"
+    return { ok: true as const }
+  },
+
+  async releaseTask(id: string) {
+    const t = dummyTasks.find((x) => String(x.id) === String(id))
+    if (t) {
+      t.status = "OPEN"
+      t.helperId = null
+    }
+    return { ok: true as const }
+  },
+
+  async reassignTask(id: string) {
+    const t = dummyTasks.find((x) => String(x.id) === String(id))
+    if (t) {
+      t.status = "OPEN"
+      t.helperId = null
+    }
+    return { ok: true as const }
+  },
+
   addReview: async () => ({ ok: true as const }),
   report: async () => ({ ok: true as const }),
   registerDevice: async () => ({ ok: true as const }),
