@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from "react"
-import { View, ActivityIndicator, Pressable, Linking, Platform, Alert } from "react-native"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { View, ActivityIndicator, Pressable, Linking, Platform, Alert, Modal } from "react-native"
 import { useFocusEffect, useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
+import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import { useTaskStore } from "@/store/taskStore"
 import { OolshikApi } from "@/api"
@@ -13,8 +14,13 @@ import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { SmileySlider } from "@/components/SmileySlider"
 import { RatingBadge } from "@/components/RatingBadge"
 import { Task } from "@/api/client"
+import { useAuth } from "@/context/AuthContext"
 
 type RouteParams = { id: string }
+type RecoveryAction = "cancel" | "release"
+
+const REASSIGN_SLA_SECONDS = 420
+const MAX_REASSIGN = 2
 
 function getInitials(name?: string) {
   if (!name) return "👤"
@@ -76,7 +82,8 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
-  const { tasks, accept } = useTaskStore()
+  const { tasks, accept, fetchNearby } = useTaskStore()
+  const { userId } = useAuth()
   const taskFromStore = tasks.find((t) => String(t.id) === String(taskId))
 
   const [loading, setLoading] = React.useState(!taskFromStore)
@@ -87,10 +94,19 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { radiusMeters } = useTaskStore()
   const [justCompleted, setJustCompleted] = React.useState(false)
+  const [actionLoading, setActionLoading] = React.useState(false)
+  const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
 
   const [fullPhone, setFullPhone] = React.useState<string | null>(null)
   const [isRevealed, setIsRevealed] = React.useState(false)
   const [revealLoading, setRevealLoading] = React.useState(false)
+
+  const [reasonModal, setReasonModal] = React.useState<{
+    visible: boolean
+    action?: RecoveryAction
+    reasonCode?: string
+    reasonText?: string
+  }>({ visible: false })
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -105,12 +121,12 @@ export default function TaskDetailScreen({ navigation }: any) {
     PENDING: { label: "Pending", bg: primarySoft, fg: primary },
     ASSIGNED: { label: "Assigned", bg: warningSoft, fg: warning },
     COMPLETED: { label: "Completed", bg: successSoft, fg: success },
+    CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
   } as const
 
   const current = task || taskFromStore || null
 
   const [rating, setRating] = useState<number>(2.5) // center default (neutral)
-  const [submitting, setSubmitting] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -126,7 +142,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [current?.createdByPhoneNumber])
 
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
-  let normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" = "PENDING"
+  let normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" | "CANCELLED" = "PENDING"
   const rawStatus = (current?.status as string | undefined) || undefined
   switch (rawStatus) {
     case "OPEN":
@@ -134,7 +150,7 @@ export default function TaskDetailScreen({ navigation }: any) {
       break
     case "CANCELLED":
     case "CANCELED":
-      normalizedStatus = "COMPLETED"
+      normalizedStatus = "CANCELLED"
       break
     case "PENDING":
     case "ASSIGNED":
@@ -167,6 +183,46 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [taskId])
 
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
+
+  const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
+  const isHelper = !!current?.helperId && !!userId && current.helperId === userId
+  const canCancel = isRequester && (rawStatus === "OPEN" || rawStatus === "ASSIGNED")
+  const canRelease = isHelper && rawStatus === "ASSIGNED"
+
+  const helperAcceptedAtMs = current?.helperAcceptedAt
+    ? new Date(current.helperAcceptedAt).getTime()
+    : null
+  const reassignAvailableAtMs = helperAcceptedAtMs
+    ? helperAcceptedAtMs + REASSIGN_SLA_SECONDS * 1000
+    : null
+
+  const [nowMs, setNowMs] = React.useState(Date.now())
+  useEffect(() => {
+    if (!reassignAvailableAtMs || rawStatus !== "ASSIGNED") return
+    const timer = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [rawStatus, reassignAvailableAtMs])
+
+  useEffect(() => {
+    if (!recoveryNotice) return
+    const timer = setTimeout(() => setRecoveryNotice(null), 4000)
+    return () => clearTimeout(timer)
+  }, [recoveryNotice])
+
+  const msUntilReassign = reassignAvailableAtMs ? Math.max(0, reassignAvailableAtMs - nowMs) : null
+  const canReassign =
+    isRequester &&
+    rawStatus === "ASSIGNED" &&
+    msUntilReassign === 0 &&
+    (current?.reassignedCount ?? 0) < MAX_REASSIGN
+
+  const reassignCountdown = useMemo(() => {
+    if (msUntilReassign == null) return null
+    const totalSeconds = Math.ceil(msUntilReassign / 1000)
+    const mins = String(Math.floor(totalSeconds / 60)).padStart(2, "0")
+    const secs = String(totalSeconds % 60).padStart(2, "0")
+    return `${mins}:${secs}`
+  }, [msUntilReassign])
 
   const onRevealPhone = async () => {
     if (!current) return
@@ -297,6 +353,101 @@ export default function TaskDetailScreen({ navigation }: any) {
     return null
   }
 
+  const openReasonSheet = (action: RecoveryAction) => {
+    setReasonModal({
+      visible: true,
+      action,
+      reasonCode: undefined,
+      reasonText: "",
+    })
+  }
+
+  const closeReasonSheet = () => {
+    setReasonModal({ visible: false })
+  }
+
+  const onConfirmReason = async () => {
+    if (!current || !reasonModal.action || !reasonModal.reasonCode) return
+    if (reasonModal.reasonCode === "OTHER" && !reasonModal.reasonText?.trim()) {
+      Alert.alert("Add a short reason", "Please add a short note for 'Other'.")
+      return
+    }
+    setActionLoading(true)
+    try {
+      if (reasonModal.action === "cancel") {
+        const res = await OolshikApi.cancelTask(current.id, {
+          reasonCode: reasonModal.reasonCode,
+          reasonText: reasonModal.reasonText?.trim() || undefined,
+        })
+        if (!res?.ok) {
+          throw new Error("Cancel failed")
+        }
+        setTask((t: any) => (t ? { ...t, status: "CANCELLED" } : t))
+        setRecoveryNotice("Request cancelled. We’ve closed it and notified the helper if assigned.")
+      } else if (reasonModal.action === "release") {
+        const res = await OolshikApi.releaseTask(current.id, {
+          reasonCode: reasonModal.reasonCode,
+          reasonText: reasonModal.reasonText?.trim() || undefined,
+        })
+        if (!res?.ok) {
+          throw new Error("Release failed")
+        }
+        setTask((t: any) => (t ? { ...t, status: "OPEN", helperId: null } : t))
+        setRecoveryNotice("Task released. It’s now open for other helpers to accept.")
+      }
+
+      if (coords && status === "ready") {
+        await fetchNearby(coords.latitude, coords.longitude)
+      }
+      closeReasonSheet()
+    } catch (e) {
+      Alert.alert("Action failed", "Please try again.")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const onReassign = async () => {
+    if (!current) return
+    setActionLoading(true)
+    try {
+      const res = await OolshikApi.reassignTask(current.id)
+      if (!res?.ok) {
+        throw new Error("Reassign failed")
+      }
+      setTask((t: any) => (t ? { ...t, status: "OPEN", helperId: null } : t))
+      setRecoveryNotice("Request reopened. We’ll look for another helper now.")
+      if (coords && status === "ready") {
+        await fetchNearby(coords.latitude, coords.longitude)
+      }
+    } catch (e) {
+      Alert.alert("Reassign failed", "Please try again.")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const cancelReasons = useMemo(
+    () => [
+      { code: "NOT_NEEDED", label: "No longer needed" },
+      { code: "FOUND_ALTERNATIVE", label: "Found another helper" },
+      { code: "WRONG_TASK", label: "Created by mistake" },
+      { code: "OTHER", label: "Other" },
+    ],
+    [],
+  )
+
+  const releaseReasons = useMemo(
+    () => [
+      { code: "CANT_COMPLETE", label: "Cannot complete" },
+      { code: "EMERGENCY", label: "Emergency" },
+      { code: "OTHER", label: "Other" },
+    ],
+    [],
+  )
+
+  const currentReasons = reasonModal.action === "release" ? releaseReasons : cancelReasons
+
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
@@ -357,10 +508,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                     justifyContent: "center",
                   }}
                 >
-                  <Text
-                    text={playing ? "…" : "▶︎"}
-                    style={{ color: "white", fontWeight: "bold" }}
-                  />
+                  <Text text={playing ? "…" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
                 </Pressable>
               )}
             </View>
@@ -452,6 +600,22 @@ export default function TaskDetailScreen({ navigation }: any) {
       {/* Bottom actions / success banner */}
       {current && (
         <>
+          {recoveryNotice && (
+            <View
+              style={{
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                marginHorizontal: 16,
+                marginBottom: spacing.xs,
+                borderRadius: 8,
+                backgroundColor: successSoft,
+                borderWidth: 1,
+                borderColor: success,
+              }}
+            >
+              <Text text={recoveryNotice} weight="medium" style={{ color: success }} />
+            </View>
+          )}
           {normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
             <View
               style={{
@@ -494,6 +658,39 @@ export default function TaskDetailScreen({ navigation }: any) {
               )}
             </View>
           ) : null}
+          {(canCancel || canRelease || rawStatus === "ASSIGNED") && (
+            <View style={{ marginTop: spacing.md, marginHorizontal: 16, gap: spacing.xs }}>
+              {canCancel && (
+                <Button
+                  text={actionLoading ? "..." : "Cancel Request"}
+                  onPress={() => openReasonSheet("cancel")}
+                  style={{ paddingVertical: spacing.xs }}
+                />
+              )}
+              {canRelease && (
+                <Button
+                  text={actionLoading ? "..." : "Give Away"}
+                  onPress={() => openReasonSheet("release")}
+                  style={{ paddingVertical: spacing.xs }}
+                />
+              )}
+              {isRequester && rawStatus === "ASSIGNED" && !canReassign && reassignCountdown && (
+                <Text text={`Reassign available in ${reassignCountdown}`} size="xs" />
+              )}
+              {canReassign && (
+                <Button
+                  text={actionLoading ? "..." : "Reassign Helper"}
+                  onPress={onReassign}
+                  style={{ paddingVertical: spacing.xs }}
+                />
+              )}
+              {isRequester &&
+                rawStatus === "ASSIGNED" &&
+                (current?.reassignedCount ?? 0) >= MAX_REASSIGN && (
+                  <Text text="Reassign limit reached" size="xs" />
+                )}
+            </View>
+          )}
           {normalizedStatus === "COMPLETED" && (
             <View
               style={{
@@ -517,6 +714,82 @@ export default function TaskDetailScreen({ navigation }: any) {
           )}
         </>
       )}
+
+      <Modal transparent visible={reasonModal.visible} animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.background,
+              borderRadius: 16,
+              padding: 16,
+              gap: spacing.sm,
+            }}
+          >
+            <Text
+              text={
+                reasonModal.action === "release" ? "Reason for giving away" : "Reason for cancel"
+              }
+              preset="subheading"
+            />
+            {currentReasons.map((r) => {
+              const selected = reasonModal.reasonCode === r.code
+              return (
+                <Pressable
+                  key={r.code}
+                  onPress={() =>
+                    setReasonModal((prev) => ({
+                      ...prev,
+                      reasonCode: r.code,
+                    }))
+                  }
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: selected ? primary : colors.palette.neutral300,
+                    backgroundColor: selected
+                      ? colors.palette.primary100
+                      : colors.palette.neutral100,
+                  }}
+                >
+                  <Text text={r.label} />
+                </Pressable>
+              )
+            })}
+
+            {reasonModal.reasonCode === "OTHER" && (
+              <TextField
+                value={reasonModal.reasonText}
+                onChangeText={(v) =>
+                  setReasonModal((prev) => ({
+                    ...prev,
+                    reasonText: v,
+                  }))
+                }
+                placeholder="Add a short note"
+                containerStyle={{ marginBottom: 0 }}
+              />
+            )}
+
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              <Button text="Cancel" onPress={closeReasonSheet} style={{ flex: 1 }} />
+              <Button
+                text={actionLoading ? "..." : "Confirm"}
+                onPress={onConfirmReason}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   )
 }
