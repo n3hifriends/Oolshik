@@ -273,6 +273,10 @@ export default function TaskDetailScreen({ navigation }: any) {
       return
     }
     if (!current) return
+    if (isRequester) {
+      Alert.alert("You created this request", "Only nearby helpers can accept it.")
+      return
+    }
     const result = await accept(current.id, coords.latitude, coords.longitude)
     if (result === "ALREADY") {
       alert("Already assigned")
@@ -625,11 +629,28 @@ export default function TaskDetailScreen({ navigation }: any) {
               }}
             >
               {normalizedStatus === "PENDING" ? (
-                <Button
-                  text="Accept"
-                  onPress={onAccept}
-                  style={{ flex: 2, paddingVertical: spacing.xs }}
-                />
+                isRequester ? (
+                  <View
+                    style={{
+                      flex: 1,
+                      paddingVertical: spacing.xs,
+                      paddingHorizontal: spacing.sm,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: colors.palette.neutral300,
+                      backgroundColor: colors.palette.neutral100,
+                    }}
+                  >
+                    <Text text="You created this request." weight="medium" />
+                    <Text text="Waiting for a helper to accept." size="xs" />
+                  </View>
+                ) : (
+                  <Button
+                    text="Accept"
+                    onPress={onAccept}
+                    style={{ flex: 2, paddingVertical: spacing.xs }}
+                  />
+                )
               ) : (
                 <View
                   style={{
