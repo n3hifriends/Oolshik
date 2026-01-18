@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   View,
   ActivityIndicator,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   TextInput,
+  Linking,
 } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
@@ -24,25 +25,37 @@ import { StatusChip } from "@/components/StatusChip"
 import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { useTaskFiltering, Status } from "@/hooks/useTaskFiltering"
 import { getDistanceMeters } from "@/utils/distance"
+import { SpotlightComposer } from "@/components/SpotlightComposer"
+import { OolshikApi } from "@/api"
+import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
 const LOGOUT_COLOR = "#FF6B2C"
+const TITLE_REFRESH_COOLDOWN_MS = 5000
 
 export default function HomeFeedScreen({ navigation }: any) {
-  const { coords } = useForegroundLocation()
+  const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
-  const { logout, userId } = useAuth()
+  const { logout, userId, userName } = useAuth()
+  const lastFetchKeyRef = useRef<string | null>(null)
 
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
     new Set(["OPEN", "ASSIGNED"]),
   )
   const [viewMode, setViewMode] = useState<ViewMode>("forYou")
+  const [creatingTask, setCreatingTask] = useState(false)
+
+  const [titleRefreshCooldowns, setTitleRefreshCooldowns] = useState<Record<string, number>>({})
+  const titleRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   // search
   const [searchOpen, setSearchOpen] = useState(false)
   const [rawSearch, setRawSearch] = useState("")
   const searchInputRef = useRef<TextInput>(null)
+
+  const sortedStatuses = useMemo(() => Array.from(selectedStatuses).sort(), [selectedStatuses])
+  const statusesKey = useMemo(() => sortedStatuses.join(","), [sortedStatuses])
 
   const { filtered, setQuery } = useTaskFiltering(tasks, {
     selectedStatuses,
@@ -50,6 +63,13 @@ export default function HomeFeedScreen({ navigation }: any) {
     myId: userId,
     rawQuery: rawSearch,
   })
+
+  useEffect(() => {
+    return () => {
+      titleRefreshTimersRef.current.forEach((timer) => clearTimeout(timer))
+      titleRefreshTimersRef.current.clear()
+    }
+  }, [])
 
   const toggleStatus = (s: Status) =>
     setSelectedStatuses((prev) => {
@@ -60,15 +80,37 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      if (coords) {
-        const statusesArg = selectedStatuses.size ? Array.from(selectedStatuses) : undefined
-        fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
-      }
-    }, [coords?.latitude, coords?.longitude, radiusMeters, selectedStatuses]),
+      refresh()
+    }, [refresh]),
+  )
+
+  useFocusEffect(
+    useCallback(() => {
+      if (status !== "ready" || !coords) return
+      const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+      const key = [
+        coords.latitude.toFixed(5),
+        coords.longitude.toFixed(5),
+        radiusMeters,
+        statusesKey,
+      ].join("|")
+      if (lastFetchKeyRef.current === key) return
+      lastFetchKeyRef.current = key
+      fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
+    }, [
+      status,
+      coords?.latitude,
+      coords?.longitude,
+      radiusMeters,
+      statusesKey,
+      fetchNearby,
+      sortedStatuses,
+    ]),
   )
 
   const onAcceptPress = async (taskId: string) => {
     if (!coords) {
+      refresh()
       alert("Location not available")
       return
     }
@@ -85,33 +127,229 @@ export default function HomeFeedScreen({ navigation }: any) {
     }
   }
 
-  const renderItem: ListRenderItem<any> = useCallback(
-    ({ item: t }) => (
-      <TaskCard
-        id={t.id}
-        title={t.title}
-        distanceMtr={getDistanceMeters(t)}
-        status={t.status}
-        voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
-        onAccept={
-          viewMode === "forYou" && t.status === "OPEN"
-            ? async () => {
-                await onAcceptPress(t.id)
-              }
-            : undefined
-        }
-        onPress={() => navigation.navigate("OolshikDetail", { id: t.id })}
-        createdByName={t.createdByName ?? t.requesterName}
-        createdAt={t.createdAt}
-        helperAvgRating={t.helperAvgRating}
-      />
-    ),
-    [accept, coords, fetchNearby, navigation, viewMode],
+  const isTitleRefreshCooling = useCallback(
+    (taskId: string) => {
+      const until = titleRefreshCooldowns[taskId]
+      return typeof until === "number" && until > Date.now()
+    },
+    [titleRefreshCooldowns],
   )
+
+  const scheduleTitleRefreshCooldown = useCallback((taskId: string) => {
+    const until = Date.now() + TITLE_REFRESH_COOLDOWN_MS
+    setTitleRefreshCooldowns((prev) => ({ ...prev, [taskId]: until }))
+
+    const existing = titleRefreshTimersRef.current.get(taskId)
+    if (existing) clearTimeout(existing)
+
+    const timer = setTimeout(() => {
+      setTitleRefreshCooldowns((prev) => {
+        if (!(taskId in prev)) return prev
+        const next = { ...prev }
+        delete next[taskId]
+        return next
+      })
+      titleRefreshTimersRef.current.delete(taskId)
+    }, TITLE_REFRESH_COOLDOWN_MS)
+
+    titleRefreshTimersRef.current.set(taskId, timer)
+  }, [])
+
+  const refreshTitleForTask = useCallback(
+    async (taskId: string) => {
+      if (loading) return
+      if (status !== "ready" || !coords) {
+        refresh()
+        Alert.alert("Location not available", "Enable location and try again.")
+        return
+      }
+      if (isTitleRefreshCooling(taskId)) return
+
+      scheduleTitleRefreshCooldown(taskId)
+      const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+      try {
+        await fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
+      } catch {
+        // best-effort refresh
+      }
+    },
+    [
+      coords,
+      fetchNearby,
+      isTitleRefreshCooling,
+      loading,
+      refresh,
+      scheduleTitleRefreshCooldown,
+      sortedStatuses,
+      status,
+    ],
+  )
+
+  const renderItem: ListRenderItem<any> = useCallback(
+    ({ item: t }) => {
+      const titleText = typeof t.title === "string" ? t.title.trim() : ""
+      const needsTitleRefresh = titleText === "..."
+      const titleRefreshDisabled = needsTitleRefresh && (loading || isTitleRefreshCooling(t.id))
+
+      return (
+        <TaskCard
+          id={t.id}
+          title={t.title}
+          distanceMtr={getDistanceMeters(t)}
+          status={t.status}
+          voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
+          onAccept={
+            viewMode === "forYou" && t.status === "OPEN"
+              ? async () => {
+                  await onAcceptPress(t.id)
+                }
+              : undefined
+          }
+          onTitleRefresh={needsTitleRefresh ? () => refreshTitleForTask(t.id) : undefined}
+          titleRefreshDisabled={titleRefreshDisabled}
+          onPress={() => navigation.navigate("OolshikDetail", { id: t.id })}
+          createdByName={t.createdByName ?? t.requesterName}
+          createdAt={t.createdAt}
+          helperAvgRating={t.helperAvgRating}
+        />
+      )
+    },
+    [
+      isTitleRefreshCooling,
+      loading,
+      navigation,
+      onAcceptPress,
+      refreshTitleForTask,
+      viewMode,
+    ],
+  )
+
+  const handleSubmitTask = useCallback(
+    async ({
+      text,
+      mode,
+      voiceNote,
+    }: {
+      text: string
+      mode: "voice" | "type"
+      voiceNote?: { filePath: string; durationSec: number }
+    }) => {
+      const title = text.trim()
+      const isVoice = mode === "voice"
+      if (!title) {
+        throw new Error("Please enter a title.")
+      }
+      if (!coords) {
+        refresh()
+        throw new Error("Location not available. Please enable location and try again.")
+      }
+      if (isVoice && !voiceNote) {
+        throw new Error("Recording not found. Please record again.")
+      }
+      if (creatingTask) {
+        throw new Error("Already submitting, please wait.")
+      }
+
+      const uploadVoiceIfNeeded = async () => {
+        if (!voiceNote) return undefined
+        const res = await uploadAudioSmart({
+          uri: voiceNote.filePath,
+          filename: `voice_${Date.now()}.m4a`,
+          mimeType: "audio/m4a",
+          durationMs: voiceNote.durationSec * 1000,
+        })
+        if (!res.ok) {
+          throw new Error("Upload failed. Please try again.")
+        }
+        return res.url
+      }
+
+      setCreatingTask(true)
+      try {
+        const voiceUrl = await uploadVoiceIfNeeded()
+        const payload = {
+          title,
+          description: undefined, // extend when composer provides description/audio
+          voiceUrl,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          radiusMeters: radiusMeters * 1000,
+          createdById: userId,
+          createdByName: userName,
+          createdAt: new Date().toISOString(),
+        }
+
+        const res = await OolshikApi.createTask(payload)
+        if (!res.ok || !res.data) {
+          const errMsg =
+            (res as any)?.data?.message ||
+            (res as any)?.problem ||
+            (res as any)?.originalError?.message ||
+            "Please try again."
+          throw new Error(errMsg)
+        }
+
+        // Refresh nearby feed so the new task appears
+        try {
+          await fetchNearby(coords.latitude, coords.longitude)
+        } catch {
+          // best-effort refresh; no need to block success
+        }
+      } finally {
+        setCreatingTask(false)
+      }
+    },
+    [coords, creatingTask, fetchNearby, radiusMeters, refresh, userId, userName],
+  )
+
+  const onOpenSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings()
+    } catch {
+      Alert.alert("Unable to open settings", "Please open Settings and enable location access.")
+    }
+  }, [])
+
+  const renderLocationState = () => {
+    if (status === "loading" || status === "idle") {
+      return (
+        <View style={{ paddingVertical: 24, alignItems: "center", gap: 8 }}>
+          <ActivityIndicator />
+          <Text text="Getting your location…" />
+        </View>
+      )
+    }
+    if (status === "denied") {
+      return (
+        <View style={{ paddingVertical: 24, gap: 12 }}>
+          <Text text="Location permission denied" preset="heading" />
+          <Text text="Enable location to see nearby tasks." />
+          <Button text="Open Settings" onPress={onOpenSettings} />
+        </View>
+      )
+    }
+    if (status === "error") {
+      return (
+        <View style={{ paddingVertical: 24, gap: 12 }}>
+          <Text text="Could not access location" preset="heading" />
+          <Text text={locationError ?? "Please try again."} />
+          <Button text="Retry" onPress={refresh} />
+        </View>
+      )
+    }
+    return null
+  }
+
+  // return (
+  //   <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
+  //       <SpotlightComposer onSubmitTask={handleSubmitTask} />
+  //   </Screen>
+  // )
 
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
-      {/* Floating Logout */}
+      <SpotlightComposer onSubmitTask={handleSubmitTask} />
+
       <Pressable
         onPress={() =>
           Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -189,7 +427,10 @@ export default function HomeFeedScreen({ navigation }: any) {
                 key={km}
                 label={`${km} km`}
                 active={radiusMeters === km}
-                onPress={() => setRadius(km as Radius)}
+                onPress={() => {
+                  console.log("🚀 ~ onPress ~ km:", km)
+                  setRadius(km as Radius)
+                }}
               />
             ))}
           </View>
@@ -210,7 +451,9 @@ export default function HomeFeedScreen({ navigation }: any) {
 
       {/* List */}
       <View style={{ flex: 1, paddingHorizontal: 16, backgroundColor: colors.background }}>
-        {loading ? (
+        {status !== "ready" ? (
+          renderLocationState()
+        ) : loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator />
           </View>
@@ -226,10 +469,12 @@ export default function HomeFeedScreen({ navigation }: any) {
             removeClippedSubviews
             refreshing={loading}
             onRefresh={() => {
-              if (coords) {
-                const statusesArg = selectedStatuses.size ? Array.from(selectedStatuses) : undefined
-                fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
+              if (status !== "ready" || !coords) {
+                refresh()
+                return
               }
+              const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+              fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
             }}
             contentContainerStyle={{ paddingBottom: 140 }}
             ListEmptyComponent={
@@ -250,11 +495,16 @@ export default function HomeFeedScreen({ navigation }: any) {
 
       {/* Create */}
       <View style={{ position: "absolute", left: 16, right: 16, bottom: 0 }}>
-        <Button
-          tx="oolshik:create"
-          onPress={() => navigation.navigate("OolshikCreate")}
-          style={{ width: "100%", marginBottom: 0 }}
-        />
+        <View style={{ flex: 1, flexDirection: "row", justifyContent: "center" }}>
+          <View style={{ flex: 0.5, flexDirection: "row", justifyContent: "center" }}></View>
+          <View style={{ flex: 0.5, flexDirection: "row", justifyContent: "center" }}>
+            <Button
+              tx="oolshik:create"
+              onPress={() => navigation.navigate("OolshikCreate")}
+              style={{ width: "100%", marginBottom: 0 }}
+            />
+          </View>
+        </View>
       </View>
     </Screen>
   )

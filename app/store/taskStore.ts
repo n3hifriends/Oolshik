@@ -10,12 +10,22 @@ type Task = {
   description?: string
   distanceMtr?: number
   status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  latitude?: number
+  longitude?: number
+  requesterId?: string
+  helperId?: string | null
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
   createdByPhoneNumber?: string
   ratingValue?: number | null
   helperAvgRating?: number | null
+  helperAcceptedAt?: string | null
+  assignmentExpiresAt?: string | null
+  cancelledAt?: string | null
+  cancelledBy?: string | null
+  reassignedCount?: number | null
+  releasedCount?: number | null
 }
 
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"
@@ -43,6 +53,9 @@ export const useTaskStore = create<State>((set, get) => ({
   setTab: (t) => set({ tab: t }),
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
+    console.log("🚀 ~ statuses:", statuses)
+    console.log("🚀 ~ lon:", lon)
+    console.log("🚀 ~ lat:", lat)
     set({ loading: true })
     try {
       if (FLAGS.USE_MOCK_NEARBY) {
@@ -59,6 +72,7 @@ export const useTaskStore = create<State>((set, get) => ({
         const r = get().radiusMeters
         const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
         if (res.ok) set({ tasks: res.data ?? [] })
+        console.log("🚀 ~ res.data:", res.data)
       }
     } finally {
       set({ loading: false })

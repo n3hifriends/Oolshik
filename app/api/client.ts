@@ -5,7 +5,7 @@ import { create, ApisauceInstance } from "apisauce"
 import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import Config from "@/config"
-import auth from "@react-native-firebase/auth"
+import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth"
 import { init } from "i18next"
 
 // ---------- Toggleable API logs (default: true) ----------
@@ -156,6 +156,42 @@ raw.interceptors.response.use(
   },
 )
 
+let authReadyPromise: Promise<FirebaseAuthTypes.User | null> | null = null
+function waitForFirebaseUser(timeoutMs = 5000) {
+  if (auth().currentUser) return Promise.resolve(auth().currentUser)
+  if (!authReadyPromise) {
+    authReadyPromise = new Promise<FirebaseAuthTypes.User | null>((resolve) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          resolve(null)
+        }
+      }, timeoutMs)
+      const unsub = auth().onAuthStateChanged((user) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        unsub()
+        resolve(user)
+      })
+    }).finally(() => {
+      authReadyPromise = null
+    })
+  }
+  return authReadyPromise
+}
+
+async function getFirebaseIdToken(force = false) {
+  try {
+    const user = auth().currentUser ?? (await waitForFirebaseUser())
+    if (!user) return null
+    return await user.getIdToken(force)
+  } catch (e) {
+    return null
+  }
+}
+
 async function refreshAccessToken(): Promise<string> {
   const refresh = tokens.refresh
   if (!refresh) throw new Error("NO_REFRESH_TOKEN")
@@ -259,24 +295,21 @@ export const api: ApisauceInstance = create({
   axiosInstance, // 👈 use our configured axios with interceptors
 })
 api.addAsyncRequestTransform(async (request) => {
-  const user = auth().currentUser
-  if (user) {
-    const idToken = await user.getIdToken() // auto-refresh if near expiry
+  const idToken = await getFirebaseIdToken(false)
+  const headerToken = idToken ?? tokens.access
+  if (headerToken) {
     request.headers = request.headers ?? {}
-    request.headers.Authorization = `Bearer ${idToken}`
+    request.headers.Authorization = `Bearer ${headerToken}`
   }
 })
 
 // Optional: retry once on 401 with a forced refresh
 api.addAsyncResponseTransform(async (response) => {
   if (response.status === 401) {
-    const user = auth().currentUser
-    if (user) {
-      try {
-        const fresh = await user.getIdToken(true)
-        setLoginTokens(fresh, undefined) // keep your helper in sync
-        // TODO: implement a retry of the original request if your API wrapper supports it
-      } catch {}
+    const fresh = await getFirebaseIdToken(true)
+    if (fresh) {
+      setLoginTokens(fresh, undefined)
+      return
     }
   }
 })
@@ -293,6 +326,14 @@ export type ServerTask = {
   helperId?: string | null
   createdAt?: string
   updatedAt?: string
+  createdByName?: string
+  createdByPhoneNumber?: string
+  helperAcceptedAt?: string | null
+  assignmentExpiresAt?: string | null
+  cancelledAt?: string | null
+  cancelledBy?: string | null
+  reassignedCount?: number | null
+  releasedCount?: number | null
   requesterName?: string
   requesterPhoneNumber?: string
   ratingValue?: number | null
@@ -324,7 +365,7 @@ export type ReportPayload = {
 export type Task = ServerTask
 
 type CreateTaskPayload = {
-  voiceUrl: string
+  voiceUrl?: string
   description?: string
   radiusMeters: number
   createdById?: string
@@ -384,6 +425,19 @@ export const OolshikApi = {
   // Complete
   completeTask: (taskId: string) => api.post(`/requests/${taskId}/complete`, {}),
 
+  // Cancel / Release / Reassign
+  cancelTask: (
+    taskId: string,
+    payload?: { reasonCode: string; reasonText?: string },
+  ) => api.post(`/requests/${taskId}/cancel`, payload ?? {}),
+
+  releaseTask: (
+    taskId: string,
+    payload?: { reasonCode?: string; reasonText?: string },
+  ) => api.post(`/requests/${taskId}/release`, payload ?? {}),
+
+  reassignTask: (taskId: string) => api.post(`/requests/${taskId}/reassign`, {}),
+
   // Reviews
   addReview: (payload: { taskId: string; rating: number; comment?: string }) =>
     api.post("/reviews", payload),
@@ -411,7 +465,11 @@ export const OolshikApi = {
     api.post<{ accessToken: string; refreshToken?: string }>("/auth/refresh", { refreshToken }),
   // ---------- /NEW ----------
 
-  revealPhone: (id: string) => api.post(`/requests/${id}/revealPhone`, {}),
+  revealPhone: (id: string) =>
+    api.post<{ phoneNumber?: string; revealCount?: number; message?: string }>(
+      `/requests/${id}/revealPhone`,
+      {},
+    ),
   // Expect { phoneNumber: string revealCount: number }
 
   // Payment APIs (if any) can go here

@@ -18,6 +18,8 @@ type Props = {
   createdByName?: string
   createdAt?: string
   helperAvgRating?: number | null
+  onTitleRefresh?: () => void
+  titleRefreshDisabled?: boolean
 }
 
 function getInitials(name?: string) {
@@ -59,17 +61,19 @@ export function TaskCard({
   createdByName,
   createdAt,
   helperAvgRating = 2.5,
+  onTitleRefresh,
+  titleRefreshDisabled = false,
 }: Props) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
   // Normalize backend statuses to UI statuses
   // Backend may send OPEN; map it to PENDING visually. Handle CANCELLED/CANCELED gracefully.
-  const normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" =
+  const normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
     status === "OPEN"
       ? "PENDING"
       : status === "CANCELLED" || status === "CANCELED"
-        ? "COMPLETED" // or choose a different bucket if you have a Cancelled style
+        ? "CANCELLED"
         : (status as any)
 
   const primary = colors.palette.primary500
@@ -79,6 +83,7 @@ export function TaskCard({
     PENDING: { label: "Pending", bg: colors.palette.primary200, fg: neutral700 },
     ASSIGNED: { label: "Assigned", bg: colors.palette.warningSoft400, fg: neutral700 },
     COMPLETED: { label: "Completed", bg: colors.palette.successSoft400, fg: neutral700 },
+    CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
   } as const
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
@@ -204,7 +209,21 @@ export function TaskCard({
       {HeaderRow}
 
       {/* Title */}
-      <Text text={title} weight="bold" style={{ color: neutral700 }} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+        {onTitleRefresh ? (
+          <Pressable
+            onPress={onTitleRefresh}
+            disabled={titleRefreshDisabled}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh title"
+            accessibilityState={{ disabled: titleRefreshDisabled }}
+          >
+            <Text text="Refresh" style={{ color: primary }} />
+          </Pressable>
+        ) : (
+          <Text text={title} weight="bold" style={{ color: neutral700, flex: 1 }} />
+        )}
+      </View>
 
       {/* Distance + Status side-by-side */}
       <View
