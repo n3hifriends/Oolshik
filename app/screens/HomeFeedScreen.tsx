@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   View,
   ActivityIndicator,
@@ -32,6 +32,7 @@ import { uploadAudioSmart } from "@/audio/uploadAudio"
 type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
 const LOGOUT_COLOR = "#FF6B2C"
+const TITLE_REFRESH_COOLDOWN_MS = 5000
 
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
@@ -44,6 +45,9 @@ export default function HomeFeedScreen({ navigation }: any) {
   )
   const [viewMode, setViewMode] = useState<ViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)
+
+  const [titleRefreshCooldowns, setTitleRefreshCooldowns] = useState<Record<string, number>>({})
+  const titleRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   // search
   const [searchOpen, setSearchOpen] = useState(false)
@@ -59,6 +63,13 @@ export default function HomeFeedScreen({ navigation }: any) {
     myId: userId,
     rawQuery: rawSearch,
   })
+
+  useEffect(() => {
+    return () => {
+      titleRefreshTimersRef.current.forEach((timer) => clearTimeout(timer))
+      titleRefreshTimersRef.current.clear()
+    }
+  }, [])
 
   const toggleStatus = (s: Status) =>
     setSelectedStatuses((prev) => {
@@ -116,28 +127,101 @@ export default function HomeFeedScreen({ navigation }: any) {
     }
   }
 
+  const isTitleRefreshCooling = useCallback(
+    (taskId: string) => {
+      const until = titleRefreshCooldowns[taskId]
+      return typeof until === "number" && until > Date.now()
+    },
+    [titleRefreshCooldowns],
+  )
+
+  const scheduleTitleRefreshCooldown = useCallback((taskId: string) => {
+    const until = Date.now() + TITLE_REFRESH_COOLDOWN_MS
+    setTitleRefreshCooldowns((prev) => ({ ...prev, [taskId]: until }))
+
+    const existing = titleRefreshTimersRef.current.get(taskId)
+    if (existing) clearTimeout(existing)
+
+    const timer = setTimeout(() => {
+      setTitleRefreshCooldowns((prev) => {
+        if (!(taskId in prev)) return prev
+        const next = { ...prev }
+        delete next[taskId]
+        return next
+      })
+      titleRefreshTimersRef.current.delete(taskId)
+    }, TITLE_REFRESH_COOLDOWN_MS)
+
+    titleRefreshTimersRef.current.set(taskId, timer)
+  }, [])
+
+  const refreshTitleForTask = useCallback(
+    async (taskId: string) => {
+      if (loading) return
+      if (status !== "ready" || !coords) {
+        refresh()
+        Alert.alert("Location not available", "Enable location and try again.")
+        return
+      }
+      if (isTitleRefreshCooling(taskId)) return
+
+      scheduleTitleRefreshCooldown(taskId)
+      const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+      try {
+        await fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
+      } catch {
+        // best-effort refresh
+      }
+    },
+    [
+      coords,
+      fetchNearby,
+      isTitleRefreshCooling,
+      loading,
+      refresh,
+      scheduleTitleRefreshCooldown,
+      sortedStatuses,
+      status,
+    ],
+  )
+
   const renderItem: ListRenderItem<any> = useCallback(
-    ({ item: t }) => (
-      <TaskCard
-        id={t.id}
-        title={t.title}
-        distanceMtr={getDistanceMeters(t)}
-        status={t.status}
-        voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
-        onAccept={
-          viewMode === "forYou" && t.status === "OPEN"
-            ? async () => {
-                await onAcceptPress(t.id)
-              }
-            : undefined
-        }
-        onPress={() => navigation.navigate("OolshikDetail", { id: t.id })}
-        createdByName={t.createdByName ?? t.requesterName}
-        createdAt={t.createdAt}
-        helperAvgRating={t.helperAvgRating}
-      />
-    ),
-    [accept, coords, fetchNearby, navigation, viewMode],
+    ({ item: t }) => {
+      const titleText = typeof t.title === "string" ? t.title.trim() : ""
+      const needsTitleRefresh = titleText === "..."
+      const titleRefreshDisabled = needsTitleRefresh && (loading || isTitleRefreshCooling(t.id))
+
+      return (
+        <TaskCard
+          id={t.id}
+          title={t.title}
+          distanceMtr={getDistanceMeters(t)}
+          status={t.status}
+          voiceUrl={t.voiceUrl ? String(t.voiceUrl) : undefined}
+          onAccept={
+            viewMode === "forYou" && t.status === "OPEN"
+              ? async () => {
+                  await onAcceptPress(t.id)
+                }
+              : undefined
+          }
+          onTitleRefresh={needsTitleRefresh ? () => refreshTitleForTask(t.id) : undefined}
+          titleRefreshDisabled={titleRefreshDisabled}
+          onPress={() => navigation.navigate("OolshikDetail", { id: t.id })}
+          createdByName={t.createdByName ?? t.requesterName}
+          createdAt={t.createdAt}
+          helperAvgRating={t.helperAvgRating}
+        />
+      )
+    },
+    [
+      isTitleRefreshCooling,
+      loading,
+      navigation,
+      onAcceptPress,
+      refreshTitleForTask,
+      viewMode,
+    ],
   )
 
   const handleSubmitTask = useCallback(

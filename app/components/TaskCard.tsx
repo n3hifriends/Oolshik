@@ -18,6 +18,8 @@ type Props = {
   createdByName?: string
   createdAt?: string
   helperAvgRating?: number | null
+  onTitleRefresh?: () => void
+  titleRefreshDisabled?: boolean
 }
 
 function getInitials(name?: string) {
@@ -59,6 +61,8 @@ export function TaskCard({
   createdByName,
   createdAt,
   helperAvgRating = 2.5,
+  onTitleRefresh,
+  titleRefreshDisabled = false,
 }: Props) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
@@ -204,7 +208,21 @@ export function TaskCard({
       {HeaderRow}
 
       {/* Title */}
-      <Text text={title} weight="bold" style={{ color: neutral700 }} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+        {onTitleRefresh ? (
+          <Pressable
+            onPress={onTitleRefresh}
+            disabled={titleRefreshDisabled}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh title"
+            accessibilityState={{ disabled: titleRefreshDisabled }}
+          >
+            <Text text="Refresh" style={{ color: primary }} />
+          </Pressable>
+        ) : (
+          <Text text={title} weight="bold" style={{ color: neutral700, flex: 1 }} />
+        )}
+      </View>
 
       {/* Distance + Status side-by-side */}
       <View
