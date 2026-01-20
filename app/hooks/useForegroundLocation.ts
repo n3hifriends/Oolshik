@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 type LatLng = { latitude: number; longitude: number }
 type LocationStatus = "idle" | "loading" | "ready" | "denied" | "error"
+type LocationOptions = { autoRequest?: boolean }
 
-export function useForegroundLocation() {
+export function useForegroundLocation(options: LocationOptions = {}) {
   const [coords, setCoords] = useState<LatLng | null>(null)
   const [lastKnown, setLastKnown] = useState<LatLng | null>(null)
   const [granted, setGranted] = useState<boolean>(false)
@@ -12,6 +13,7 @@ export function useForegroundLocation() {
   const [status, setStatus] = useState<LocationStatus>("idle")
   const watcherRef = useRef<Location.LocationSubscription | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
+  const autoRequest = options.autoRequest !== false
 
   const refresh = useCallback(() => {
     setRefreshToken((v) => v + 1)
@@ -29,8 +31,14 @@ export function useForegroundLocation() {
           setStatus("loading")
         }
 
-        const { status } = await Location.requestForegroundPermissionsAsync()
-        const ok = status === Location.PermissionStatus.GRANTED
+        let ok = false
+        if (!autoRequest && refreshToken === 0) {
+          const perm = await Location.getForegroundPermissionsAsync()
+          ok = perm.status === Location.PermissionStatus.GRANTED
+        } else {
+          const perm = await Location.requestForegroundPermissionsAsync()
+          ok = perm.status === Location.PermissionStatus.GRANTED
+        }
         if (!cancelled) setGranted(ok)
         if (!ok) {
           if (!cancelled) {
@@ -96,7 +104,7 @@ export function useForegroundLocation() {
       watcherRef.current?.remove()
       watcherRef.current = null
     }
-  }, [refreshToken])
+  }, [refreshToken, autoRequest])
 
   return { coords, lastKnown, granted, error, status, refresh, request: refresh }
 }
