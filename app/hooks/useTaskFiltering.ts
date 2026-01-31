@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { normalize } from "@/utils/text"
 import { getDistanceMeters, distanceLabel } from "@/utils/distance"
 
-export type Status = "OPEN" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
+export type Status = "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
 export type ViewMode = "forYou" | "mine"
 
 export function useTaskFiltering(
@@ -35,6 +35,11 @@ export function useTaskFiltering(
 
     let res = unique.filter((t: any) => statusesToUse.includes(t.status as Status))
     res = res.filter((t: any) => (options.viewMode === "mine" ? mine(t) : !mine(t)))
+    res = res.filter((t: any) => {
+      if (t?.status !== "PENDING_AUTH") return true
+      if (options.viewMode === "mine") return true
+      return options.myId ? String(t?.pendingHelperId) === String(options.myId) : false
+    })
 
     const q = normalize(query)
     if (q) {

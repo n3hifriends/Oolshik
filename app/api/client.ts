@@ -317,19 +317,21 @@ export type ServerTask = {
   id: string
   title?: string
   description?: string
-  status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   voiceUrl?: string | null
   latitude: number
   longitude: number
   radiusMeters: number
   requesterId?: string
   helperId?: string | null
+  pendingHelperId?: string | null
   createdAt?: string
   updatedAt?: string
   createdByName?: string
   createdByPhoneNumber?: string
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null
+  pendingAuthExpiresAt?: string | null
   cancelledAt?: string | null
   cancelledBy?: string | null
   reassignedCount?: number | null
@@ -421,6 +423,11 @@ export const OolshikApi = {
   acceptTask: (taskId: string, payload: { latitude: number; longitude: number }) => {
     return api.post(`/requests/${taskId}/accept`, payload)
   },
+
+  authorizeRequest: (taskId: string) => api.post(`/requests/${taskId}/authorize`, {}),
+
+  rejectRequest: (taskId: string, payload: { reasonCode: string; reasonText?: string }) =>
+    api.post(`/requests/${taskId}/reject`, payload),
 
   // Complete
   completeTask: (taskId: string) => api.post(`/requests/${taskId}/complete`, {}),

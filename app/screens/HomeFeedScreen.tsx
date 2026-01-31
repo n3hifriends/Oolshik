@@ -30,7 +30,7 @@ import { OolshikApi } from "@/api"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
-const STATUS_ORDER: Status[] = ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]
+const STATUS_ORDER: Status[] = ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]
 const LOGOUT_COLOR = "#FF6B2C"
 const TITLE_REFRESH_COOLDOWN_MS = 5000
 
@@ -41,7 +41,7 @@ export default function HomeFeedScreen({ navigation }: any) {
   const lastFetchKeyRef = useRef<string | null>(null)
 
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
-    new Set(["OPEN", "ASSIGNED"]),
+    new Set(["OPEN", "PENDING_AUTH", "ASSIGNED"]),
   )
   const [viewMode, setViewMode] = useState<ViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)

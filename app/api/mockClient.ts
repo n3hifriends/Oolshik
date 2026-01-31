@@ -99,8 +99,29 @@ export const MockOolshikApi = {
 
   async acceptTask(id: string) {
     const t = dummyTasks.find((x) => String(x.id) === String(id))
-    if (t) t.status = "ASSIGNED"
-    return { ok: true as const }
+    if (t) {
+      t.status = "PENDING_AUTH"
+      t.pendingAuthExpiresAt = new Date(Date.now() + 120 * 1000).toISOString()
+    }
+    return { ok: true as const, data: t }
+  },
+
+  async authorizeRequest(id: string) {
+    const t = dummyTasks.find((x) => String(x.id) === String(id))
+    if (t) {
+      t.status = "ASSIGNED"
+      t.pendingAuthExpiresAt = null
+    }
+    return { ok: true as const, data: t }
+  },
+
+  async rejectRequest(id: string) {
+    const t = dummyTasks.find((x) => String(x.id) === String(id))
+    if (t) {
+      t.status = "OPEN"
+      t.pendingAuthExpiresAt = null
+    }
+    return { ok: true as const, data: t }
   },
 
   async completeTask(id: string) {
