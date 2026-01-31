@@ -144,7 +144,8 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [current?.createdByPhoneNumber])
 
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
-  let normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" = "PENDING"
+  let normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
+    "PENDING"
   const rawStatus = (current?.status as string | undefined) || undefined
   switch (rawStatus) {
     case "OPEN":
@@ -194,7 +195,8 @@ export default function TaskDetailScreen({ navigation }: any) {
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
   const canCancel =
-    isRequester && (rawStatus === "OPEN" || rawStatus === "ASSIGNED" || rawStatus === "PENDING_AUTH")
+    isRequester &&
+    (rawStatus === "OPEN" || rawStatus === "ASSIGNED" || rawStatus === "PENDING_AUTH")
   const canRelease = isHelper && rawStatus === "ASSIGNED"
 
   const helperAcceptedAtMs = current?.helperAcceptedAt
@@ -255,6 +257,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const msUntilAuthExpiry = pendingAuthExpiresAtMs
     ? Math.max(0, pendingAuthExpiresAtMs - nowMs)
     : null
+  const authExpired = msUntilAuthExpiry !== null && msUntilAuthExpiry <= 0
   const canReassign =
     isRequester &&
     rawStatus === "ASSIGNED" &&
@@ -526,7 +529,7 @@ export default function TaskDetailScreen({ navigation }: any) {
         throw new Error("Reassign failed")
       }
       setTask((t: any) => (t ? { ...t, status: "OPEN", helperId: null } : t))
-      setRecoveryNotice("Request reopened. We’ll look for another helper now.")
+      setRecoveryNotice("Request reopened. We'll look for another helper now.")
       if (coords && status === "ready") {
         await fetchNearby(coords.latitude, coords.longitude)
       }
@@ -756,24 +759,22 @@ export default function TaskDetailScreen({ navigation }: any) {
                   }}
                 >
                   <Text text="Helper requested authorization." weight="medium" />
-                  {current?.pendingHelperId && (
-                    <Text
-                      text={`Helper ID: ${String(current.pendingHelperId).slice(0, 8)}…`}
-                      size="xs"
-                    />
-                  )}
-                  {authCountdown && (
+                  <Text text={`Requester: ${current.createdByName || "Requester"}`} size="xs" />
+                  {authCountdown && !authExpired && (
                     <Text text={`Approve within ${authCountdown}`} size="xs" />
                   )}
+                  {authExpired && <Text text="Authorization expired." size="xs" />}
                   <View style={{ flexDirection: "row", gap: spacing.sm }}>
                     <Button
                       text={actionLoading ? "..." : "Approve"}
                       onPress={onAuthorize}
+                      disabled={authExpired || actionLoading}
                       style={{ flex: 1, paddingVertical: spacing.xs }}
                     />
                     <Button
                       text="Reject"
                       onPress={() => openReasonSheet("reject")}
+                      disabled={authExpired || actionLoading}
                       style={{ flex: 1, paddingVertical: spacing.xs }}
                     />
                   </View>
@@ -791,7 +792,11 @@ export default function TaskDetailScreen({ navigation }: any) {
                   }}
                 >
                   <Text text="Waiting for requester approval." weight="medium" />
-                  {authCountdown && <Text text={`Time left: ${authCountdown}`} size="xs" />}
+                  <Text text={`Requester: ${current.createdByName || "Requester"}`} size="xs" />
+                  {authCountdown && !authExpired && (
+                    <Text text={`Time left: ${authCountdown}`} size="xs" />
+                  )}
+                  {authExpired && <Text text="Authorization expired." size="xs" />}
                 </View>
               ) : (
                 <View
@@ -994,7 +999,7 @@ export default function TaskDetailScreen({ navigation }: any) {
             )}
 
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <Button text="Cancel" onPress={closeReasonSheet} style={{ flex: 1 }} />
+              <Button text="Go Back" onPress={closeReasonSheet} style={{ flex: 1 }} />
               <Button
                 text={actionLoading ? "..." : "Confirm"}
                 onPress={onConfirmReason}
