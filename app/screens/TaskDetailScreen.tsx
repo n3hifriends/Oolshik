@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, ActivityIndicator, Pressable, Linking, Platform, Alert, Modal } from "react-native"
 import { useFocusEffect, useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
@@ -17,7 +17,7 @@ import { Task } from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
 
 type RouteParams = { id: string }
-type RecoveryAction = "cancel" | "release"
+type RecoveryAction = "cancel" | "release" | "reject"
 
 const REASSIGN_SLA_SECONDS = 420
 const MAX_REASSIGN = 2
@@ -96,6 +96,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [justCompleted, setJustCompleted] = React.useState(false)
   const [actionLoading, setActionLoading] = React.useState(false)
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
+  const authExpiredRef = useRef(false)
 
   const [fullPhone, setFullPhone] = React.useState<string | null>(null)
   const [isRevealed, setIsRevealed] = React.useState(false)
@@ -119,6 +120,7 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const statusMap = {
     PENDING: { label: "Pending", bg: primarySoft, fg: primary },
+    PENDING_AUTH: { label: "Awaiting approval", bg: colors.palette.primary100, fg: primary },
     ASSIGNED: { label: "Assigned", bg: warningSoft, fg: warning },
     COMPLETED: { label: "Completed", bg: successSoft, fg: success },
     CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
@@ -142,11 +144,14 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [current?.createdByPhoneNumber])
 
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
-  let normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" | "CANCELLED" = "PENDING"
+  let normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" = "PENDING"
   const rawStatus = (current?.status as string | undefined) || undefined
   switch (rawStatus) {
     case "OPEN":
       normalizedStatus = "PENDING"
+      break
+    case "PENDING_AUTH":
+      normalizedStatus = "PENDING_AUTH"
       break
     case "CANCELLED":
     case "CANCELED":
@@ -186,11 +191,17 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
   const isHelper = !!current?.helperId && !!userId && current.helperId === userId
-  const canCancel = isRequester && (rawStatus === "OPEN" || rawStatus === "ASSIGNED")
+  const isPendingHelper =
+    !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
+  const canCancel =
+    isRequester && (rawStatus === "OPEN" || rawStatus === "ASSIGNED" || rawStatus === "PENDING_AUTH")
   const canRelease = isHelper && rawStatus === "ASSIGNED"
 
   const helperAcceptedAtMs = current?.helperAcceptedAt
     ? new Date(current.helperAcceptedAt).getTime()
+    : null
+  const pendingAuthExpiresAtMs = current?.pendingAuthExpiresAt
+    ? new Date(current.pendingAuthExpiresAt).getTime()
     : null
   const reassignAvailableAtMs = helperAcceptedAtMs
     ? helperAcceptedAtMs + REASSIGN_SLA_SECONDS * 1000
@@ -198,10 +209,12 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const [nowMs, setNowMs] = React.useState(Date.now())
   useEffect(() => {
-    if (!reassignAvailableAtMs || rawStatus !== "ASSIGNED") return
+    const needsReassignTimer = reassignAvailableAtMs && rawStatus === "ASSIGNED"
+    const needsAuthTimer = pendingAuthExpiresAtMs && rawStatus === "PENDING_AUTH"
+    if (!needsReassignTimer && !needsAuthTimer) return
     const timer = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [rawStatus, reassignAvailableAtMs])
+  }, [rawStatus, reassignAvailableAtMs, pendingAuthExpiresAtMs])
 
   useEffect(() => {
     if (!recoveryNotice) return
@@ -209,7 +222,39 @@ export default function TaskDetailScreen({ navigation }: any) {
     return () => clearTimeout(timer)
   }, [recoveryNotice])
 
+  useEffect(() => {
+    if (rawStatus !== "PENDING_AUTH") {
+      authExpiredRef.current = false
+      return
+    }
+    if (msUntilAuthExpiry == null || msUntilAuthExpiry > 0) {
+      authExpiredRef.current = false
+      return
+    }
+    if (authExpiredRef.current) return
+    authExpiredRef.current = true
+    setRecoveryNotice("Authorization expired; searching again.")
+
+    const refreshTask = async () => {
+      try {
+        const res = await OolshikApi.findTaskByTaskId(taskId)
+        if (res?.ok) {
+          setTask(res.data as Task)
+        }
+        if (coords && status === "ready") {
+          await fetchNearby(coords.latitude, coords.longitude)
+        }
+      } catch {
+        // best-effort refresh
+      }
+    }
+    refreshTask()
+  }, [coords, fetchNearby, msUntilAuthExpiry, rawStatus, status, taskId])
+
   const msUntilReassign = reassignAvailableAtMs ? Math.max(0, reassignAvailableAtMs - nowMs) : null
+  const msUntilAuthExpiry = pendingAuthExpiresAtMs
+    ? Math.max(0, pendingAuthExpiresAtMs - nowMs)
+    : null
   const canReassign =
     isRequester &&
     rawStatus === "ASSIGNED" &&
@@ -223,6 +268,14 @@ export default function TaskDetailScreen({ navigation }: any) {
     const secs = String(totalSeconds % 60).padStart(2, "0")
     return `${mins}:${secs}`
   }, [msUntilReassign])
+
+  const authCountdown = useMemo(() => {
+    if (msUntilAuthExpiry == null) return null
+    const totalSeconds = Math.ceil(msUntilAuthExpiry / 1000)
+    const mins = String(Math.floor(totalSeconds / 60)).padStart(2, "0")
+    const secs = String(totalSeconds % 60).padStart(2, "0")
+    return `${mins}:${secs}`
+  }, [msUntilAuthExpiry])
 
   const onRevealPhone = async () => {
     if (!current) return
@@ -281,12 +334,51 @@ export default function TaskDetailScreen({ navigation }: any) {
     if (result === "ALREADY") {
       alert("Already assigned")
     } else if (result === "OK") {
-      alert("Task accepted")
-      setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
+      alert("Authorization requested")
+      setTask((t: any) =>
+        t
+          ? {
+              ...t,
+              status: "PENDING_AUTH",
+              pendingAuthExpiresAt: new Date(Date.now() + 120 * 1000).toISOString(),
+            }
+          : t,
+      )
+      try {
+        const res = await OolshikApi.findTaskByTaskId(current.id as any)
+        if (res?.ok) {
+          setTask(res.data as Task)
+        }
+      } catch {
+        // best-effort refresh
+      }
     } else {
       alert("Error accepting task / Requester can't accept this task")
     }
     // reflect status locally
+  }
+
+  const onAuthorize = async () => {
+    if (!current) return
+    setActionLoading(true)
+    try {
+      const res = await OolshikApi.authorizeRequest(current.id as any)
+      if (!res?.ok) {
+        throw new Error("Authorize failed")
+      }
+      if (res?.data) {
+        setTask(res.data as any)
+      } else {
+        setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
+      }
+      if (coords && status === "ready") {
+        await fetchNearby(coords.latitude, coords.longitude)
+      }
+    } catch {
+      Alert.alert("Approve failed", "Please try again.")
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   function openInMaps(lat: number, lon: number, label = "Task") {
@@ -398,6 +490,20 @@ export default function TaskDetailScreen({ navigation }: any) {
         }
         setTask((t: any) => (t ? { ...t, status: "OPEN", helperId: null } : t))
         setRecoveryNotice("Task released. It’s now open for other helpers to accept.")
+      } else if (reasonModal.action === "reject") {
+        const res = await OolshikApi.rejectRequest(current.id, {
+          reasonCode: reasonModal.reasonCode,
+          reasonText: reasonModal.reasonText?.trim() || undefined,
+        })
+        if (!res?.ok) {
+          throw new Error("Reject failed")
+        }
+        if (res?.data) {
+          setTask(res.data as any)
+        } else {
+          setTask((t: any) => (t ? { ...t, status: "OPEN", pendingHelperId: null } : t))
+        }
+        setRecoveryNotice("Authorization rejected. Searching again.")
       }
 
       if (coords && status === "ready") {
@@ -450,7 +556,22 @@ export default function TaskDetailScreen({ navigation }: any) {
     [],
   )
 
-  const currentReasons = reasonModal.action === "release" ? releaseReasons : cancelReasons
+  const rejectReasons = useMemo(
+    () => [
+      { code: "NOT_COMFORTABLE", label: "Not comfortable" },
+      { code: "FOUND_OTHER_HELP", label: "Found other help" },
+      { code: "WAIT_TOO_LONG", label: "Waited too long" },
+      { code: "OTHER", label: "Other" },
+    ],
+    [],
+  )
+
+  const currentReasons =
+    reasonModal.action === "release"
+      ? releaseReasons
+      : reasonModal.action === "reject"
+        ? rejectReasons
+        : cancelReasons
 
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
@@ -620,7 +741,75 @@ export default function TaskDetailScreen({ navigation }: any) {
               <Text text={recoveryNotice} weight="medium" style={{ color: success }} />
             </View>
           )}
-          {normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
+          {rawStatus === "PENDING_AUTH" ? (
+            <View style={{ marginHorizontal: 16, gap: spacing.sm }}>
+              {isRequester ? (
+                <View
+                  style={{
+                    gap: spacing.xs,
+                    paddingVertical: spacing.xs,
+                    paddingHorizontal: spacing.sm,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.palette.neutral300,
+                    backgroundColor: colors.palette.neutral100,
+                  }}
+                >
+                  <Text text="Helper requested authorization." weight="medium" />
+                  {current?.pendingHelperId && (
+                    <Text
+                      text={`Helper ID: ${String(current.pendingHelperId).slice(0, 8)}…`}
+                      size="xs"
+                    />
+                  )}
+                  {authCountdown && (
+                    <Text text={`Approve within ${authCountdown}`} size="xs" />
+                  )}
+                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                    <Button
+                      text={actionLoading ? "..." : "Approve"}
+                      onPress={onAuthorize}
+                      style={{ flex: 1, paddingVertical: spacing.xs }}
+                    />
+                    <Button
+                      text="Reject"
+                      onPress={() => openReasonSheet("reject")}
+                      style={{ flex: 1, paddingVertical: spacing.xs }}
+                    />
+                  </View>
+                </View>
+              ) : isPendingHelper ? (
+                <View
+                  style={{
+                    gap: spacing.xs,
+                    paddingVertical: spacing.xs,
+                    paddingHorizontal: spacing.sm,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.palette.neutral300,
+                    backgroundColor: colors.palette.neutral100,
+                  }}
+                >
+                  <Text text="Waiting for requester approval." weight="medium" />
+                  {authCountdown && <Text text={`Time left: ${authCountdown}`} size="xs" />}
+                </View>
+              ) : (
+                <View
+                  style={{
+                    gap: spacing.xs,
+                    paddingVertical: spacing.xs,
+                    paddingHorizontal: spacing.sm,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.palette.neutral300,
+                    backgroundColor: colors.palette.neutral100,
+                  }}
+                >
+                  <Text text="Awaiting requester approval." weight="medium" />
+                </View>
+              )}
+            </View>
+          ) : normalizedStatus === "PENDING" || normalizedStatus === "ASSIGNED" ? (
             <View
               style={{
                 flexDirection: "row",
@@ -755,7 +944,11 @@ export default function TaskDetailScreen({ navigation }: any) {
           >
             <Text
               text={
-                reasonModal.action === "release" ? "Reason for giving away" : "Reason for cancel"
+                reasonModal.action === "release"
+                  ? "Reason for giving away"
+                  : reasonModal.action === "reject"
+                    ? "Reason for reject"
+                    : "Reason for cancel"
               }
               preset="subheading"
             />
