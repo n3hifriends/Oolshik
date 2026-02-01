@@ -20,6 +20,9 @@ type Task = {
   createdAt?: string // ISO
   createdByPhoneNumber?: string
   ratingValue?: number | null
+  ratingByRequester?: number | null
+  ratingByHelper?: number | null
+  requesterAvgRating?: number | null
   helperAvgRating?: number | null
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null

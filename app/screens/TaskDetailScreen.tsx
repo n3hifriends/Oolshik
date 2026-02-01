@@ -95,6 +95,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { radiusMeters } = useTaskStore()
   const [justCompleted, setJustCompleted] = React.useState(false)
   const [actionLoading, setActionLoading] = React.useState(false)
+  const [ratingSubmitting, setRatingSubmitting] = React.useState(false)
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
   const authExpiredRef = useRef(false)
 
@@ -194,6 +195,11 @@ export default function TaskDetailScreen({ navigation }: any) {
   const isHelper = !!current?.helperId && !!userId && current.helperId === userId
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
+  const ratingByRequester = current?.ratingByRequester ?? null
+  const ratingByHelper = current?.ratingByHelper ?? null
+  const myRating = isRequester ? ratingByRequester : isHelper ? ratingByHelper : null
+  const otherPartyRating = isRequester ? ratingByHelper : isHelper ? ratingByRequester : null
+  const oppositeAvgRating = isRequester ? current?.helperAvgRating : current?.requesterAvgRating
   const canCancel =
     isRequester &&
     (rawStatus === "OPEN" || rawStatus === "ASSIGNED" || rawStatus === "PENDING_AUTH")
@@ -416,7 +422,39 @@ export default function TaskDetailScreen({ navigation }: any) {
     }
   }
 
-  const showRatings = normalizedStatus === "COMPLETED" ? true : false
+  const onSubmitRating = async () => {
+    if (!current) return
+    if (!isRequester && !isHelper) return
+    if (myRating != null) return
+    setRatingSubmitting(true)
+    try {
+      const res = await OolshikApi.rateTask(current.id as any, {
+        rating,
+        feedback: undefined,
+      })
+      if (!res?.ok) {
+        throw new Error("Rating failed")
+      }
+      setTask((t: any) =>
+        t
+          ? {
+              ...t,
+              ratingByRequester: isRequester ? rating : t.ratingByRequester,
+              ratingByHelper: isHelper ? rating : t.ratingByHelper,
+            }
+          : t,
+      )
+      setRecoveryNotice("Rating submitted. Thank you!")
+    } catch (e) {
+      Alert.alert("Rating failed", "Please try again.")
+    } finally {
+      setRatingSubmitting(false)
+    }
+  }
+
+  const ratingBadgeValue = normalizedStatus === "COMPLETED" ? otherPartyRating : oppositeAvgRating
+  const showRatingBadge = ratingBadgeValue != null
+  const canRate = normalizedStatus === "COMPLETED" && (isRequester || isHelper)
   const distance =
     (current?.distanceMtr ?? 0) < 1000
       ? `${(current?.distanceMtr ?? 0).toFixed(0)}m`
@@ -718,7 +756,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               >
                 <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
               </View>
-              {showRatings && <RatingBadge value={current.ratingValue} />}
+              {showRatingBadge && <RatingBadge value={ratingBadgeValue} />}
             </View>
           </View>
         )}
@@ -848,28 +886,73 @@ export default function TaskDetailScreen({ navigation }: any) {
               ) : (
                 <View
                   style={{
-                    gap: spacing.md,
+                    gap: spacing.sm,
                     paddingHorizontal: spacing.sm,
                     borderRadius: 12,
                     borderWidth: 1,
                     borderColor: colors.palette.neutral300,
                     backgroundColor: colors.palette.neutral100,
                     flex: 1,
-                    paddingBottom: 32,
+                    paddingVertical: spacing.sm,
                   }}
                 >
-                  <Text tx="oolshik:yourExperience" preset="subheading" />
+                  {isRequester ? (
+                    <>
+                      <Text text="You can mark this task as completed." weight="medium" />
+                      <Button
+                        text="Mark as Complete"
+                        onPress={onComplete}
+                        style={{ flex: 2, paddingVertical: spacing.xs }}
+                      />
+                    </>
+                  ) : (
+                    <Text text="Waiting for requester to complete." weight="medium" />
+                  )}
+                </View>
+              )}
+            </View>
+          ) : null}
+          {canRate ? (
+            <View
+              style={{
+                gap: spacing.md,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.palette.neutral300,
+                backgroundColor: colors.palette.neutral100,
+                marginHorizontal: 16,
+                paddingBottom: 16,
+                paddingTop: 12,
+              }}
+            >
+              <Text
+                text={isRequester ? "Rate your helper" : "Rate the requester"}
+                preset="subheading"
+              />
+              {myRating == null ? (
+                <>
                   <SmileySlider disabled={false} value={rating} onChange={setRating} />
                   <Text style={{ textAlign: "center", marginTop: 6, opacity: 0.6 }}>
                     {rating.toFixed(1)} / 5.0
                   </Text>
-
                   <Button
-                    text="Mark as Complete"
-                    onPress={onComplete}
-                    style={{ flex: 2, paddingVertical: spacing.xs }}
+                    text={ratingSubmitting ? "..." : "Submit Rating"}
+                    onPress={onSubmitRating}
+                    style={{ paddingVertical: spacing.xs }}
+                    disabled={ratingSubmitting}
                   />
-                </View>
+                </>
+              ) : (
+                <Text text={`Your rating: ${myRating.toFixed(1)} / 5.0`} weight="medium" />
+              )}
+              {otherPartyRating != null && (
+                <Text
+                  text={`${
+                    isRequester ? "Helper" : "Requester"
+                  } rating: ${otherPartyRating.toFixed(1)} / 5.0`}
+                  size="xs"
+                />
               )}
             </View>
           ) : null}
@@ -911,6 +994,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               style={{
                 paddingVertical: spacing.xs,
                 paddingHorizontal: spacing.sm,
+                marginVertical: spacing.sm,
                 marginHorizontal: 16,
                 borderRadius: 8,
                 backgroundColor: successSoft,

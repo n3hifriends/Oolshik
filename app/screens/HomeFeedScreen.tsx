@@ -190,6 +190,10 @@ export default function HomeFeedScreen({ navigation }: any) {
       const titleText = typeof t.title === "string" ? t.title.trim() : ""
       const needsTitleRefresh = titleText === "..."
       const titleRefreshDisabled = needsTitleRefresh && (loading || isTitleRefreshCooling(t.id))
+      const avgRating =
+        userId && t.requesterId && t.requesterId === userId
+          ? t.helperAvgRating ?? null
+          : t.requesterAvgRating ?? null
 
       return (
         <TaskCard
@@ -210,7 +214,7 @@ export default function HomeFeedScreen({ navigation }: any) {
           onPress={() => navigation.navigate("OolshikDetail", { id: t.id })}
           createdByName={t.createdByName ?? t.requesterName}
           createdAt={t.createdAt}
-          helperAvgRating={t.helperAvgRating}
+          avgRating={avgRating}
         />
       )
     },
@@ -220,6 +224,7 @@ export default function HomeFeedScreen({ navigation }: any) {
       navigation,
       onAcceptPress,
       refreshTitleForTask,
+      userId,
       viewMode,
     ],
   )

@@ -17,7 +17,7 @@ type Props = {
   onPress?: () => void
   createdByName?: string
   createdAt?: string
-  helperAvgRating?: number | null
+  avgRating?: number | null
   onTitleRefresh?: () => void
   titleRefreshDisabled?: boolean
 }
@@ -60,7 +60,7 @@ export function TaskCard({
   onPress,
   createdByName,
   createdAt,
-  helperAvgRating = 2.5,
+  avgRating,
   onTitleRefresh,
   titleRefreshDisabled = false,
 }: Props) {
@@ -249,7 +249,7 @@ export function TaskCard({
         >
           <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
         </View>
-        <RatingBadge value={helperAvgRating} />
+        <RatingBadge value={avgRating} />
       </View>
     </View>
   )

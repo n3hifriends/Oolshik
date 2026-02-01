@@ -130,6 +130,18 @@ export const MockOolshikApi = {
     return { ok: true as const }
   },
 
+  async rateTask(id: string, payload: { rating: number }) {
+    const t = dummyTasks.find((x) => String(x.id) === String(id))
+    if (t) {
+      if (t.ratingByRequester == null) {
+        t.ratingByRequester = payload.rating
+      } else {
+        t.ratingByHelper = payload.rating
+      }
+    }
+    return { ok: true as const }
+  },
+
   async cancelTask(id: string) {
     const t = dummyTasks.find((x) => String(x.id) === String(id))
     if (t) t.status = "CANCELLED"
