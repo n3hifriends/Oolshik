@@ -339,6 +339,9 @@ export type ServerTask = {
   requesterName?: string
   requesterPhoneNumber?: string
   ratingValue?: number | null
+  ratingByRequester?: number | null
+  ratingByHelper?: number | null
+  requesterAvgRating?: number | null
   helperAvgRating?: number | null
 }
 
@@ -431,6 +434,9 @@ export const OolshikApi = {
 
   // Complete
   completeTask: (taskId: string) => api.post(`/requests/${taskId}/complete`, {}),
+
+  rateTask: (taskId: string, payload: { rating: number; feedback?: string }) =>
+    api.post(`/requests/${taskId}/rate`, payload),
 
   // Cancel / Release / Reassign
   cancelTask: (

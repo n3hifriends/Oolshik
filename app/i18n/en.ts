@@ -38,7 +38,7 @@ const en = {
     emptyNearby: "No nearby tasks yet — try a larger radius.",
     nearbyForYouHeader: "Nearby for You",
     myRequestsHeader: "My Requests",
-    tabForYou: "For You",
+    tabForYou: "Nearby Help",
     tabMyRequests: "My Requests",
     emptyForYou: "No nearby requests right now.",
     emptyMine: "You haven't created any requests yet.",
