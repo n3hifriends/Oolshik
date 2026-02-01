@@ -368,21 +368,41 @@ export default function TaskDetailScreen({ navigation }: any) {
   }
 
   const onAuthorize = async () => {
-    if (!current) return
+    if (!current || actionLoading) return
     setActionLoading(true)
+    setRecoveryNotice("Authorizing...")
     try {
       const res = await OolshikApi.authorizeRequest(current.id as any)
-      if (!res?.ok) {
-        throw new Error("Authorize failed")
+      if (res?.ok) {
+        if (res?.data) {
+          setTask((t: any) => (t ? { ...t, ...(res.data as any) } : (res.data as any)))
+        } else {
+          setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
+        }
+        setRecoveryNotice("Authorization approved.")
+        if (coords && status === "ready") {
+          await fetchNearby(coords.latitude, coords.longitude)
+        }
+        return
       }
-      if (res?.data) {
-        setTask(res.data as any)
-      } else {
-        setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
+      if (res?.status === 409) {
+        const refreshed = await OolshikApi.findTaskByTaskId(current.id as any)
+        if (refreshed?.ok && refreshed?.data) {
+          setTask(refreshed.data as Task)
+          const refreshedStatus = (refreshed.data as any)?.status
+          if (refreshedStatus === "ASSIGNED") {
+            setRecoveryNotice("Authorization already approved.")
+            return
+          }
+          if (refreshedStatus === "OPEN") {
+            setRecoveryNotice("Authorization expired; searching again.")
+            return
+          }
+        }
+        setRecoveryNotice("Authorization not allowed.")
+        return
       }
-      if (coords && status === "ready") {
-        await fetchNearby(coords.latitude, coords.longitude)
-      }
+      throw new Error("Authorize failed")
     } catch {
       Alert.alert("Approve failed", "Please try again.")
     } finally {
