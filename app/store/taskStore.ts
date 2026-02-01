@@ -9,19 +9,24 @@ type Task = {
   title?: string
   description?: string
   distanceMtr?: number
-  status: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   latitude?: number
   longitude?: number
   requesterId?: string
   helperId?: string | null
+  pendingHelperId?: string | null
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
   createdByPhoneNumber?: string
   ratingValue?: number | null
+  ratingByRequester?: number | null
+  ratingByHelper?: number | null
+  requesterAvgRating?: number | null
   helperAvgRating?: number | null
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null
+  pendingAuthExpiresAt?: string | null
   cancelledAt?: string | null
   cancelledBy?: string | null
   reassignedCount?: number | null
@@ -62,7 +67,9 @@ export const useTaskStore = create<State>((set, get) => ({
         await new Promise((r) => setTimeout(r, 300))
         const r = get().radiusMeters
         const allowed = new Set(
-          (statuses?.length ? statuses : ["OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
+          (statuses?.length
+            ? statuses
+            : ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
         )
         const filtered = MOCK_NEARBY_TASKS.filter(
           (t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status),
@@ -83,14 +90,24 @@ export const useTaskStore = create<State>((set, get) => ({
     if (FLAGS.USE_MOCK_NEARBY) {
       // optimistic accept in mock mode
       set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "ASSIGNED" } : t)),
+        tasks: s.tasks.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                status: "PENDING_AUTH",
+                pendingAuthExpiresAt: new Date(Date.now() + 120 * 1000).toISOString(),
+              }
+            : t,
+        ),
       }))
       return "OK"
     } else {
       const res = await OolshikApi.acceptTask(id, { latitude, longitude })
       if (res.ok) {
         set((s) => ({
-          tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "ASSIGNED" } : t)),
+          tasks: s.tasks.map((t) =>
+            t.id === id ? { ...t, ...(res.data as any), status: "PENDING_AUTH" } : t,
+          ),
         }))
         return "OK"
       }

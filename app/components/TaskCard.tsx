@@ -12,12 +12,12 @@ type Props = {
   title?: string
   distanceMtr?: number
   onAccept?: () => void
-  status?: "PENDING" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status?: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   voiceUrl?: string | null
   onPress?: () => void
   createdByName?: string
   createdAt?: string
-  helperAvgRating?: number | null
+  avgRating?: number | null
   onTitleRefresh?: () => void
   titleRefreshDisabled?: boolean
 }
@@ -60,7 +60,7 @@ export function TaskCard({
   onPress,
   createdByName,
   createdAt,
-  helperAvgRating = 2.5,
+  avgRating,
   onTitleRefresh,
   titleRefreshDisabled = false,
 }: Props) {
@@ -69,7 +69,7 @@ export function TaskCard({
 
   // Normalize backend statuses to UI statuses
   // Backend may send OPEN; map it to PENDING visually. Handle CANCELLED/CANCELED gracefully.
-  const normalizedStatus: "PENDING" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
+  const normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
     status === "OPEN"
       ? "PENDING"
       : status === "CANCELLED" || status === "CANCELED"
@@ -81,11 +81,14 @@ export function TaskCard({
 
   const statusMap = {
     PENDING: { label: "Pending", bg: colors.palette.primary200, fg: neutral700 },
+    PENDING_AUTH: { label: "Awaiting approval", bg: colors.palette.primary100, fg: neutral700 },
     ASSIGNED: { label: "Assigned", bg: colors.palette.warningSoft400, fg: neutral700 },
     COMPLETED: { label: "Completed", bg: colors.palette.successSoft400, fg: neutral700 },
     CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
   } as const
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
+
+  const canAccept = !!onAccept && (status === "OPEN" || status === "PENDING")
 
   const [sound, setSound] = React.useState<Audio.Sound | null>(null)
   const [playing, setPlaying] = React.useState(false)
@@ -107,7 +110,7 @@ export function TaskCard({
 
   // Footer: type as ReactElement | undefined to satisfy Card's prop
   const FooterComponent =
-    status === "PENDING" && onAccept ? (
+    canAccept ? (
       <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
         <Button
           text="Accept"
@@ -168,7 +171,7 @@ export function TaskCard({
           <Text text={playing ? "…" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
         </Pressable>
       ) : undefined}
-      {status === "PENDING" && onAccept ? (
+      {canAccept ? (
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Button
             text="Accept"
@@ -246,7 +249,7 @@ export function TaskCard({
         >
           <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
         </View>
-        <RatingBadge value={helperAvgRating} />
+        <RatingBadge value={avgRating} />
       </View>
     </View>
   )
