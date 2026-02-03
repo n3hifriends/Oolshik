@@ -459,7 +459,8 @@ export const OolshikApi = {
   report: (payload: ReportPayload) => api.post("/reports", payload),
 
   // Device token (push)
-  registerDevice: (token: string) => api.post("/users/device", { token }),
+  registerDevice: (token: string, platform?: string) =>
+    api.post("/users/device", { token, platform }),
 
   // Media: pre-signed URL
   getPresigned: (contentType: string) =>
