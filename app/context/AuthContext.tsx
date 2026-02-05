@@ -1,7 +1,7 @@
 import { setLoginTokens } from "@/api/client"
 import { authEvents } from "@/auth/events"
 import { navigationRef } from "@/navigators/navigationUtilities"
-import { attachNotificationListeners, getExpoPushTokenAsync, registerDeviceTokenWithRetry } from "@/utils/pushNotifications"
+import { attachNotificationListeners, getCachedPushToken, getExpoPushTokenAsync, registerDeviceTokenWithRetry, setCachedPushToken } from "@/utils/pushNotifications"
 import React, {
   createContext,
   useContext,
@@ -9,7 +9,6 @@ import React, {
   PropsWithChildren,
   useCallback,
   useEffect, // ✅ added
-  useRef,
 } from "react"
 import { useMMKVString } from "react-native-mmkv"
 
@@ -40,8 +39,6 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const [authEmail, setAuthEmailMMKV] = useMMKVString(MMKV_AUTH_EMAIL)
   const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
   const [userName, setUserNameMMKV] = useMMKVString(MMKV_USER_NAME)
-
-  const lastPushToken = useRef<string | null>(null)
 
   // Defaults for local/dev use
   const effectiveUserId = userId || "U-LOCAL-1"
@@ -96,11 +93,12 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     let active = true
     const cleanup = attachNotificationListeners()
     getExpoPushTokenAsync()
-      .then((token) => {
+      .then(async (token) => {
         if (!active || !token) return
-        if (token === lastPushToken.current) return
-        lastPushToken.current = token
-        return registerDeviceTokenWithRetry(token)
+        const cached = getCachedPushToken()
+        if (token === cached) return
+        await registerDeviceTokenWithRetry(token)
+        setCachedPushToken(token)
       })
       .catch(() => {})
     return () => {
