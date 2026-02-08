@@ -8,13 +8,13 @@ import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import { useTaskStore } from "@/store/taskStore"
 import { OolshikApi } from "@/api"
-import { Audio } from "expo-av"
 import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { SmileySlider } from "@/components/SmileySlider"
 import { RatingBadge } from "@/components/RatingBadge"
 import { Task } from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
+import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
 
 type RouteParams = { id: string }
 type RecoveryAction = "cancel" | "release" | "reject"
@@ -89,8 +89,12 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [loading, setLoading] = React.useState(!taskFromStore)
   const [task, setTask] = React.useState(taskFromStore || null)
 
-  const [sound, setSound] = React.useState<Audio.Sound | null>(null)
-  const [playing, setPlaying] = React.useState(false)
+  const current = task || taskFromStore || null
+
+  const { status: playbackStatus, toggle, stop } = useAudioPlaybackForUri(
+    current?.voiceUrl ? String(current.voiceUrl) : null,
+    current?.id ? `detail-${current.id}` : "detail",
+  )
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { radiusMeters } = useTaskStore()
   const [justCompleted, setJustCompleted] = React.useState(false)
@@ -127,14 +131,15 @@ export default function TaskDetailScreen({ navigation }: any) {
     CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
   } as const
 
-  const current = task || taskFromStore || null
-
   const [rating, setRating] = useState<number>(2.5) // center default (neutral)
 
   useFocusEffect(
     useCallback(() => {
       refresh()
-    }, [refresh]),
+      return () => {
+        void stop()
+      }
+    }, [refresh, stop]),
   )
 
   React.useEffect(() => {
@@ -192,6 +197,8 @@ export default function TaskDetailScreen({ navigation }: any) {
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
+  const contactLabel = isRequester ? "Your phone" : "Requester phone"
+
   const isHelper = !!current?.helperId && !!userId && current.helperId === userId
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
@@ -313,20 +320,9 @@ export default function TaskDetailScreen({ navigation }: any) {
     if (num) Linking.openURL(`tel:${num}`)
   }
 
-  const play = async () => {
-    if (!current?.voiceUrl) return
-    const { sound } = await Audio.Sound.createAsync({ uri: String(current.voiceUrl) })
-    setSound(sound)
-    setPlaying(true)
-    await sound.playAsync()
-    sound.setOnPlaybackStatusUpdate((st: any) => {
-      if (!st.isPlaying) {
-        setPlaying(false)
-        sound.unloadAsync()
-        setSound(null)
-      }
-    })
-  }
+  const audioLoading = playbackStatus === "loading"
+  const playing = playbackStatus === "playing"
+  const togglePlay = () => toggle()
 
   const onAccept = async () => {
     if (status !== "ready" || !coords) {
@@ -410,11 +406,40 @@ export default function TaskDetailScreen({ navigation }: any) {
     }
   }
 
-  function openInMaps(lat: number, lon: number, label = "Task") {
-    const g = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}&q=(${encodeURIComponent(label)})`
-    // const g = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${label} @${lat},${lon}`)}`
-    const a = `http://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(label)}`
-    Linking.openURL(Platform.OS === "ios" ? a : g)
+  async function openInMaps(lat: number, lon: number, label = "Task") {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      Alert.alert("Location unavailable", "Coordinates are missing.")
+      return
+    }
+
+    const safeLabel = encodeURIComponent(label)
+    const appleMaps = `https://maps.apple.com/?ll=${lat},${lon}&q=${safeLabel}`
+    const googleWeb = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}&q=(${safeLabel})`
+    const geo = `geo:${lat},${lon}?q=${lat},${lon}(${safeLabel})`
+
+    try {
+      if (Platform.OS === "android") {
+        if (await Linking.canOpenURL(geo)) {
+          await Linking.openURL(geo)
+          return
+        }
+      }
+
+      const primary = Platform.OS === "ios" ? appleMaps : googleWeb
+      if (await Linking.canOpenURL(primary)) {
+        await Linking.openURL(primary)
+        return
+      }
+
+      if (await Linking.canOpenURL(googleWeb)) {
+        await Linking.openURL(googleWeb)
+        return
+      }
+    } catch {
+      // fall through to alert
+    }
+
+    Alert.alert("No Maps App Found", `Can't open maps on this device.\n\n${lat}, ${lon}`)
   }
 
   const onComplete = async () => {
@@ -682,9 +707,12 @@ export default function TaskDetailScreen({ navigation }: any) {
               {/* Small play control on the right */}
               {!!current.voiceUrl && (
                 <Pressable
-                  onPress={play}
+                  onPress={togglePlay}
                   accessibilityRole="button"
-                  accessibilityLabel={playing ? "Playing" : "Play voice"}
+                  accessibilityLabel={
+                    audioLoading ? "Loading voice" : playing ? "Stop voice" : "Play voice"
+                  }
+                  accessibilityState={{ disabled: audioLoading }}
                   style={{
                     width: 44,
                     height: 44,
@@ -692,9 +720,13 @@ export default function TaskDetailScreen({ navigation }: any) {
                     backgroundColor: primary,
                     alignItems: "center",
                     justifyContent: "center",
+                    opacity: audioLoading ? 0.7 : 1,
                   }}
                 >
-                  <Text text={playing ? "…" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
+                  <Text
+                    text={audioLoading ? "…" : playing ? "⏸" : "▶︎"}
+                    style={{ color: "white", fontWeight: "bold" }}
+                  />
                 </Pressable>
               )}
             </View>
@@ -720,7 +752,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                   backgroundColor: colors.palette.neutral100,
                 }}
               >
-                <Text text="Contact" weight="medium" style={{ color: neutral700 }} />
+                <Text text={contactLabel} weight="medium" style={{ color: neutral700 }} />
                 <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                   <Text
                     text={isRevealed ? String(fullPhone) : maskPhoneNumber(fullPhone || "")}
@@ -740,43 +772,107 @@ export default function TaskDetailScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* Distance + Status pill in one row */}
+            {/* Compact single-line row; wraps only if absolutely necessary */}
             <View
               style={{
                 flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xxs,
                 justifyContent: "space-between",
               }}
             >
-              {typeof current.distanceMtr === "number" ? (
-                <Text text={`${distance} away`} size="xs" style={{ color: neutral700 }} />
-              ) : (
-                <View />
-              )}
-
-              <Pressable
-                onPress={() => openInMaps(current.latitude || 0, current.longitude || 0)}
+              <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.xxs,
-                  borderRadius: 999,
-                  backgroundColor: colors.palette.neutral200,
+                  gap: spacing.xxs,
+                  flexShrink: 1,
+                  minWidth: 0,
                 }}
               >
-                <Text text="Let's Go 🚗" size="xs" weight="medium" style={{ color: neutral700 }} />
-              </Pressable>
+                {typeof current.distanceMtr === "number" ? (
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.xs,
+                      paddingVertical: spacing.xxxs,
+                      borderRadius: 999,
+                      backgroundColor: colors.palette.neutral200,
+                      flexShrink: 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    <Text
+                      text={`${distance} away`}
+                      size="xs"
+                      numberOfLines={1}
+                      style={{ color: neutral700 }}
+                    />
+                  </View>
+                ) : (
+                  <View />
+                )}
+
+                <Pressable
+                  onPress={() => openInMaps(current.latitude || 0, current.longitude || 0)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing.xxs,
+                    paddingHorizontal: spacing.xs,
+                    paddingVertical: spacing.xxxs,
+                    borderRadius: 999,
+                    backgroundColor: colors.palette.primary100,
+                    borderWidth: 1,
+                    borderColor: colors.palette.primary200,
+                    maxWidth: 96,
+                    flexShrink: 1,
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open maps for directions"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      backgroundColor: primary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text text="↗" size="xxs" weight="bold" style={{ color: "white" }} />
+                  </View>
+                  <Text
+                    text="Map"
+                    size="xs"
+                    weight="medium"
+                    numberOfLines={1}
+                    style={{ color: primary, flexShrink: 1 }}
+                  />
+                </Pressable>
+              </View>
+
               <View
                 style={{
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.xxs,
-                  borderRadius: 999,
-                  backgroundColor: S.bg,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.xxs,
+                  flexShrink: 0,
                 }}
               >
-                <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
+                <View
+                  style={{
+                    paddingHorizontal: spacing.xs,
+                    paddingVertical: spacing.xxxs,
+                    borderRadius: 999,
+                    backgroundColor: S.bg,
+                  }}
+                >
+                  <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
+                </View>
+                {showRatingBadge && <RatingBadge value={ratingBadgeValue} />}
               </View>
-              {showRatingBadge && <RatingBadge value={ratingBadgeValue} />}
             </View>
           </View>
         )}
@@ -946,10 +1042,12 @@ export default function TaskDetailScreen({ navigation }: any) {
                 paddingTop: 12,
               }}
             >
-              <Text
-                text={isRequester ? "Rate your helper" : "Rate the requester"}
-                preset="subheading"
-              />
+              {myRating == null && (
+                <Text
+                  text={isRequester ? "Rate your helper" : "Rate the requester"}
+                  preset="subheading"
+                />
+              )}
               {myRating == null ? (
                 <>
                   <SmileySlider disabled={false} value={rating} onChange={setRating} />
@@ -964,13 +1062,13 @@ export default function TaskDetailScreen({ navigation }: any) {
                   />
                 </>
               ) : (
-                <Text text={`Your rating: ${myRating.toFixed(1)} / 5.0`} weight="medium" />
+                <Text text={`You rated: ${myRating.toFixed(1)} / 5.0`} weight="medium" />
               )}
               {otherPartyRating != null && (
                 <Text
                   text={`${
                     isRequester ? "Helper" : "Requester"
-                  } rating: ${otherPartyRating.toFixed(1)} / 5.0`}
+                  } rated you: ${otherPartyRating.toFixed(1)} / 5.0`}
                   size="xs"
                 />
               )}

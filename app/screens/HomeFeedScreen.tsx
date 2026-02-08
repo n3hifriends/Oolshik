@@ -32,7 +32,6 @@ import { uploadAudioSmart } from "@/audio/uploadAudio"
 
 type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]
-const LOGOUT_COLOR = "#FF6B2C"
 const TITLE_REFRESH_COOLDOWN_MS = 5000
 const RADIUS_OPTIONS: Radius[] = [1, 2, 5]
 const normalizeRadius = (value?: number | null): Radius => {
@@ -415,7 +414,7 @@ export default function HomeFeedScreen({ navigation }: any) {
           width: 30,
           height: 30,
           borderRadius: 22,
-          backgroundColor: LOGOUT_COLOR,
+          backgroundColor: colors.palette.primary500,
           alignItems: "center",
           justifyContent: "center",
           zIndex: 1000,
