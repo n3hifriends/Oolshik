@@ -502,7 +502,6 @@ export default function HomeFeedScreen({ navigation }: any) {
                 label={`${km} km`}
                 active={radiusMeters === km}
                 onPress={() => {
-                  console.log("🚀 ~ onPress ~ km:", km)
                   setRadius(km as Radius)
                 }}
               />

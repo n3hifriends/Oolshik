@@ -42,7 +42,7 @@ const en = {
     tabMyRequests: "My Requests",
     emptyForYou: "No nearby requests right now.",
     emptyMine: "You haven't created any requests yet.",
-    distanceFilter: "Distance",
+    distanceFilter: "Distance Within",
     statusFilter: "Status",
     yourExperience: "Your Experience",
     leftRightExperience: "(Left: Bad • Right: Great)",

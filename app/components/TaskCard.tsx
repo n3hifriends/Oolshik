@@ -109,21 +109,20 @@ export function TaskCard({
   }
 
   // Footer: type as ReactElement | undefined to satisfy Card's prop
-  const FooterComponent =
-    canAccept ? (
-      <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-        <Button
-          text="Accept"
-          onPress={onAccept}
-          style={{
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.xs,
-            borderRadius: spacing.sm,
-            minWidth: 100,
-          }}
-        />
-      </View>
-    ) : undefined // <-- important
+  const FooterComponent = canAccept ? (
+    <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+      <Button
+        text="Accept"
+        onPress={onAccept}
+        style={{
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.xs,
+          borderRadius: spacing.sm,
+          minWidth: 100,
+        }}
+      />
+    </View>
+  ) : undefined // <-- important
 
   const distance =
     (distanceMtr ?? 0) < 1000
