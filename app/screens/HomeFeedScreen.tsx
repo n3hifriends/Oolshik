@@ -18,6 +18,7 @@ import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { colors } from "@/theme/colors"
 import { useAuth } from "@/context/AuthContext"
+import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 import { SectionCard } from "@/components/SectionCard"
 import { Segmented, ViewMode } from "@/components/Segmented"
 import { Pill } from "@/components/Pill"
@@ -33,11 +34,27 @@ type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]
 const LOGOUT_COLOR = "#FF6B2C"
 const TITLE_REFRESH_COOLDOWN_MS = 5000
+const RADIUS_OPTIONS: Radius[] = [1, 2, 5]
+const normalizeRadius = (value?: number | null): Radius => {
+  if (value && RADIUS_OPTIONS.includes(value as Radius)) return value as Radius
+  if (!value) return 1
+  return RADIUS_OPTIONS.reduce((closest, current) =>
+    Math.abs(current - value) < Math.abs(closest - value) ? current : closest,
+  )
+}
+
+function getInitials(name?: string, fallback?: string) {
+  const source = (name || fallback || "").trim()
+  if (!source) return "U"
+  const parts = source.split(/[\s@._-]+/).filter(Boolean)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
+}
 
 export default function HomeFeedScreen({ navigation }: any) {
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
-  const { logout, userId, userName } = useAuth()
+  const { logout, userId, userName, authEmail } = useAuth()
   const lastFetchKeyRef = useRef<string | null>(null)
 
   const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
@@ -45,6 +62,11 @@ export default function HomeFeedScreen({ navigation }: any) {
   )
   const [viewMode, setViewMode] = useState<ViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)
+  const [preferredRadiusKm, setPreferredRadiusKm] = useState<number | null>(null)
+  const profileInitials = useMemo(
+    () => getInitials(userName && userName !== "You" ? userName : undefined, authEmail ?? ""),
+    [authEmail, userName],
+  )
 
   const [titleRefreshCooldowns, setTitleRefreshCooldowns] = useState<Record<string, number>>({})
   const titleRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -68,6 +90,19 @@ export default function HomeFeedScreen({ navigation }: any) {
     return () => {
       titleRefreshTimersRef.current.forEach((timer) => clearTimeout(timer))
       titleRefreshTimersRef.current.clear()
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    getProfileExtras()
+      .then((extras) => {
+        if (!active) return
+        setPreferredRadiusKm(extras.helperRadiusKm ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
     }
   }, [])
 
@@ -192,8 +227,8 @@ export default function HomeFeedScreen({ navigation }: any) {
       const titleRefreshDisabled = needsTitleRefresh && (loading || isTitleRefreshCooling(t.id))
       const avgRating =
         userId && t.requesterId && t.requesterId === userId
-          ? t.helperAvgRating ?? null
-          : t.requesterAvgRating ?? null
+          ? (t.helperAvgRating ?? null)
+          : (t.requesterAvgRating ?? null)
 
       return (
         <TaskCard
@@ -269,6 +304,9 @@ export default function HomeFeedScreen({ navigation }: any) {
         return res.url
       }
 
+      const effectiveRadiusKm =
+        preferredRadiusKm != null ? normalizeRadius(preferredRadiusKm) : radiusMeters
+
       setCreatingTask(true)
       try {
         const voiceUrl = await uploadVoiceIfNeeded()
@@ -278,7 +316,7 @@ export default function HomeFeedScreen({ navigation }: any) {
           voiceUrl,
           latitude: coords.latitude,
           longitude: coords.longitude,
-          radiusMeters: radiusMeters * 1000,
+          radiusMeters: effectiveRadiusKm * 1000,
           createdById: userId,
           createdByName: userName,
           createdAt: new Date().toISOString(),
@@ -304,7 +342,7 @@ export default function HomeFeedScreen({ navigation }: any) {
         setCreatingTask(false)
       }
     },
-    [coords, creatingTask, fetchNearby, radiusMeters, refresh, userId, userName],
+    [coords, creatingTask, fetchNearby, preferredRadiusKm, radiusMeters, refresh, userId, userName],
   )
 
   const onOpenSettings = useCallback(async () => {
@@ -359,7 +397,13 @@ export default function HomeFeedScreen({ navigation }: any) {
         onPress={() =>
           Alert.alert("Logout", "Are you sure you want to logout?", [
             { text: "Cancel", style: "cancel" },
-            { text: "Logout", style: "destructive", onPress: () => logout() },
+            {
+              text: "Logout",
+              style: "destructive",
+              onPress: () => {
+                logout()
+              },
+            },
           ])
         }
         accessibilityRole="button"
@@ -389,7 +433,30 @@ export default function HomeFeedScreen({ navigation }: any) {
 
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: searchOpen ? "flex-start" : "center",
+            gap: 10,
+          }}
+        >
+          <Pressable
+            onPress={() => navigation.navigate("OolshikProfile")}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            hitSlop={8}
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: colors.palette.primary500,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: searchOpen ? 8 : 0,
+            }}
+          >
+            <Text text={profileInitials} style={{ color: "#fff", fontWeight: "700" }} />
+          </Pressable>
           {/* {!searchOpen && (
             <Text
               preset="heading"
@@ -397,26 +464,28 @@ export default function HomeFeedScreen({ navigation }: any) {
               style={{ marginBottom: 12, flex: 1 }}
             />
           )} */}
-          <ExpandableSearch
-            open={searchOpen}
-            setOpen={(v) => {
-              setSearchOpen(v)
-              if (!v) {
+          <View style={{ flex: 1 }}>
+            <ExpandableSearch
+              open={searchOpen}
+              setOpen={(v) => {
+                setSearchOpen(v)
+                if (!v) {
+                  setRawSearch("")
+                  setQuery("")
+                }
+              }}
+              value={rawSearch}
+              onChangeText={(t) => {
+                setRawSearch(t)
+                setQuery(t)
+              }}
+              onClear={() => {
                 setRawSearch("")
                 setQuery("")
-              }
-            }}
-            value={rawSearch}
-            onChangeText={(t) => {
-              setRawSearch(t)
-              setQuery(t)
-            }}
-            onClear={() => {
-              setRawSearch("")
-              setQuery("")
-            }}
-            inputRef={searchInputRef as React.RefObject<TextInput>}
-          />
+              }}
+              inputRef={searchInputRef as React.RefObject<TextInput>}
+            />
+          </View>
         </View>
 
         <Segmented value={viewMode} onChange={setViewMode} />

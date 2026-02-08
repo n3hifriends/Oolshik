@@ -2,7 +2,7 @@ import * as Notifications from "expo-notifications"
 import { Platform } from "react-native"
 import { OolshikApi } from "@/api/client"
 import { navigate } from "@/navigators/navigationUtilities"
-import { loadString, saveString } from "@/utils/storage"
+import { loadString, saveString, remove } from "@/utils/storage"
 
 const PUSH_TOKEN_KEY = "push.token"
 const PUSH_PERMISSION_REQUESTED_KEY = "push.permission.requested"
@@ -58,6 +58,24 @@ export async function registerDeviceTokenWithRetry(token: string, maxAttempts = 
   throw lastError
 }
 
+export async function unregisterDeviceToken(token: string) {
+  await OolshikApi.unregisterDevice(token)
+}
+
+export async function unregisterDeviceTokenWithRetry(token: string, maxAttempts = 2) {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await unregisterDeviceToken(token)
+      return
+    } catch (err) {
+      lastError = err
+      await delay(500 * attempt)
+    }
+  }
+  throw lastError
+}
+
 export function attachNotificationListeners() {
   const received = Notifications.addNotificationReceivedListener(() => {
     // no-op for now
@@ -92,6 +110,30 @@ export function getCachedPushToken() {
 
 export function setCachedPushToken(token: string) {
   saveString(PUSH_TOKEN_KEY, token)
+}
+
+export function clearCachedPushToken() {
+  remove(PUSH_TOKEN_KEY)
+}
+
+export async function enablePushNotifications() {
+  const token = await getExpoPushTokenAsync()
+  if (!token) return null
+  const cached = getCachedPushToken()
+  if (token === cached) return token
+  await registerDeviceTokenWithRetry(token)
+  setCachedPushToken(token)
+  return token
+}
+
+export async function disablePushNotifications() {
+  const cached = getCachedPushToken()
+  if (!cached) return
+  try {
+    await unregisterDeviceTokenWithRetry(cached)
+  } finally {
+    clearCachedPushToken()
+  }
 }
 
 async function ensureAndroidChannel() {

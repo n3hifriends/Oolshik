@@ -366,6 +366,11 @@ export type ReportPayload = {
   text?: string
 }
 
+export type UserStats = {
+  avgRating?: number | null
+  completedHelps?: number | null
+}
+
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
@@ -461,6 +466,11 @@ export const OolshikApi = {
   // Device token (push)
   registerDevice: (token: string, platform?: string) =>
     api.post("/users/device", { token, platform }),
+  unregisterDevice: (token: string) =>
+    api.delete("/users/device", {}, { data: { token } }),
+
+  // Profile stats
+  getMyStats: () => api.get<UserStats>("/users/me/stats"),
 
   // Media: pre-signed URL
   getPresigned: (contentType: string) =>
