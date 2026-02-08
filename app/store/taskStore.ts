@@ -35,6 +35,30 @@ type Task = {
 
 type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"
 
+const normalizeStatus = (
+  status?: Task["status"] | string | null,
+): "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" => {
+  const raw = String(status ?? "")
+    .trim()
+    .toUpperCase()
+  if (!raw) return "OPEN"
+  if (raw === "PENDING") return "OPEN"
+  if (raw === "CANCELED") return "CANCELLED"
+  if (
+    raw === "OPEN" ||
+    raw === "PENDING_AUTH" ||
+    raw === "ASSIGNED" ||
+    raw === "COMPLETED" ||
+    raw === "CANCELLED"
+  ) {
+    return raw as any
+  }
+  return "OPEN"
+}
+
+const normalizeTasks = (items?: Task[] | null) =>
+  (items ?? []).map((t) => ({ ...t, status: normalizeStatus(t.status) }))
+
 type State = {
   radiusMeters: 1 | 2 | 5
   tasks: Task[]
@@ -71,14 +95,14 @@ export const useTaskStore = create<State>((set, get) => ({
             ? statuses
             : ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
         )
-        const filtered = MOCK_NEARBY_TASKS.filter(
-          (t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status),
-        ).sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
+        const filtered = normalizeTasks(MOCK_NEARBY_TASKS)
+          .filter((t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status))
+          .sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
         set({ tasks: filtered })
       } else {
         const r = get().radiusMeters
         const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
-        if (res.ok) set({ tasks: res.data ?? [] })
+        if (res.ok) set({ tasks: normalizeTasks(res.data as Task[]) })
         console.log("🚀 ~ res.data:", res.data)
       }
     } finally {

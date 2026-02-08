@@ -34,6 +34,22 @@ type Radius = 1 | 2 | 5
 const STATUS_ORDER: Status[] = ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]
 const TITLE_REFRESH_COOLDOWN_MS = 5000
 const RADIUS_OPTIONS: Radius[] = [1, 2, 5]
+const normalizeStatus = (status?: string): Status | null => {
+  const raw = String(status ?? "").trim().toUpperCase()
+  if (!raw) return null
+  if (raw === "PENDING") return "OPEN"
+  if (raw === "CANCELED") return "CANCELLED"
+  if (
+    raw === "OPEN" ||
+    raw === "PENDING_AUTH" ||
+    raw === "ASSIGNED" ||
+    raw === "COMPLETED" ||
+    raw === "CANCELLED"
+  ) {
+    return raw as Status
+  }
+  return null
+}
 const normalizeRadius = (value?: number | null): Radius => {
   if (value && RADIUS_OPTIONS.includes(value as Radius)) return value as Radius
   if (!value) return 1
@@ -55,10 +71,11 @@ export default function HomeFeedScreen({ navigation }: any) {
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
   const { logout, userId, userName, authEmail } = useAuth()
   const lastFetchKeyRef = useRef<string | null>(null)
+  const suppressNextFetchRef = useRef(false)
+  const userTouchedStatusesRef = useRef(false)
+  const selectedStatusesRef = useRef<Set<Status>>(new Set())
 
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(
-    new Set(["OPEN", "PENDING_AUTH", "ASSIGNED"]),
-  )
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<Status>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)
   const [preferredRadiusKm, setPreferredRadiusKm] = useState<number | null>(null)
@@ -77,6 +94,9 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   const sortedStatuses = useMemo(() => Array.from(selectedStatuses).sort(), [selectedStatuses])
   const statusesKey = useMemo(() => sortedStatuses.join(","), [sortedStatuses])
+  useEffect(() => {
+    selectedStatusesRef.current = selectedStatuses
+  }, [selectedStatuses])
 
   const { filtered, setQuery } = useTaskFiltering(tasks, {
     selectedStatuses,
@@ -107,10 +127,18 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   const toggleStatus = (s: Status) =>
     setSelectedStatuses((prev) => {
+      userTouchedStatusesRef.current = true
       const next = new Set(prev)
       next.has(s) ? next.delete(s) : next.add(s)
       return next
     })
+
+  useEffect(() => {
+    userTouchedStatusesRef.current = false
+    if (selectedStatusesRef.current.size === 0) return
+    suppressNextFetchRef.current = true
+    setSelectedStatuses(new Set())
+  }, [viewMode])
 
   useFocusEffect(
     useCallback(() => {
@@ -121,13 +149,20 @@ export default function HomeFeedScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       if (status !== "ready" || !coords) return
-      const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+      const statusesArg = userTouchedStatusesRef.current
+        ? sortedStatuses
+        : undefined
       const key = [
         coords.latitude.toFixed(5),
         coords.longitude.toFixed(5),
         radiusMeters,
-        statusesKey,
+        userTouchedStatusesRef.current ? statusesKey : "auto",
       ].join("|")
+      if (suppressNextFetchRef.current) {
+        suppressNextFetchRef.current = false
+        lastFetchKeyRef.current = key
+        return
+      }
       if (lastFetchKeyRef.current === key) return
       lastFetchKeyRef.current = key
       fetchNearby(coords.latitude, coords.longitude, statusesArg as any)
@@ -141,6 +176,38 @@ export default function HomeFeedScreen({ navigation }: any) {
       sortedStatuses,
     ]),
   )
+
+  const availableStatuses = useMemo(() => {
+    const list = Array.isArray(tasks) ? tasks : []
+    const unique = Array.from(new Map(list.map((t: any) => [t.id, t])).values())
+    const mine = (t: any) =>
+      userId ? String(t?.requesterId) === String(userId) : false
+
+    let res = unique.filter((t: any) => (viewMode === "mine" ? mine(t) : !mine(t)))
+    res = res.filter((t: any) => {
+      if (t?.status !== "PENDING_AUTH") return true
+      if (viewMode === "mine") return true
+      return userId ? String(t?.pendingHelperId) === String(userId) : false
+    })
+
+    const set = new Set<Status>()
+    res.forEach((t: any) => {
+      const normalized = normalizeStatus(t?.status)
+      if (normalized) set.add(normalized)
+    })
+    return STATUS_ORDER.filter((s) => set.has(s))
+  }, [tasks, userId, viewMode])
+
+  useEffect(() => {
+    if (userTouchedStatusesRef.current) return
+    if (loading) return
+    if (!tasks || tasks.length === 0) return
+    if (selectedStatuses.size > 0) return
+    if (availableStatuses.length === 0) return
+
+    suppressNextFetchRef.current = true
+    setSelectedStatuses(new Set(availableStatuses))
+  }, [availableStatuses, loading, selectedStatuses.size, tasks])
 
   const onAcceptPress = async (taskId: string) => {
     if (!coords) {
