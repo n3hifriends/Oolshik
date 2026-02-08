@@ -17,6 +17,7 @@ import { Button } from "@/components/Button"
 import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { colors } from "@/theme/colors"
+import { useAppTheme } from "@/theme/context"
 import { useAuth } from "@/context/AuthContext"
 import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 import { SectionCard } from "@/components/SectionCard"
@@ -67,6 +68,8 @@ function getInitials(name?: string, fallback?: string) {
 }
 
 export default function HomeFeedScreen({ navigation }: any) {
+  const { theme } = useAppTheme()
+  const { colors: themeColors, spacing, isDark } = theme
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
   const { logout, userId, userName, authEmail } = useAuth()
@@ -83,6 +86,7 @@ export default function HomeFeedScreen({ navigation }: any) {
     () => getInitials(userName && userName !== "You" ? userName : undefined, authEmail ?? ""),
     [authEmail, userName],
   )
+  const profileTextColor = isDark ? themeColors.palette.neutral100 : "#fff"
 
   const [titleRefreshCooldowns, setTitleRefreshCooldowns] = useState<Record<string, number>>({})
   const titleRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -510,18 +514,42 @@ export default function HomeFeedScreen({ navigation }: any) {
             onPress={() => navigation.navigate("OolshikProfile")}
             accessibilityRole="button"
             accessibilityLabel="Open profile"
+            accessibilityHint="View your profile and settings"
             hitSlop={8}
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              backgroundColor: colors.palette.primary500,
-              alignItems: "center",
-              justifyContent: "center",
-              marginTop: searchOpen ? 8 : 0,
-            }}
+            style={({ pressed }) => [
+              {
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: themeColors.palette.neutral100,
+                borderWidth: 1,
+                borderColor: themeColors.palette.primary200,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: searchOpen ? spacing.xxxs : 0,
+              },
+              !isDark && {
+                shadowColor: "#000",
+                shadowOpacity: 0.08,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 2,
+              },
+              pressed && { transform: [{ scale: 0.97 }] },
+            ]}
           >
-            <Text text={profileInitials} style={{ color: "#fff", fontWeight: "700" }} />
+            <View
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: themeColors.palette.primary500,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text text={profileInitials} style={{ color: profileTextColor, fontWeight: "700" }} />
+            </View>
           </Pressable>
           {/* {!searchOpen && (
             <Text
