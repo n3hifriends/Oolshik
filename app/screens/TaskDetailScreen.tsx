@@ -101,6 +101,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [actionLoading, setActionLoading] = React.useState(false)
   const [ratingSubmitting, setRatingSubmitting] = React.useState(false)
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
+  const [authDecision, setAuthDecision] = React.useState<"approved" | "rejected" | null>(null)
   const authExpiredRef = useRef(false)
 
   const [fullPhone, setFullPhone] = React.useState<string | null>(null)
@@ -172,6 +173,12 @@ export default function TaskDetailScreen({ navigation }: any) {
     default:
       normalizedStatus = "PENDING"
   }
+
+  useEffect(() => {
+    if (rawStatus !== "PENDING_AUTH") {
+      setAuthDecision(null)
+    }
+  }, [rawStatus])
 
   // ensure we have the task (e.g., deep link / app resume)
   React.useEffect(() => {
@@ -370,10 +377,22 @@ export default function TaskDetailScreen({ navigation }: any) {
     try {
       const res = await OolshikApi.authorizeRequest(current.id as any)
       if (res?.ok) {
+        setAuthDecision("approved")
         if (res?.data) {
-          setTask((t: any) => (t ? { ...t, ...(res.data as any) } : (res.data as any)))
+          setTask((t: any) =>
+            t
+              ? {
+                  ...t,
+                  ...(res.data as any),
+                  status: "ASSIGNED",
+                  pendingAuthExpiresAt: null,
+                }
+              : { ...(res.data as any), status: "ASSIGNED", pendingAuthExpiresAt: null },
+          )
         } else {
-          setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
+          setTask((t: any) =>
+            t ? { ...t, status: "ASSIGNED", pendingAuthExpiresAt: null } : t,
+          )
         }
         setRecoveryNotice("Authorization approved.")
         if (coords && status === "ready") {
@@ -400,6 +419,7 @@ export default function TaskDetailScreen({ navigation }: any) {
       }
       throw new Error("Authorize failed")
     } catch {
+      setAuthDecision(null)
       Alert.alert("Approve failed", "Please try again.")
     } finally {
       setActionLoading(false)
@@ -898,7 +918,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               <Text text={recoveryNotice} weight="medium" style={{ color: success }} />
             </View>
           )}
-          {rawStatus === "PENDING_AUTH" ? (
+          {rawStatus === "PENDING_AUTH" && !authDecision ? (
             <View style={{ marginHorizontal: 16, gap: spacing.sm }}>
               {isRequester ? (
                 <View
