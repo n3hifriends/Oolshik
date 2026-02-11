@@ -57,22 +57,22 @@ function maskPhoneNumber(input?: string) {
   const digits = input.replace(/\D/g, "")
   if (digits.length <= 4) return input
   const last4 = digits.slice(-4)
-  let maskedDigitsIdx = 0
-  const numDigitsToMask = Math.max(0, digits.length - 4)
-  return input
-    .split("")
-    .map((ch) => {
-      if (/\d/.test(ch)) {
-        if (maskedDigitsIdx < numDigitsToMask) {
-          maskedDigitsIdx += 1
-          return "•"
-        }
-        // past masked portion -> reveal last 4
-        return last4[maskedDigitsIdx++ - numDigitsToMask] || ch
+  let remainingToMask = Math.max(0, digits.length - 4)
+  let lastIdx = 0
+  let out = ""
+  for (const ch of input) {
+    if (/\d/.test(ch)) {
+      if (remainingToMask > 0) {
+        out += "*"
+        remainingToMask -= 1
+      } else {
+        out += last4[lastIdx++] ?? ch
       }
-      return ch
-    })
-    .join("")
+    } else {
+      out += ch
+    }
+  }
+  return out
 }
 
 export default function TaskDetailScreen({ navigation }: any) {
@@ -91,13 +91,16 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const current = task || taskFromStore || null
 
-  const { status: playbackStatus, toggle, stop } = useAudioPlaybackForUri(
+  const {
+    status: playbackStatus,
+    toggle,
+    stop,
+  } = useAudioPlaybackForUri(
     current?.voiceUrl ? String(current.voiceUrl) : null,
     current?.id ? `detail-${current.id}` : "detail",
   )
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { radiusMeters } = useTaskStore()
-  const [justCompleted, setJustCompleted] = React.useState(false)
   const [actionLoading, setActionLoading] = React.useState(false)
   const [ratingSubmitting, setRatingSubmitting] = React.useState(false)
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
@@ -143,13 +146,6 @@ export default function TaskDetailScreen({ navigation }: any) {
     }, [refresh, stop]),
   )
 
-  React.useEffect(() => {
-    if (current?.createdByPhoneNumber) {
-      setFullPhone(String(current.createdByPhoneNumber))
-      setIsRevealed(false) // always start masked on open
-    }
-  }, [current?.createdByPhoneNumber])
-
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
   let normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
     "PENDING"
@@ -184,12 +180,11 @@ export default function TaskDetailScreen({ navigation }: any) {
   React.useEffect(() => {
     let cancelled = false
     const load = async () => {
-      if (taskFromStore) return
-      setLoading(true)
+      setLoading(!taskFromStore)
       try {
         const res = await OolshikApi.findTaskByTaskId(taskId)
         const fetchedTask = res?.ok ? (res.data as Task | null) : null
-        if (!cancelled) setTask(fetchedTask)
+        if (!cancelled && fetchedTask) setTask(fetchedTask)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -204,11 +199,34 @@ export default function TaskDetailScreen({ navigation }: any) {
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
-  const contactLabel = isRequester ? "Your phone" : "Requester phone"
 
   const isHelper = !!current?.helperId && !!userId && current.helperId === userId
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
+  const contactLabel = isRequester ? "Helper phone" : "Requester phone"
+  const hasHelper = !!current?.helperId || !!current?.pendingHelperId
+  const canViewContact = isRequester
+    ? !!rawStatus && rawStatus !== "OPEN" && hasHelper
+    : !!fullPhone
+
+  React.useEffect(() => {
+    const requesterPhone =
+      current?.requesterPhoneNumber ||
+      current?.createdByPhoneNumber ||
+      (current as any)?.phoneNumber
+    const helperPhone = current?.helperPhoneNumber || (current as any)?.helperPhone
+
+    const nextPhone = isRequester ? helperPhone : requesterPhone
+    setFullPhone(nextPhone ? String(nextPhone) : null)
+    setIsRevealed(false) // always start masked on open
+  }, [
+    current?.requesterPhoneNumber,
+    current?.createdByPhoneNumber,
+    (current as any)?.phoneNumber,
+    (current as any)?.helperPhone,
+    current?.helperPhoneNumber,
+    isRequester,
+  ])
   const ratingByRequester = current?.ratingByRequester ?? null
   const ratingByHelper = current?.ratingByHelper ?? null
   const myRating = isRequester ? ratingByRequester : isHelper ? ratingByHelper : null
@@ -390,9 +408,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               : { ...(res.data as any), status: "ASSIGNED", pendingAuthExpiresAt: null },
           )
         } else {
-          setTask((t: any) =>
-            t ? { ...t, status: "ASSIGNED", pendingAuthExpiresAt: null } : t,
-          )
+          setTask((t: any) => (t ? { ...t, status: "ASSIGNED", pendingAuthExpiresAt: null } : t))
         }
         setRecoveryNotice("Authorization approved.")
         if (coords && status === "ready") {
@@ -467,15 +483,7 @@ export default function TaskDetailScreen({ navigation }: any) {
     const res = await OolshikApi.completeTask(current.id as any)
     if (res?.ok) {
       setTask((t: any) => (t ? { ...t, status: "COMPLETED" } : t))
-      setJustCompleted(true)
-      // Briefly show a success banner, then return to previous screen
-      setTimeout(() => {
-        try {
-          navigation.goBack()
-        } catch {
-          // ignore
-        }
-      }, 1200)
+      // stay on screen so requester can rate helper
     } else if (
       res?.status === 403 ||
       res?.status === 409 ||
@@ -761,7 +769,7 @@ export default function TaskDetailScreen({ navigation }: any) {
             </View>
 
             {/* Contact (masked -> reveal) */}
-            {!!fullPhone && (
+            {canViewContact && (
               <View
                 style={{
                   gap: spacing.xs,
@@ -775,12 +783,21 @@ export default function TaskDetailScreen({ navigation }: any) {
                 <Text text={contactLabel} weight="medium" style={{ color: neutral700 }} />
                 <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                   <Text
-                    text={isRevealed ? String(fullPhone) : maskPhoneNumber(fullPhone || "")}
+                    text={
+                      isRevealed && fullPhone
+                        ? String(fullPhone)
+                        : maskPhoneNumber(fullPhone || "•••••••••••••")
+                    }
                     weight="bold"
                     style={{ flex: 1, color: neutral700 }}
                   />
                   {isRevealed ? (
-                    <Button text="Call" onPress={onCall} style={{ paddingVertical: spacing.xs }} />
+                    <Button
+                      text="Call"
+                      onPress={onCall}
+                      disabled={!fullPhone}
+                      style={{ paddingVertical: spacing.xs }}
+                    />
                   ) : (
                     <Button
                       text={revealLoading ? "…" : "Show"}

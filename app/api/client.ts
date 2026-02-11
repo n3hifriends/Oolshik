@@ -329,6 +329,7 @@ export type ServerTask = {
   updatedAt?: string
   createdByName?: string
   createdByPhoneNumber?: string
+  helperPhoneNumber?: string
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null
   pendingAuthExpiresAt?: string | null
