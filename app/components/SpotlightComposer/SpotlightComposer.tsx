@@ -319,10 +319,6 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const handleStopRecording = useCallback(
     async (shouldTranscribe = true) => {
       await stop()
-      if (!shouldTranscribe) {
-        closeComposer()
-        return
-      }
       let { uri: filePath, durationSec: recordedDuration } = latestRecording.current
       if (!filePath) {
         // allow state to flush
@@ -334,28 +330,35 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         return
       }
       setVoiceNote({ filePath, durationSec: recordedDuration })
+      if (!shouldTranscribe) {
+        setState("editing")
+        return
+      }
       setState("transcribing")
       try {
         const transcript = await transcribeAudio(filePath)
         if (!isMounted.current || state === "closing") return
         setText(transcript)
         setState("editing")
-        focusInput()
+        // only focus input for typed mode
+        if (mode === "type") focusInput()
       } catch (e) {
         if (!isMounted.current) return
-        Alert.alert("Transcription failed", "Please try again.")
-        closeComposer()
+        setText("")
+        setState("editing")
       }
     },
-    [closeComposer, focusInput, state, stop],
+    [closeComposer, focusInput, mode, state, stop],
   )
 
   const handleSubmit = useCallback(async () => {
-    if (!text.trim()) return
+    const trimmed = text.trim()
+    const safeText = trimmed || (mode === "voice" && voiceNote ? "Voice task" : "")
+    if (!safeText) return
     setState("submitting")
     try {
       await onSubmitTask?.({
-        text: text.trim(),
+        text: safeText,
         mode: mode ?? "type",
         voiceNote: voiceNote ?? undefined,
       })
@@ -546,10 +549,10 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     </View>
   )
 
-  const renderEditing = () => (
+  const renderTypeEditing = () => (
     <View style={styles.editRow}>
       <MaterialCommunityIcons
-        name="microphone-outline"
+        name="microphone"
         size={20}
         color={theme.colors.text}
         style={{ marginRight: 10 }}
@@ -567,7 +570,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         onChangeText={setText}
         placeholder="Type your task…"
         placeholderTextColor={theme.colors.textDim}
-        style={[styles.input, { color: theme.colors.text, display: "none" }]}
+        style={[styles.input, { color: theme.colors.text }]}
         accessibilityLabel="Task input"
         autoFocus={false}
         autoCapitalize="sentences"
@@ -586,6 +589,33 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       </TouchableOpacity>
     </View>
   )
+
+  const renderVoiceReady = () => (
+    <View style={styles.editRow}>
+      <MaterialCommunityIcons
+        name="microphone"
+        size={20}
+        color={theme.colors.text}
+        style={{ marginRight: 10 }}
+      />
+      <Text
+        text={voiceNote ? `Voice note ready (${voiceNote.durationSec}s)` : "Voice note ready"}
+        style={{ color: theme.colors.text, flex: 1 }}
+      />
+      <TouchableOpacity
+        accessibilityLabel="Submit task"
+        onPress={handleSubmit}
+        style={[
+          styles.submitPill,
+          { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
+        ]}
+      >
+        <Text text="Submit" style={styles.submitText} />
+      </TouchableOpacity>
+    </View>
+  )
+
+  const renderEditing = () => (mode === "voice" ? renderVoiceReady() : renderTypeEditing())
 
   const renderPillContent = () => {
     switch (state) {

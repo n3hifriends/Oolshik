@@ -8,13 +8,13 @@ import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import { useTaskStore } from "@/store/taskStore"
 import { OolshikApi } from "@/api"
-import { Audio } from "expo-av"
 import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { SmileySlider } from "@/components/SmileySlider"
 import { RatingBadge } from "@/components/RatingBadge"
 import { Task } from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
+import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
 
 type RouteParams = { id: string }
 type RecoveryAction = "cancel" | "release" | "reject"
@@ -57,22 +57,22 @@ function maskPhoneNumber(input?: string) {
   const digits = input.replace(/\D/g, "")
   if (digits.length <= 4) return input
   const last4 = digits.slice(-4)
-  let maskedDigitsIdx = 0
-  const numDigitsToMask = Math.max(0, digits.length - 4)
-  return input
-    .split("")
-    .map((ch) => {
-      if (/\d/.test(ch)) {
-        if (maskedDigitsIdx < numDigitsToMask) {
-          maskedDigitsIdx += 1
-          return "•"
-        }
-        // past masked portion -> reveal last 4
-        return last4[maskedDigitsIdx++ - numDigitsToMask] || ch
+  let remainingToMask = Math.max(0, digits.length - 4)
+  let lastIdx = 0
+  let out = ""
+  for (const ch of input) {
+    if (/\d/.test(ch)) {
+      if (remainingToMask > 0) {
+        out += "*"
+        remainingToMask -= 1
+      } else {
+        out += last4[lastIdx++] ?? ch
       }
-      return ch
-    })
-    .join("")
+    } else {
+      out += ch
+    }
+  }
+  return out
 }
 
 export default function TaskDetailScreen({ navigation }: any) {
@@ -82,21 +82,29 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
-  const { tasks, accept, fetchNearby } = useTaskStore()
+  const { tasks, accept, fetchNearby, upsertTask } = useTaskStore()
   const { userId } = useAuth()
   const taskFromStore = tasks.find((t) => String(t.id) === String(taskId))
 
   const [loading, setLoading] = React.useState(!taskFromStore)
   const [task, setTask] = React.useState(taskFromStore || null)
 
-  const [sound, setSound] = React.useState<Audio.Sound | null>(null)
-  const [playing, setPlaying] = React.useState(false)
+  const current = task || taskFromStore || null
+
+  const {
+    status: playbackStatus,
+    toggle,
+    stop,
+  } = useAudioPlaybackForUri(
+    current?.voiceUrl ? String(current.voiceUrl) : null,
+    current?.id ? `detail-${current.id}` : "detail",
+  )
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
-  const { radiusMeters } = useTaskStore()
-  const [justCompleted, setJustCompleted] = React.useState(false)
   const [actionLoading, setActionLoading] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
   const [ratingSubmitting, setRatingSubmitting] = React.useState(false)
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
+  const [authDecision, setAuthDecision] = React.useState<"approved" | "rejected" | null>(null)
   const authExpiredRef = useRef(false)
 
   const [fullPhone, setFullPhone] = React.useState<string | null>(null)
@@ -127,22 +135,16 @@ export default function TaskDetailScreen({ navigation }: any) {
     CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
   } as const
 
-  const current = task || taskFromStore || null
-
   const [rating, setRating] = useState<number>(2.5) // center default (neutral)
 
   useFocusEffect(
     useCallback(() => {
       refresh()
-    }, [refresh]),
+      return () => {
+        void stop()
+      }
+    }, [refresh, stop]),
   )
-
-  React.useEffect(() => {
-    if (current?.createdByPhoneNumber) {
-      setFullPhone(String(current.createdByPhoneNumber))
-      setIsRevealed(false) // always start masked on open
-    }
-  }, [current?.createdByPhoneNumber])
 
   // Normalize backend statuses (e.g., OPEN/CANCELLED) to UI statuses used in statusMap
   let normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
@@ -168,16 +170,21 @@ export default function TaskDetailScreen({ navigation }: any) {
       normalizedStatus = "PENDING"
   }
 
+  useEffect(() => {
+    if (rawStatus !== "PENDING_AUTH") {
+      setAuthDecision(null)
+    }
+  }, [rawStatus])
+
   // ensure we have the task (e.g., deep link / app resume)
   React.useEffect(() => {
     let cancelled = false
     const load = async () => {
-      if (taskFromStore) return
-      setLoading(true)
+      setLoading(!taskFromStore)
       try {
         const res = await OolshikApi.findTaskByTaskId(taskId)
         const fetchedTask = res?.ok ? (res.data as Task | null) : null
-        if (!cancelled) setTask(fetchedTask)
+        if (!cancelled && fetchedTask) setTask(fetchedTask)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -189,12 +196,54 @@ export default function TaskDetailScreen({ navigation }: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
+  const refreshTask = async () => {
+    if (!taskId || refreshing) return
+    setRefreshing(true)
+    try {
+      const res = await OolshikApi.findTaskByTaskId(taskId)
+      if (res?.ok && res.data) {
+        setTask(res.data as Task)
+        upsertTask(res.data as Task)
+        return
+      }
+      const msg = (res as any)?.data?.message || "Unable to refresh task details."
+      Alert.alert("Refresh failed", msg)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
+
   const isHelper = !!current?.helperId && !!userId && current.helperId === userId
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
+  const contactLabel = isRequester ? "Helper phone" : "Requester phone"
+  const hasHelper = !!current?.helperId || !!current?.pendingHelperId
+  const canViewContact = isRequester
+    ? !!rawStatus && rawStatus !== "OPEN" && hasHelper
+    : !!fullPhone
+
+  React.useEffect(() => {
+    const requesterPhone =
+      current?.requesterPhoneNumber ||
+      current?.createdByPhoneNumber ||
+      (current as any)?.phoneNumber
+    const helperPhone = current?.helperPhoneNumber || (current as any)?.helperPhone
+
+    const nextPhone = isRequester ? helperPhone : requesterPhone
+    setFullPhone(nextPhone ? String(nextPhone) : null)
+    setIsRevealed(false) // always start masked on open
+  }, [
+    current?.requesterPhoneNumber,
+    current?.createdByPhoneNumber,
+    (current as any)?.phoneNumber,
+    (current as any)?.helperPhone,
+    current?.helperPhoneNumber,
+    isRequester,
+  ])
   const ratingByRequester = current?.ratingByRequester ?? null
   const ratingByHelper = current?.ratingByHelper ?? null
   const myRating = isRequester ? ratingByRequester : isHelper ? ratingByHelper : null
@@ -214,8 +263,11 @@ export default function TaskDetailScreen({ navigation }: any) {
   const reassignAvailableAtMs = helperAcceptedAtMs
     ? helperAcceptedAtMs + REASSIGN_SLA_SECONDS * 1000
     : null
-
   const [nowMs, setNowMs] = React.useState(Date.now())
+  const msUntilAuthExpiry = pendingAuthExpiresAtMs
+    ? Math.max(0, pendingAuthExpiresAtMs - nowMs)
+    : null
+
   useEffect(() => {
     const needsReassignTimer = reassignAvailableAtMs && rawStatus === "ASSIGNED"
     const needsAuthTimer = pendingAuthExpiresAtMs && rawStatus === "PENDING_AUTH"
@@ -260,9 +312,6 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [coords, fetchNearby, msUntilAuthExpiry, rawStatus, status, taskId])
 
   const msUntilReassign = reassignAvailableAtMs ? Math.max(0, reassignAvailableAtMs - nowMs) : null
-  const msUntilAuthExpiry = pendingAuthExpiresAtMs
-    ? Math.max(0, pendingAuthExpiresAtMs - nowMs)
-    : null
   const authExpired = msUntilAuthExpiry !== null && msUntilAuthExpiry <= 0
   const canReassign =
     isRequester &&
@@ -313,20 +362,9 @@ export default function TaskDetailScreen({ navigation }: any) {
     if (num) Linking.openURL(`tel:${num}`)
   }
 
-  const play = async () => {
-    if (!current?.voiceUrl) return
-    const { sound } = await Audio.Sound.createAsync({ uri: String(current.voiceUrl) })
-    setSound(sound)
-    setPlaying(true)
-    await sound.playAsync()
-    sound.setOnPlaybackStatusUpdate((st: any) => {
-      if (!st.isPlaying) {
-        setPlaying(false)
-        sound.unloadAsync()
-        setSound(null)
-      }
-    })
-  }
+  const audioLoading = playbackStatus === "loading"
+  const playing = playbackStatus === "playing"
+  const togglePlay = () => toggle()
 
   const onAccept = async () => {
     if (status !== "ready" || !coords) {
@@ -374,10 +412,20 @@ export default function TaskDetailScreen({ navigation }: any) {
     try {
       const res = await OolshikApi.authorizeRequest(current.id as any)
       if (res?.ok) {
+        setAuthDecision("approved")
         if (res?.data) {
-          setTask((t: any) => (t ? { ...t, ...(res.data as any) } : (res.data as any)))
+          setTask((t: any) =>
+            t
+              ? {
+                  ...t,
+                  ...(res.data as any),
+                  status: "ASSIGNED",
+                  pendingAuthExpiresAt: null,
+                }
+              : { ...(res.data as any), status: "ASSIGNED", pendingAuthExpiresAt: null },
+          )
         } else {
-          setTask((t: any) => (t ? { ...t, status: "ASSIGNED" } : t))
+          setTask((t: any) => (t ? { ...t, status: "ASSIGNED", pendingAuthExpiresAt: null } : t))
         }
         setRecoveryNotice("Authorization approved.")
         if (coords && status === "ready") {
@@ -404,17 +452,47 @@ export default function TaskDetailScreen({ navigation }: any) {
       }
       throw new Error("Authorize failed")
     } catch {
+      setAuthDecision(null)
       Alert.alert("Approve failed", "Please try again.")
     } finally {
       setActionLoading(false)
     }
   }
 
-  function openInMaps(lat: number, lon: number, label = "Task") {
-    const g = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}&q=(${encodeURIComponent(label)})`
-    // const g = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${label} @${lat},${lon}`)}`
-    const a = `http://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(label)}`
-    Linking.openURL(Platform.OS === "ios" ? a : g)
+  async function openInMaps(lat: number, lon: number, label = "Task") {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      Alert.alert("Location unavailable", "Coordinates are missing.")
+      return
+    }
+
+    const safeLabel = encodeURIComponent(label)
+    const appleMaps = `https://maps.apple.com/?ll=${lat},${lon}&q=${safeLabel}`
+    const googleWeb = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}&q=(${safeLabel})`
+    const geo = `geo:${lat},${lon}?q=${lat},${lon}(${safeLabel})`
+
+    try {
+      if (Platform.OS === "android") {
+        if (await Linking.canOpenURL(geo)) {
+          await Linking.openURL(geo)
+          return
+        }
+      }
+
+      const primary = Platform.OS === "ios" ? appleMaps : googleWeb
+      if (await Linking.canOpenURL(primary)) {
+        await Linking.openURL(primary)
+        return
+      }
+
+      if (await Linking.canOpenURL(googleWeb)) {
+        await Linking.openURL(googleWeb)
+        return
+      }
+    } catch {
+      // fall through to alert
+    }
+
+    Alert.alert("No Maps App Found", `Can't open maps on this device.\n\n${lat}, ${lon}`)
   }
 
   const onComplete = async () => {
@@ -422,15 +500,7 @@ export default function TaskDetailScreen({ navigation }: any) {
     const res = await OolshikApi.completeTask(current.id as any)
     if (res?.ok) {
       setTask((t: any) => (t ? { ...t, status: "COMPLETED" } : t))
-      setJustCompleted(true)
-      // Briefly show a success banner, then return to previous screen
-      setTimeout(() => {
-        try {
-          navigation.goBack()
-        } catch {
-          // ignore
-        }
-      }, 1200)
+      // stay on screen so requester can rate helper
     } else if (
       res?.status === 403 ||
       res?.status === 409 ||
@@ -640,12 +710,52 @@ export default function TaskDetailScreen({ navigation }: any) {
       <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
         <Text preset="heading" text="Task Detail" />
         {/* REPORT *** lightweight header action */}
-        <View style={{ marginLeft: "auto" }}>
+        <View
+          style={{
+            marginLeft: "auto",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.xs,
+          }}
+        >
+          <Pressable
+            onPress={refreshTask}
+            disabled={refreshing}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh task details"
+            style={({ pressed }) => ({
+              minHeight: 32,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xxxs,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.palette.neutral300,
+              backgroundColor: colors.palette.neutral100,
+              opacity: refreshing ? 0.6 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 32,
+            })}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.palette.primary500} />
+            ) : (
+              <Text text="Refresh" size="xs" weight="medium" style={{ color: colors.textDim }} />
+            )}
+          </Pressable>
           <Button
             text="Report"
             onPress={() => {
               navigation.navigate("OolshikReport", { taskId: current?.id })
             }}
+            style={{
+              minHeight: 32,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xxxs,
+              borderRadius: 999,
+            }}
+            textStyle={{ fontSize: 12, lineHeight: 16 }}
           />
         </View>
       </View>
@@ -682,9 +792,12 @@ export default function TaskDetailScreen({ navigation }: any) {
               {/* Small play control on the right */}
               {!!current.voiceUrl && (
                 <Pressable
-                  onPress={play}
+                  onPress={togglePlay}
                   accessibilityRole="button"
-                  accessibilityLabel={playing ? "Playing" : "Play voice"}
+                  accessibilityLabel={
+                    audioLoading ? "Loading voice" : playing ? "Stop voice" : "Play voice"
+                  }
+                  accessibilityState={{ disabled: audioLoading }}
                   style={{
                     width: 44,
                     height: 44,
@@ -692,9 +805,13 @@ export default function TaskDetailScreen({ navigation }: any) {
                     backgroundColor: primary,
                     alignItems: "center",
                     justifyContent: "center",
+                    opacity: audioLoading ? 0.7 : 1,
                   }}
                 >
-                  <Text text={playing ? "…" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
+                  <Text
+                    text={audioLoading ? "…" : playing ? "⏸" : "▶︎"}
+                    style={{ color: "white", fontWeight: "bold" }}
+                  />
                 </Pressable>
               )}
             </View>
@@ -709,7 +826,7 @@ export default function TaskDetailScreen({ navigation }: any) {
             </View>
 
             {/* Contact (masked -> reveal) */}
-            {!!fullPhone && (
+            {canViewContact && (
               <View
                 style={{
                   gap: spacing.xs,
@@ -720,15 +837,24 @@ export default function TaskDetailScreen({ navigation }: any) {
                   backgroundColor: colors.palette.neutral100,
                 }}
               >
-                <Text text="Contact" weight="medium" style={{ color: neutral700 }} />
+                <Text text={contactLabel} weight="medium" style={{ color: neutral700 }} />
                 <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                   <Text
-                    text={isRevealed ? String(fullPhone) : maskPhoneNumber(fullPhone || "")}
+                    text={
+                      isRevealed && fullPhone
+                        ? String(fullPhone)
+                        : maskPhoneNumber(fullPhone || "•••••••••••••")
+                    }
                     weight="bold"
                     style={{ flex: 1, color: neutral700 }}
                   />
                   {isRevealed ? (
-                    <Button text="Call" onPress={onCall} style={{ paddingVertical: spacing.xs }} />
+                    <Button
+                      text="Call"
+                      onPress={onCall}
+                      disabled={!fullPhone}
+                      style={{ paddingVertical: spacing.xs }}
+                    />
                   ) : (
                     <Button
                       text={revealLoading ? "…" : "Show"}
@@ -740,43 +866,107 @@ export default function TaskDetailScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* Distance + Status pill in one row */}
+            {/* Compact single-line row; wraps only if absolutely necessary */}
             <View
               style={{
                 flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xxs,
                 justifyContent: "space-between",
               }}
             >
-              {typeof current.distanceMtr === "number" ? (
-                <Text text={`${distance} away`} size="xs" style={{ color: neutral700 }} />
-              ) : (
-                <View />
-              )}
-
-              <Pressable
-                onPress={() => openInMaps(current.latitude || 0, current.longitude || 0)}
+              <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.xxs,
-                  borderRadius: 999,
-                  backgroundColor: colors.palette.neutral200,
+                  gap: spacing.xxs,
+                  flexShrink: 1,
+                  minWidth: 0,
                 }}
               >
-                <Text text="Let's Go 🚗" size="xs" weight="medium" style={{ color: neutral700 }} />
-              </Pressable>
+                {typeof current.distanceMtr === "number" ? (
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.xs,
+                      paddingVertical: spacing.xxxs,
+                      borderRadius: 999,
+                      backgroundColor: colors.palette.neutral200,
+                      flexShrink: 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    <Text
+                      text={`${distance} away`}
+                      size="xs"
+                      numberOfLines={1}
+                      style={{ color: neutral700 }}
+                    />
+                  </View>
+                ) : (
+                  <View />
+                )}
+
+                <Pressable
+                  onPress={() => openInMaps(current.latitude || 0, current.longitude || 0)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing.xxs,
+                    paddingHorizontal: spacing.xs,
+                    paddingVertical: spacing.xxxs,
+                    borderRadius: 999,
+                    backgroundColor: colors.palette.primary100,
+                    borderWidth: 1,
+                    borderColor: colors.palette.primary200,
+                    maxWidth: 96,
+                    flexShrink: 1,
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open maps for directions"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      backgroundColor: primary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text text="↗" size="xxs" weight="bold" style={{ color: "white" }} />
+                  </View>
+                  <Text
+                    text="Map"
+                    size="xs"
+                    weight="medium"
+                    numberOfLines={1}
+                    style={{ color: primary, flexShrink: 1 }}
+                  />
+                </Pressable>
+              </View>
+
               <View
                 style={{
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.xxs,
-                  borderRadius: 999,
-                  backgroundColor: S.bg,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.xxs,
+                  flexShrink: 0,
                 }}
               >
-                <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
+                <View
+                  style={{
+                    paddingHorizontal: spacing.xs,
+                    paddingVertical: spacing.xxxs,
+                    borderRadius: 999,
+                    backgroundColor: S.bg,
+                  }}
+                >
+                  <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
+                </View>
+                {showRatingBadge && <RatingBadge value={ratingBadgeValue} />}
               </View>
-              {showRatingBadge && <RatingBadge value={ratingBadgeValue} />}
             </View>
           </View>
         )}
@@ -802,7 +992,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               <Text text={recoveryNotice} weight="medium" style={{ color: success }} />
             </View>
           )}
-          {rawStatus === "PENDING_AUTH" ? (
+          {rawStatus === "PENDING_AUTH" && !authDecision ? (
             <View style={{ marginHorizontal: 16, gap: spacing.sm }}>
               {isRequester ? (
                 <View
@@ -946,10 +1136,12 @@ export default function TaskDetailScreen({ navigation }: any) {
                 paddingTop: 12,
               }}
             >
-              <Text
-                text={isRequester ? "Rate your helper" : "Rate the requester"}
-                preset="subheading"
-              />
+              {myRating == null && (
+                <Text
+                  text={isRequester ? "Rate your helper" : "Rate the requester"}
+                  preset="subheading"
+                />
+              )}
               {myRating == null ? (
                 <>
                   <SmileySlider disabled={false} value={rating} onChange={setRating} />
@@ -964,13 +1156,13 @@ export default function TaskDetailScreen({ navigation }: any) {
                   />
                 </>
               ) : (
-                <Text text={`Your rating: ${myRating.toFixed(1)} / 5.0`} weight="medium" />
+                <Text text={`You rated: ${myRating.toFixed(1)} / 5.0`} weight="medium" />
               )}
               {otherPartyRating != null && (
                 <Text
                   text={`${
                     isRequester ? "Helper" : "Requester"
-                  } rating: ${otherPartyRating.toFixed(1)} / 5.0`}
+                  } rated you: ${otherPartyRating.toFixed(1)} / 5.0`}
                   size="xs"
                 />
               )}

@@ -1,11 +1,11 @@
 import React from "react"
-import { View, Pressable } from "react-native"
+import { View, Pressable, ActivityIndicator } from "react-native"
 import { Card } from "@/components/Card"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
-import { Audio } from "expo-av"
 import { RatingBadge } from "./RatingBadge"
+import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
 
 type Props = {
   id: string
@@ -52,6 +52,7 @@ function minsAgo(iso?: string) {
 }
 
 export function TaskCard({
+  id,
   title = "Voice task",
   distanceMtr,
   onAccept,
@@ -90,40 +91,21 @@ export function TaskCard({
 
   const canAccept = !!onAccept && (status === "OPEN" || status === "PENDING")
 
-  const [sound, setSound] = React.useState<Audio.Sound | null>(null)
-  const [playing, setPlaying] = React.useState(false)
-
-  const play = async () => {
-    if (!voiceUrl) return
-    const { sound } = await Audio.Sound.createAsync({ uri: voiceUrl })
-    setSound(sound)
-    setPlaying(true)
-    await sound.playAsync()
-    sound.setOnPlaybackStatusUpdate((st: any) => {
-      if (!st.isPlaying) {
-        setPlaying(false)
-        sound.unloadAsync()
-        setSound(null)
-      }
-    })
-  }
-
   // Footer: type as ReactElement | undefined to satisfy Card's prop
-  const FooterComponent =
-    canAccept ? (
-      <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-        <Button
-          text="Accept"
-          onPress={onAccept}
-          style={{
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.xs,
-            borderRadius: spacing.sm,
-            minWidth: 100,
-          }}
-        />
-      </View>
-    ) : undefined // <-- important
+  const FooterComponent = canAccept ? (
+    <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+      <Button
+        text="Accept"
+        onPress={onAccept}
+        style={{
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.xs,
+          borderRadius: spacing.sm,
+          minWidth: 100,
+        }}
+      />
+    </View>
+  ) : undefined // <-- important
 
   const distance =
     (distanceMtr ?? 0) < 1000
@@ -153,24 +135,7 @@ export function TaskCard({
         {/* When posted */}
         <Text text={minsAgo(createdAt)} size="xs" />
       </View>
-      {voiceUrl ? (
-        <Pressable
-          onPress={play}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: primary,
-            justifyContent: "center",
-            alignItems: "center",
-            marginRight: spacing.md,
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={playing ? "Playing" : "Play voice"}
-        >
-          <Text text={playing ? "…" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
-        </Pressable>
-      ) : undefined}
+      {voiceUrl ? <VoicePlayButton uri={voiceUrl} playKey={id} /> : undefined}
       {canAccept ? (
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Button
@@ -265,3 +230,43 @@ export function TaskCard({
     />
   )
 }
+
+const VoicePlayButton = React.memo(function VoicePlayButton({
+  uri,
+  playKey,
+}: {
+  uri: string
+  playKey: string
+}) {
+  const { theme } = useAppTheme()
+  const { spacing, colors } = theme
+  const primary = colors.palette.primary500
+  const { status: playbackStatus, toggle } = useAudioPlaybackForUri(uri, playKey)
+  const audioLoading = playbackStatus === "loading"
+  const playing = playbackStatus === "playing"
+
+  return (
+    <Pressable
+      onPress={() => toggle()}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: primary,
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: spacing.md,
+        opacity: audioLoading ? 0.7 : 1,
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={audioLoading ? "Loading voice" : playing ? "Stop voice" : "Play voice"}
+      accessibilityState={{ disabled: audioLoading }}
+    >
+      {audioLoading ? (
+        <ActivityIndicator color="#fff" size="small" />
+      ) : (
+        <Text text={playing ? "⏸" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
+      )}
+    </Pressable>
+  )
+})

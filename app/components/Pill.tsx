@@ -14,9 +14,9 @@ export const Pill: React.FC<{
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 4,
+      borderRadius: 499,
       backgroundColor: active ? "#111827" : "#F2F4F7",
     }}
   >
@@ -29,6 +29,10 @@ export const Pill: React.FC<{
         opacity: active ? 1 : 0.8,
       }}
     />
-    <Text style={{ color: active ? "#fff" : "#111827", fontWeight: "600" }} text={label} />
+    <Text
+      size="xxs"
+      style={{ color: active ? "#fff" : "#111827", fontWeight: "600" }}
+      text={label}
+    />
   </Pressable>
 )

@@ -45,6 +45,7 @@ import { ThemeProvider } from "./theme/context"
 import { customFontsToLoad } from "./theme/typography"
 import { loadDateFnsLocale } from "./utils/formatDate"
 import * as storage from "./utils/storage"
+import { getProfileExtras } from "./features/profile/storage/profileExtrasStore"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -85,9 +86,25 @@ export function App() {
   const [isI18nInitialized, setIsI18nInitialized] = useState(false)
 
   useEffect(() => {
-    initI18n()
-      .then(() => setIsI18nInitialized(true))
-      .then(() => loadDateFnsLocale())
+    let mounted = true
+    ;(async () => {
+      const instance = await initI18n()
+      try {
+        const extras = await getProfileExtras()
+        const lang = extras.language
+        if (lang) {
+          await instance.changeLanguage(lang)
+        }
+      } catch {
+        // best-effort
+      }
+      if (!mounted) return
+      setIsI18nInitialized(true)
+      await loadDateFnsLocale()
+    })()
+    return () => {
+      mounted = false
+    }
   }, [])
 
   // Before we show the app, we have to wait for our state to be ready.

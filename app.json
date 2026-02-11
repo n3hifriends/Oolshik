@@ -21,6 +21,10 @@
       "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
       "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
     },
+    "notification": {
+      "icon": "./assets/images/oolshik_logo_72_72.png",
+      "color": "#191015"
+    },
     "allowBackup": false,
     "edgeToEdgeEnabled": true
   },
