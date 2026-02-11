@@ -1,6 +1,15 @@
 import { setLoginTokens } from "@/api/client"
 import { authEvents } from "@/auth/events"
 import { navigationRef } from "@/navigators/navigationUtilities"
+import {
+  attachNotificationListeners,
+  disablePushNotifications,
+  getCachedPushToken,
+  getExpoPushTokenAsync,
+  registerDeviceTokenWithRetry,
+  setCachedPushToken,
+} from "@/utils/pushNotifications"
+import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 import React, {
   createContext,
   useContext,
@@ -86,6 +95,34 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       authEvents.off("logout", handler)
     }
   }, [])
+
+  useEffect(() => {
+    if (!authToken) return
+    let active = true
+    const cleanup = attachNotificationListeners()
+    ;(async () => {
+      try {
+        const extras = await getProfileExtras()
+        const enabled = extras.notificationsEnabled ?? true
+        if (!enabled) {
+          await disablePushNotifications()
+          return
+        }
+        const token = await getExpoPushTokenAsync()
+        if (!active || !token) return
+        const cached = getCachedPushToken()
+        if (token === cached) return
+        await registerDeviceTokenWithRetry(token)
+        setCachedPushToken(token)
+      } catch {
+        // best-effort
+      }
+    })()
+    return () => {
+      active = false
+      cleanup()
+    }
+  }, [authToken])
 
   // 🔑 email validation logic preserved
   const validationError = useMemo(() => {

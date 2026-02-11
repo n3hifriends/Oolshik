@@ -8,6 +8,7 @@ import TaskDetailScreen from "@/screens/TaskDetailScreen"
 import MyTasksScreen from "@/screens/MyTasksScreen"
 import ChatScreen from "@/screens/ChatScreen"
 import ProfileScreen from "@/screens/ProfileScreen"
+import EditProfileScreen from "@/screens/EditProfileScreen"
 import ReportScreen from "@/screens/ReportScreen"
 import { useMMKVString } from "react-native-mmkv"
 import { storage } from "@/utils/storage"
@@ -36,6 +37,7 @@ export type OolshikParamList = {
   OolshikMy: undefined
   OolshikChat: { taskId: string }
   OolshikProfile: undefined
+  OolshikProfileEdit: undefined
   OolshikReport: { taskId?: string; targetUserId?: string }
   QrScanner: { taskId: string }
   PaymentPay: PaymentPayParams
@@ -111,6 +113,7 @@ export function OolshikNavigator() {
       <Stack.Screen name="OolshikMy" component={MyTasksScreen} />
       <Stack.Screen name="OolshikChat" component={ChatScreen} />
       <Stack.Screen name="OolshikProfile" component={ProfileScreen} />
+      <Stack.Screen name="OolshikProfileEdit" component={EditProfileScreen} />
       <Stack.Screen name="OolshikReport" component={ReportScreen} />
       <Stack.Screen name="QrScanner" component={QrScannerScreen} />
       <Stack.Screen name="PaymentPay" component={PaymentPayScreen} />

@@ -5,6 +5,25 @@ import { getDistanceMeters, distanceLabel } from "@/utils/distance"
 export type Status = "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
 export type ViewMode = "forYou" | "mine"
 
+const normalizeStatus = (status?: string): Status | null => {
+  const raw = String(status ?? "")
+    .trim()
+    .toUpperCase()
+  if (!raw) return null
+  if (raw === "PENDING") return "OPEN"
+  if (raw === "CANCELED") return "CANCELLED"
+  if (
+    raw === "OPEN" ||
+    raw === "PENDING_AUTH" ||
+    raw === "ASSIGNED" ||
+    raw === "COMPLETED" ||
+    raw === "CANCELLED"
+  ) {
+    return raw as Status
+  }
+  return null
+}
+
 export function useTaskFiltering(
   tasks: any[],
   options: {
@@ -27,13 +46,22 @@ export function useTaskFiltering(
 
     const statusesToUse: Status[] =
       options.selectedStatuses.size === 0
-        ? (Array.from(new Set(unique.map((t: any) => t.status))).filter(Boolean) as Status[])
+        ? (Array.from(
+            new Set(
+              unique
+                .map((t: any) => normalizeStatus(t.status))
+                .filter((s): s is Status => Boolean(s)),
+            ),
+          ) as Status[])
         : (Array.from(options.selectedStatuses) as Status[])
 
     const mine = (t: any) =>
       options.myId ? String(t?.requesterId) === String(options.myId) : false
 
-    let res = unique.filter((t: any) => statusesToUse.includes(t.status as Status))
+    let res = unique.filter((t: any) => {
+      const normalized = normalizeStatus(t.status)
+      return normalized ? statusesToUse.includes(normalized) : false
+    })
     res = res.filter((t: any) => (options.viewMode === "mine" ? mine(t) : !mine(t)))
     res = res.filter((t: any) => {
       if (t?.status !== "PENDING_AUTH") return true

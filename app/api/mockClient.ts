@@ -168,7 +168,7 @@ export const MockOolshikApi = {
 
   addReview: async () => ({ ok: true as const }),
   report: async () => ({ ok: true as const }),
-  registerDevice: async () => ({ ok: true as const }),
+  registerDevice: async (_token?: string, _platform?: string) => ({ ok: true as const }),
 
   // --- Phase 1: Auth / OTP mock endpoints ---
   async requestOtp(phone: string) {

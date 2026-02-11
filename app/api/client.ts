@@ -329,6 +329,7 @@ export type ServerTask = {
   updatedAt?: string
   createdByName?: string
   createdByPhoneNumber?: string
+  helperPhoneNumber?: string
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null
   pendingAuthExpiresAt?: string | null
@@ -364,6 +365,11 @@ export type ReportPayload = {
   targetUserId?: string
   reason: "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
   text?: string
+}
+
+export type UserStats = {
+  avgRating?: number | null
+  completedHelps?: number | null
 }
 
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
@@ -459,7 +465,13 @@ export const OolshikApi = {
   report: (payload: ReportPayload) => api.post("/reports", payload),
 
   // Device token (push)
-  registerDevice: (token: string) => api.post("/users/device", { token }),
+  registerDevice: (token: string, platform?: string) =>
+    api.post("/users/device", { token, platform }),
+  unregisterDevice: (token: string) =>
+    api.delete("/users/device", {}, { data: { token } }),
+
+  // Profile stats
+  getMyStats: () => api.get<UserStats>("/users/me/stats"),
 
   // Media: pre-signed URL
   getPresigned: (contentType: string) =>

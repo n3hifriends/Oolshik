@@ -36,14 +36,18 @@ export const StatusChip: React.FC<{ s: Status; active: boolean; onPress: () => v
     accessibilityState={{ selected: active }}
     accessibilityLabel={`Filter ${s}`}
     style={{
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: 999,
+      paddingVertical: 4,
+      paddingHorizontal: 7,
+      borderRadius: 499,
       borderWidth: 1,
       borderColor: STATUS_COLORS[s],
       backgroundColor: active ? STATUS_COLORS[s] : STATUS_BG[s],
     }}
   >
-    <Text text={STATUS_LABELS[s]} style={{ color: active ? "#fff" : STATUS_COLORS[s] }} />
+    <Text
+      text={STATUS_LABELS[s]}
+      size="xxs"
+      style={{ color: active ? "#fff" : STATUS_COLORS[s] }}
+    />
   </Pressable>
 )

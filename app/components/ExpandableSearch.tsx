@@ -3,6 +3,7 @@ import { Animated, Easing, Pressable, TextInput, View } from "react-native"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
 import { typography } from "@/theme/typography"
+import { colors } from "@/theme/colors"
 
 type Props = {
   open: boolean
@@ -71,7 +72,7 @@ export const ExpandableSearch: React.FC<Props> = ({
             width: 30,
             height: 30,
             borderRadius: 22,
-            backgroundColor: "#111827",
+            backgroundColor: colors.palette.primary500,
             alignItems: "center",
             justifyContent: "center",
           }}

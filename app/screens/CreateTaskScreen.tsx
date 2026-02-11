@@ -15,8 +15,18 @@ import { useAuth } from "@/context/AuthContext"
 import { FLAGS } from "@/config/flags"
 import { useTaskStore } from "@/store/taskStore"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
+import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 
 type Radius = 1 | 2 | 5
+
+const RADIUS_OPTIONS: Radius[] = [1, 2, 5]
+const normalizeRadius = (value?: number | null): Radius => {
+  if (value && RADIUS_OPTIONS.includes(value as Radius)) return value as Radius
+  if (!value) return 1
+  return RADIUS_OPTIONS.reduce((closest, current) =>
+    Math.abs(current - value) < Math.abs(closest - value) ? current : closest,
+  )
+}
 
 export default function CreateTaskScreen({ navigation }: any) {
   const [title, setTitle] = useState("")
@@ -39,6 +49,20 @@ export default function CreateTaskScreen({ navigation }: any) {
       refresh()
     }, [refresh]),
   )
+
+  useEffect(() => {
+    let active = true
+    getProfileExtras()
+      .then((extras) => {
+        if (!active) return
+        const preferred = extras.helperRadiusKm
+        if (preferred) setRadiusKm(normalizeRadius(preferred))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Load/unload preview sound when a new recording is available
   useEffect(() => {
