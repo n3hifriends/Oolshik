@@ -82,7 +82,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
-  const { tasks, accept, fetchNearby } = useTaskStore()
+  const { tasks, accept, fetchNearby, upsertTask } = useTaskStore()
   const { userId } = useAuth()
   const taskFromStore = tasks.find((t) => String(t.id) === String(taskId))
 
@@ -100,8 +100,8 @@ export default function TaskDetailScreen({ navigation }: any) {
     current?.id ? `detail-${current.id}` : "detail",
   )
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
-  const { radiusMeters } = useTaskStore()
   const [actionLoading, setActionLoading] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
   const [ratingSubmitting, setRatingSubmitting] = React.useState(false)
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
   const [authDecision, setAuthDecision] = React.useState<"approved" | "rejected" | null>(null)
@@ -196,6 +196,23 @@ export default function TaskDetailScreen({ navigation }: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
+  const refreshTask = async () => {
+    if (!taskId || refreshing) return
+    setRefreshing(true)
+    try {
+      const res = await OolshikApi.findTaskByTaskId(taskId)
+      if (res?.ok && res.data) {
+        setTask(res.data as Task)
+        upsertTask(res.data as Task)
+        return
+      }
+      const msg = (res as any)?.data?.message || "Unable to refresh task details."
+      Alert.alert("Refresh failed", msg)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
@@ -246,8 +263,11 @@ export default function TaskDetailScreen({ navigation }: any) {
   const reassignAvailableAtMs = helperAcceptedAtMs
     ? helperAcceptedAtMs + REASSIGN_SLA_SECONDS * 1000
     : null
-
   const [nowMs, setNowMs] = React.useState(Date.now())
+  const msUntilAuthExpiry = pendingAuthExpiresAtMs
+    ? Math.max(0, pendingAuthExpiresAtMs - nowMs)
+    : null
+
   useEffect(() => {
     const needsReassignTimer = reassignAvailableAtMs && rawStatus === "ASSIGNED"
     const needsAuthTimer = pendingAuthExpiresAtMs && rawStatus === "PENDING_AUTH"
@@ -292,9 +312,6 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [coords, fetchNearby, msUntilAuthExpiry, rawStatus, status, taskId])
 
   const msUntilReassign = reassignAvailableAtMs ? Math.max(0, reassignAvailableAtMs - nowMs) : null
-  const msUntilAuthExpiry = pendingAuthExpiresAtMs
-    ? Math.max(0, pendingAuthExpiresAtMs - nowMs)
-    : null
   const authExpired = msUntilAuthExpiry !== null && msUntilAuthExpiry <= 0
   const canReassign =
     isRequester &&
@@ -693,12 +710,52 @@ export default function TaskDetailScreen({ navigation }: any) {
       <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
         <Text preset="heading" text="Task Detail" />
         {/* REPORT *** lightweight header action */}
-        <View style={{ marginLeft: "auto" }}>
+        <View
+          style={{
+            marginLeft: "auto",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.xs,
+          }}
+        >
+          <Pressable
+            onPress={refreshTask}
+            disabled={refreshing}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh task details"
+            style={({ pressed }) => ({
+              minHeight: 32,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xxxs,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.palette.neutral300,
+              backgroundColor: colors.palette.neutral100,
+              opacity: refreshing ? 0.6 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 32,
+            })}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.palette.primary500} />
+            ) : (
+              <Text text="Refresh" size="xs" weight="medium" style={{ color: colors.textDim }} />
+            )}
+          </Pressable>
           <Button
             text="Report"
             onPress={() => {
               navigation.navigate("OolshikReport", { taskId: current?.id })
             }}
+            style={{
+              minHeight: 32,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xxxs,
+              borderRadius: 999,
+            }}
+            textStyle={{ fontSize: 12, lineHeight: 16 }}
           />
         </View>
       </View>

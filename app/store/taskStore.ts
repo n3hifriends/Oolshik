@@ -19,6 +19,7 @@ type Task = {
   createdByName?: string
   createdAt?: string // ISO
   createdByPhoneNumber?: string
+  requesterPhoneNumber?: string
   helperPhoneNumber?: string
   ratingValue?: number | null
   ratingByRequester?: number | null
@@ -68,6 +69,7 @@ type State = {
   tab: TaskTab
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
+  upsertTask: (task: Task) => void
   fetchNearby: (lat: number, lng: number, statuses?: string[]) => Promise<void>
   accept: (id: string, latitude: number, longitude: number) => Promise<"OK" | "ALREADY" | "ERROR">
   complete: (id: string) => Promise<"OK" | "FORBIDDEN" | "ERROR">
@@ -81,6 +83,14 @@ export const useTaskStore = create<State>((set, get) => ({
   tab: "ALL",
   setRadius: (r) => set({ radiusMeters: r }),
   setTab: (t) => set({ tab: t }),
+  upsertTask: (task) =>
+    set((s) => {
+      const idx = s.tasks.findIndex((t) => t.id === task.id)
+      if (idx === -1) return { tasks: [task, ...s.tasks] }
+      const next = s.tasks.slice()
+      next[idx] = { ...next[idx], ...task }
+      return { tasks: next }
+    }),
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
     console.log("🚀 ~ statuses:", statuses)
