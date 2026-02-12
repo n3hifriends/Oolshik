@@ -309,6 +309,23 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       </SectionCard>
 
       <SectionCard>
+        <Text
+          preset="subheading"
+          tx="oolshik:feedback.title"
+          style={{ marginBottom: spacing.sm }}
+        />
+        <Text tx="oolshik:feedback.subtitle" size="xs" style={{ color: colors.textDim }} />
+        <View style={{ marginTop: spacing.sm }}>
+          <Button
+            tx="oolshik:feedback.openFeedback"
+            onPress={() => navigation.navigate("OolshikFeedbackHub")}
+            style={{ borderRadius: 10, minHeight: 44 }}
+            accessibilityLabel="Open feedback"
+          />
+        </View>
+      </SectionCard>
+
+      <SectionCard>
         <Text preset="subheading" text="Account" style={{ marginBottom: spacing.sm }} />
         <View style={{ marginBottom: spacing.sm }}>
           <Text text="App version" size="xs" style={{ color: colors.textDim }} />

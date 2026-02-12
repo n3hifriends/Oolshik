@@ -10,7 +10,7 @@ import { OolshikApi } from "@/api"
 import { useRoute, useNavigation } from "@react-navigation/native"
 import { RadioGroup } from "@/components/RadioGroup"
 
-type Params = { taskId?: string; userId?: string }
+type Params = { taskId?: string; userId?: string; targetUserId?: string }
 
 type Reason = "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
 
@@ -27,7 +27,8 @@ export default function ReportScreen() {
   const MAX_DESC = 500
 
   const validate = (): { ok: boolean; message?: string } => {
-    if (!params?.taskId && !params?.userId) {
+    const targetUserId = params?.targetUserId || params?.userId
+    if (!params?.taskId && !targetUserId) {
       return { ok: false, message: "Missing context. Please report from a task or a profile." }
     }
     if (reason === "OTHER" && !text.trim()) {
@@ -51,7 +52,7 @@ export default function ReportScreen() {
       console.log("🚀 ~ submit ~ params:", params)
       const res = await OolshikApi.report({
         taskId: params?.taskId,
-        targetUserId: params?.userId,
+        targetUserId: targetUserId,
         reason,
         text: text.trim() || undefined,
       })

@@ -10,6 +10,11 @@ import ChatScreen from "@/screens/ChatScreen"
 import ProfileScreen from "@/screens/ProfileScreen"
 import EditProfileScreen from "@/screens/EditProfileScreen"
 import ReportScreen from "@/screens/ReportScreen"
+import FeedbackHubScreen from "@/screens/FeedbackHubScreen"
+import BugFeedbackScreen from "@/screens/BugFeedbackScreen"
+import FeatureFeedbackScreen from "@/screens/FeatureFeedbackScreen"
+import RatingFeedbackScreen from "@/screens/RatingFeedbackScreen"
+import SafetyFeedbackScreen from "@/screens/SafetyFeedbackScreen"
 import { useMMKVString } from "react-native-mmkv"
 import { storage } from "@/utils/storage"
 import { QrScannerScreen } from "@/screens/QrScannerScreen"
@@ -39,6 +44,11 @@ export type OolshikParamList = {
   OolshikProfile: undefined
   OolshikProfileEdit: undefined
   OolshikReport: { taskId?: string; targetUserId?: string }
+  OolshikFeedbackHub: { taskId?: string; targetUserId?: string } | undefined
+  OolshikFeedbackBug: { taskId?: string } | undefined
+  OolshikFeedbackFeature: { taskId?: string } | undefined
+  OolshikFeedbackRating: { taskId?: string } | undefined
+  OolshikFeedbackSafety: { taskId?: string } | undefined
   QrScanner: { taskId: string }
   PaymentPay: PaymentPayParams
 }
@@ -115,6 +125,11 @@ export function OolshikNavigator() {
       <Stack.Screen name="OolshikProfile" component={ProfileScreen} />
       <Stack.Screen name="OolshikProfileEdit" component={EditProfileScreen} />
       <Stack.Screen name="OolshikReport" component={ReportScreen} />
+      <Stack.Screen name="OolshikFeedbackHub" component={FeedbackHubScreen} />
+      <Stack.Screen name="OolshikFeedbackBug" component={BugFeedbackScreen} />
+      <Stack.Screen name="OolshikFeedbackFeature" component={FeatureFeedbackScreen} />
+      <Stack.Screen name="OolshikFeedbackRating" component={RatingFeedbackScreen} />
+      <Stack.Screen name="OolshikFeedbackSafety" component={SafetyFeedbackScreen} />
       <Stack.Screen name="QrScanner" component={QrScannerScreen} />
       <Stack.Screen name="PaymentPay" component={PaymentPayScreen} />
     </Stack.Navigator>
