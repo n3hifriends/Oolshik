@@ -15,6 +15,11 @@ import { RatingBadge } from "@/components/RatingBadge"
 import { Task } from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
 import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
+import {
+  submitFeedback,
+  hasSubmittedFeedback,
+  markSubmittedFeedback,
+} from "@/features/feedback/storage/feedbackQueue"
 
 type RouteParams = { id: string }
 type RecoveryAction = "cancel" | "release" | "reject"
@@ -106,6 +111,10 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [recoveryNotice, setRecoveryNotice] = React.useState<string | null>(null)
   const [authDecision, setAuthDecision] = React.useState<"approved" | "rejected" | null>(null)
   const authExpiredRef = useRef(false)
+  const [csatRating, setCsatRating] = useState(4)
+  const [csatTag, setCsatTag] = useState<string | null>(null)
+  const [csatSubmitting, setCsatSubmitting] = useState(false)
+  const [csatSubmitted, setCsatSubmitted] = useState(false)
 
   const [fullPhone, setFullPhone] = React.useState<string | null>(null)
   const [isRevealed, setIsRevealed] = React.useState(false)
@@ -175,6 +184,15 @@ export default function TaskDetailScreen({ navigation }: any) {
       setAuthDecision(null)
     }
   }, [rawStatus])
+
+  useEffect(() => {
+    if (!current?.id) {
+      setCsatSubmitted(false)
+      return
+    }
+    const key = `task:${current.id}:csat`
+    setCsatSubmitted(hasSubmittedFeedback(key))
+  }, [current?.id])
 
   // ensure we have the task (e.g., deep link / app resume)
   React.useEffect(() => {
@@ -540,6 +558,30 @@ export default function TaskDetailScreen({ navigation }: any) {
     } finally {
       setRatingSubmitting(false)
     }
+  }
+
+  const onSubmitCsat = async () => {
+    if (!current?.id || csatSubmitting || csatSubmitted) return
+    setCsatSubmitting(true)
+    const key = `task:${current.id}:csat`
+    const cleanRating = Math.max(1, Math.min(5, Math.round(csatRating)))
+    const res = await submitFeedback({
+      feedbackType: "CSAT",
+      contextType: "TASK",
+      contextId: String(current.id),
+      rating: cleanRating,
+      tags: csatTag ? [csatTag] : undefined,
+    })
+    setCsatSubmitting(false)
+
+    if (res.ok || res.queued) {
+      markSubmittedFeedback(key)
+      setCsatSubmitted(true)
+      setRecoveryNotice("Thanks for the feedback.")
+      return
+    }
+
+    Alert.alert("Feedback failed", "Please try again.")
   }
 
   const ratingBadgeValue = normalizedStatus === "COMPLETED" ? otherPartyRating : oppositeAvgRating
@@ -1165,6 +1207,93 @@ export default function TaskDetailScreen({ navigation }: any) {
                   } rated you: ${otherPartyRating.toFixed(1)} / 5.0`}
                   size="xs"
                 />
+              )}
+            </View>
+          ) : null}
+          {normalizedStatus === "COMPLETED" && current?.id ? (
+            <View
+              style={{
+                gap: spacing.sm,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.palette.neutral300,
+                backgroundColor: colors.palette.neutral100,
+                marginHorizontal: 16,
+                paddingBottom: 16,
+                paddingTop: 12,
+              }}
+            >
+              <Text text="How was the overall experience?" preset="subheading" />
+              {csatSubmitted ? (
+                <Text text="Thanks for the feedback." size="xs" style={{ color: neutral600 }} />
+              ) : (
+                <>
+                  <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                    {[1, 2, 3, 4, 5].map((val) => {
+                      const active = Math.round(csatRating) === val
+                      return (
+                        <Pressable
+                          key={`csat-${val}`}
+                          onPress={() => setCsatRating(val)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Rate ${val}`}
+                          style={({ pressed }) => ({
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderWidth: 1,
+                            borderColor: active ? primary : colors.palette.neutral300,
+                            backgroundColor: active ? colors.palette.primary100 : "transparent",
+                            opacity: pressed ? 0.7 : 1,
+                          })}
+                        >
+                          <Text text={String(val)} weight="medium" />
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+                  <View style={{ gap: spacing.xs }}>
+                    <Text text="Quick tag (optional)" size="xs" style={{ color: neutral600 }} />
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                      {[
+                        "Smooth",
+                        "Helpful",
+                        "Clear communication",
+                        "Could improve",
+                      ].map((tag) => {
+                        const active = csatTag === tag
+                        return (
+                          <Pressable
+                            key={tag}
+                            onPress={() => setCsatTag(active ? null : tag)}
+                            style={({ pressed }) => ({
+                              paddingHorizontal: spacing.sm,
+                              paddingVertical: spacing.xxxs,
+                              borderRadius: 999,
+                              borderWidth: 1,
+                              borderColor: active ? primary : colors.palette.neutral300,
+                              backgroundColor: active ? colors.palette.primary100 : "transparent",
+                              opacity: pressed ? 0.7 : 1,
+                            })}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Tag ${tag}`}
+                          >
+                            <Text text={tag} size="xs" style={{ color: active ? primary : neutral700 }} />
+                          </Pressable>
+                        )
+                      })}
+                    </View>
+                  </View>
+                  <Button
+                    text={csatSubmitting ? "..." : "Send feedback"}
+                    onPress={onSubmitCsat}
+                    disabled={csatSubmitting}
+                    style={{ paddingVertical: spacing.xs }}
+                  />
+                </>
               )}
             </View>
           ) : null}

@@ -46,6 +46,7 @@ import { customFontsToLoad } from "./theme/typography"
 import { loadDateFnsLocale } from "./utils/formatDate"
 import * as storage from "./utils/storage"
 import { getProfileExtras } from "./features/profile/storage/profileExtrasStore"
+import { useFeedbackQueue } from "./features/feedback/storage/feedbackQueue"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -76,6 +77,7 @@ const config = {
  * @returns {JSX.Element} The rendered `App` component.
  */
 export function App() {
+  useFeedbackQueue()
   const {
     initialNavigationState,
     onNavigationStateChange,

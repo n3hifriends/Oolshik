@@ -367,6 +367,24 @@ export type ReportPayload = {
   text?: string
 }
 
+export type FeedbackPayload = {
+  feedbackType: "BUG" | "FEATURE" | "CSAT" | "SAFETY" | "OTHER"
+  contextType: "APP" | "TASK" | "SCREEN"
+  contextId?: string
+  rating?: number
+  tags?: string[]
+  message?: string
+  locale?: string
+  appVersion?: string
+  os?: string
+  deviceModel?: string
+}
+
+export type FeedbackCreateResponse = {
+  id: string
+  createdAt?: string
+}
+
 export type UserStats = {
   avgRating?: number | null
   completedHelps?: number | null
@@ -463,6 +481,12 @@ export const OolshikApi = {
 
   // Reports
   report: (payload: ReportPayload) => api.post("/reports", payload),
+
+  // Feedback
+  createFeedback: (payload: FeedbackPayload, idempotencyKey: string) =>
+    api.post<FeedbackCreateResponse>("/feedback", payload, {
+      headers: { "Idempotency-Key": idempotencyKey },
+    }),
 
   // Device token (push)
   registerDevice: (token: string, platform?: string) =>

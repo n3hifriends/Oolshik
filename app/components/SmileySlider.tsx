@@ -21,7 +21,8 @@ export type SmileySliderProps = {
 }
 
 export function SmileySlider({ disabled, value, onChange, onSlidingComplete }: SmileySliderProps) {
-  const face = useMemo(() => getFace(value), [value])
+  const safeValue = Number.isFinite(value) ? value : 4
+  const face = useMemo(() => getFace(safeValue), [safeValue])
 
   return (
     <View style={styles.wrapper}>
@@ -35,7 +36,7 @@ export function SmileySlider({ disabled, value, onChange, onSlidingComplete }: S
         <View style={{ flex: 1 }}>
           <Slider
             disabled={disabled}
-            value={value}
+            value={safeValue}
             onValueChange={onChange}
             onSlidingComplete={onSlidingComplete}
             minimumValue={0}
