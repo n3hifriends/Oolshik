@@ -9,6 +9,7 @@ import type { FeedbackCreateInput, FeedbackPayload } from "@/features/feedback/t
 
 const FEEDBACK_QUEUE_KEY = "feedback.queue.v1"
 const FEEDBACK_SUBMITTED_PREFIX = "feedback.submitted.v1."
+const FEEDBACK_SUBMITTED_DATA_PREFIX = "feedback.submitted.data.v1."
 
 const BASE_BACKOFF_MS = 5000
 const MAX_BACKOFF_MS = 5 * 60 * 1000
@@ -20,6 +21,13 @@ export type FeedbackQueueItem = {
   attemptCount: number
   nextAttemptAt: number
   createdAt: number
+}
+
+export type SubmittedFeedbackSnapshot = {
+  rating?: number
+  tags?: string[]
+  message?: string
+  submittedAt: string
 }
 
 type SubmitResult = { ok: boolean; queued?: boolean; id?: string; error?: string }
@@ -188,6 +196,14 @@ export function hasSubmittedFeedback(key: string) {
 
 export function markSubmittedFeedback(key: string) {
   saveString(`${FEEDBACK_SUBMITTED_PREFIX}${key}`, "1")
+}
+
+export function saveSubmittedFeedbackSnapshot(key: string, snapshot: SubmittedFeedbackSnapshot) {
+  save(`${FEEDBACK_SUBMITTED_DATA_PREFIX}${key}`, snapshot)
+}
+
+export function getSubmittedFeedbackSnapshot(key: string): SubmittedFeedbackSnapshot | null {
+  return load<SubmittedFeedbackSnapshot>(`${FEEDBACK_SUBMITTED_DATA_PREFIX}${key}`)
 }
 
 export function useFeedbackQueue() {

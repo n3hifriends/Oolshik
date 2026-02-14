@@ -9,6 +9,7 @@ import {
   View,
   ViewStyle,
 } from "react-native"
+import * as Application from "expo-application"
 import type {
   OolshikStackScreenProps,
   PaymentScanPayload,
@@ -17,16 +18,19 @@ import type {
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import * as Location from "expo-location"
-import { OolshikApi } from "@/api/client"
+import { OolshikApi, PaymentPayerRole } from "@/api/client"
 import { useFocusEffect, useRoute } from "@react-navigation/native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTaskStore } from "@/store/taskStore"
+import { loadString, saveString } from "@/utils/storage"
+import { useAuth } from "@/context/AuthContext"
+import { parseUpiQr } from "@/utils/upiQr"
 
 interface QrScannerScreenProps extends OolshikStackScreenProps<"QrScanner"> {}
-type Params = { taskId?: string }
+type Params = { taskId?: string; amount?: number | null }
 
 const DEFAULT_PAYMENT_GUIDELINES = [
   "Transfers are only accepted from the registered bank account.",
@@ -44,6 +48,56 @@ const DEMO_TASK_CONTEXT: PaymentTaskContext = {
   createdByName: "Netra Patil",
   createdByPhoneNumber: "+91 98765 43210",
 }
+const QR_DEVICE_ID_KEY = "payment.qr.device-id.v1"
+
+function normalizeIdentifier(value: string | null | undefined): string | null {
+  if (!value) return null
+  const normalized = value.trim()
+  if (!normalized) return null
+  const lowered = normalized.toLowerCase()
+  if (
+    lowered === "unknown" ||
+    lowered === "null" ||
+    lowered === "undefined" ||
+    lowered === "9774d56d682e549c"
+  ) {
+    return null
+  }
+  return normalized
+}
+
+function fallbackInstallationId() {
+  return `${Platform.OS}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function buildAppVersionLabel() {
+  const appId = normalizeIdentifier(Application.applicationId) ?? "oolshik"
+  const version = normalizeIdentifier(Application.nativeApplicationVersion) ?? "unknown"
+  const build = normalizeIdentifier(Application.nativeBuildVersion)
+  return build ? `${appId}/${version} (${build})` : `${appId}/${version}`
+}
+
+async function resolveStableDeviceId(): Promise<string> {
+  const cached = normalizeIdentifier(loadString(QR_DEVICE_ID_KEY))
+  if (cached) return cached
+
+  let nativeId: string | null = null
+  if (Platform.OS === "android") {
+    nativeId = normalizeIdentifier((Application as any).androidId)
+  } else if (Platform.OS === "ios") {
+    try {
+      nativeId = normalizeIdentifier(await Application.getIosIdForVendorAsync())
+    } catch {
+      nativeId = null
+    }
+  }
+
+  const resolved = nativeId
+    ? `${Platform.OS}:native:${nativeId}`
+    : `${Platform.OS}:install:${fallbackInstallationId()}`
+  saveString(QR_DEVICE_ID_KEY, resolved)
+  return resolved
+}
 
 export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const { params } = useRoute<any>() as { params: Params }
@@ -55,10 +109,20 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const handledRef = useRef(false)
   const demoTriggeredRef = useRef(false)
   const { theme } = useAppTheme()
+  const { userId } = useAuth()
   const insets = useSafeAreaInsets()
   const styles = useMemo(() => createStyles(theme), [theme])
   const tasks = useTaskStore((state) => state.tasks)
   const [cameraActive, setCameraActive] = useState(false)
+  const appVersion = useMemo(() => buildAppVersionLabel(), [])
+  const deviceIdRef = useRef<string | null>(null)
+
+  const getDeviceId = useCallback(async () => {
+    if (deviceIdRef.current) return deviceIdRef.current
+    const resolved = await resolveStableDeviceId()
+    deviceIdRef.current = resolved
+    return resolved
+  }, [])
 
   useEffect(() => {
     if (permission?.granted) {
@@ -69,59 +133,6 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
       setErrorMessage("Camera access is blocked. Enable it in Settings to continue.")
     }
   }, [permission])
-
-  function parseUpiUri(uri: string) {
-    const qIndex = uri.indexOf("?")
-    if (qIndex < 0) {
-      return { format: "unknown" as const, raw: uri }
-    }
-
-    const query = uri.slice(qIndex + 1)
-    const params: Record<string, string> = Object.create(null)
-
-    const decode = (value: string) => {
-      if (value.length === 0) return ""
-      if (value.indexOf("+") !== -1) {
-        value = value.split("+").join(" ")
-      }
-      try {
-        return decodeURIComponent(value)
-      } catch {
-        return value
-      }
-    }
-
-    let start = 0
-    for (let i = 0; i <= query.length; i++) {
-      if (i === query.length || query.charCodeAt(i) === 38 /* & */) {
-        if (i > start) {
-          const segment = query.slice(start, i)
-          const eqIdx = segment.indexOf("=")
-          const key = eqIdx === -1 ? segment : segment.slice(0, eqIdx)
-          const rawValue = eqIdx === -1 ? "" : segment.slice(eqIdx + 1)
-          params[decode(key)] = decode(rawValue)
-        }
-        start = i + 1
-      }
-    }
-
-    const payeeVpa = params.pa?.trim()
-    const payeeName = params.pn?.trim()
-    const currency = params.cu?.trim()
-    const note = params.tn?.trim()
-    const amountRaw = params.am?.trim()
-    const amountNumber = amountRaw && amountRaw.length > 0 ? Number(amountRaw) : Number.NaN
-
-    return {
-      format: "upi-uri" as const,
-      raw: uri,
-      payeeVpa: payeeVpa && payeeVpa.length > 0 ? payeeVpa : null,
-      payeeName: payeeName && payeeName.length > 0 ? payeeName : null,
-      amount: Number.isFinite(amountNumber) ? amountNumber : null,
-      currency: currency && currency.length > 0 ? currency : "INR",
-      note: note && note.length > 0 ? note : null,
-    }
-  }
 
   useFocusEffect(
     useCallback(() => {
@@ -134,11 +145,11 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
     }, []),
   )
 
-  function whoWillPayConfirmation(payerLabel: string) {
-    const label = payerLabel?.trim().length ? payerLabel.trim() : "Neta"
-    return new Promise<"You" | "Neta" | "Cancel">((resolve) => {
+  function whoWillPayConfirmation(otherPayerLabel: string) {
+    const label = otherPayerLabel?.trim().length ? otherPayerLabel.trim() : "Requester"
+    return new Promise<"SELF" | "OTHER" | "CANCEL">((resolve) => {
       let resolved = false
-      const safeResolve = (value: "You" | "Neta" | "Cancel") => {
+      const safeResolve = (value: "SELF" | "OTHER" | "CANCEL") => {
         if (resolved) return
         resolved = true
         resolve(value)
@@ -148,11 +159,11 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         "Transaction fee",
         "Who will pay the transaction fee?",
         [
-          { text: "You", onPress: () => safeResolve("You") },
-          { text: label, onPress: () => safeResolve("Neta") },
-          { text: "Cancel", style: "cancel", onPress: () => safeResolve("Cancel") },
+          { text: "Me", onPress: () => safeResolve("SELF") },
+          { text: label, onPress: () => safeResolve("OTHER") },
+          { text: "Cancel", style: "cancel", onPress: () => safeResolve("CANCEL") },
         ],
-        { cancelable: true, onDismiss: () => safeResolve("Cancel") },
+        { cancelable: true, onDismiss: () => safeResolve("CANCEL") },
       )
     })
   }
@@ -167,9 +178,15 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
 
       let hadError = false
       try {
-        const parsed = data.startsWith("upi://")
-          ? parseUpiUri(data)
-          : { format: "unknown" as const, raw: data }
+        const parsed = parseUpiQr(data)
+        const routeAmount =
+          typeof params?.amount === "number" && Number.isFinite(params.amount) && params.amount > 0
+            ? Number(params.amount.toFixed(2))
+            : null
+        const resolvedAmount =
+          typeof parsed.amount === "number" && Number.isFinite(parsed.amount)
+            ? parsed.amount
+            : routeAmount
         let coords: { latitude: number; longitude: number } | undefined
         try {
           const locPerm = await Location.requestForegroundPermissionsAsync()
@@ -189,11 +206,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         const scanPayload: PaymentScanPayload = {
           rawPayload: data,
           format: parsed.format,
-          payeeVpa: (parsed as any).payeeVpa ?? null,
-          payeeName: (parsed as any).payeeName ?? null,
-          amount: typeof (parsed as any).amount === "number" ? (parsed as any).amount : null,
-          currency: (parsed as any).currency ?? null,
-          note: (parsed as any).note ?? null,
+          payeeVpa: parsed.payeeVpa ?? null,
+          payeeName: parsed.payeeName ?? null,
+          txnRef: parsed.txnRef ?? null,
+          mcc: parsed.mcc ?? null,
+          merchantId: parsed.merchantId ?? null,
+          amount: resolvedAmount,
+          currency: parsed.currency ?? null,
+          note: parsed.note ?? null,
           scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : null,
           scannedAt: new Date().toISOString(),
           guidelines: DEFAULT_PAYMENT_GUIDELINES,
@@ -212,10 +232,15 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
             ? DEMO_TASK_CONTEXT
             : undefined
 
-        const netaLabel = taskContext?.createdByName ?? task?.createdByName ?? "Neta"
-        const payerChoice = await whoWillPayConfirmation(netaLabel)
+        const scannerIsRequester =
+          !!task?.requesterId && !!userId && String(task.requesterId) === String(userId)
+        const yourRole: PaymentPayerRole = scannerIsRequester ? "REQUESTER" : "HELPER"
+        const otherRole: PaymentPayerRole = yourRole === "REQUESTER" ? "HELPER" : "REQUESTER"
+        const requesterLabel = taskContext?.createdByName ?? task?.createdByName ?? "Requester"
+        const otherPayerLabel = yourRole === "REQUESTER" ? "Helper" : requesterLabel
+        const payerChoice = await whoWillPayConfirmation(otherPayerLabel)
 
-        if (payerChoice === "Cancel") {
+        if (payerChoice === "CANCEL") {
           handledRef.current = false
           setProcessing(false)
           setStatusMessage("Align the QR code inside the frame")
@@ -223,18 +248,24 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           return
         }
 
+        const payerRole: PaymentPayerRole = payerChoice === "SELF" ? yourRole : otherRole
+
         const body = {
           taskId,
           rawPayload: data,
           format: parsed.format,
-          payeeVpa: (parsed as any).payeeVpa ?? undefined,
-          payeeName: (parsed as any).payeeName ?? undefined,
-          amount: (parsed as any).amount ?? undefined,
-          currency: (parsed as any).currency ?? undefined,
-          note: (parsed as any).note ?? undefined,
+          payeeVpa: parsed.payeeVpa ?? undefined,
+          payeeName: parsed.payeeName ?? undefined,
+          mcc: parsed.mcc ?? undefined,
+          merchantId: parsed.merchantId ?? undefined,
+          txnRef: parsed.txnRef ?? undefined,
+          amount: resolvedAmount ?? undefined,
+          currency: parsed.currency ?? undefined,
+          note: parsed.note ?? undefined,
           scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : undefined,
-          appVersion: `rn-0.73-${Platform.OS}`,
-          deviceId: "device-qr",
+          appVersion,
+          deviceId: await getDeviceId(),
+          payerRole,
         }
 
         let requestId: string | undefined
@@ -257,7 +288,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           upiIntentOverride = data.startsWith("upi://") ? data : undefined
         }
 
-        if (payerChoice === "You") {
+        if (payerChoice === "SELF") {
           setCameraActive(false)
           navigation.replace("PaymentPay", {
             taskId,
@@ -271,7 +302,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
 
         setStatusMessage("Payment request generated")
         const message = requestId
-          ? `Share this ID with Neta:\n${requestId}`
+          ? `Share this ID with ${otherPayerLabel}:\n${requestId}`
           : "Payment request captured."
         Alert.alert("Payment requested", message, [
           {
@@ -295,7 +326,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         }
       }
     },
-    [processing, params?.taskId, navigation, tasks],
+    [processing, params?.taskId, params?.amount, navigation, tasks, appVersion, getDeviceId, userId],
   )
 
   // make hardcoded demo scan on load
@@ -355,7 +386,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           facing="back"
           enableTorch={torchEnabled}
-          isActive={cameraActive}
+          active={cameraActive}
           onBarcodeScanned={(evt) => {
             if (evt?.data) onScanned({ data: evt.data })
           }}

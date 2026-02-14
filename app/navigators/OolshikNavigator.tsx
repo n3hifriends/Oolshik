@@ -49,7 +49,7 @@ export type OolshikParamList = {
   OolshikFeedbackFeature: { taskId?: string } | undefined
   OolshikFeedbackRating: { taskId?: string } | undefined
   OolshikFeedbackSafety: { taskId?: string } | undefined
-  QrScanner: { taskId: string }
+  QrScanner: { taskId: string; amount?: number | null }
   PaymentPay: PaymentPayParams
 }
 
@@ -63,6 +63,9 @@ export type PaymentScanPayload = {
   format: string
   payeeVpa?: string | null
   payeeName?: string | null
+  txnRef?: string | null
+  mcc?: string | null
+  merchantId?: string | null
   amount?: number | null
   currency?: string | null
   note?: string | null

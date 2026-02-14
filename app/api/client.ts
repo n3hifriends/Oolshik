@@ -317,7 +317,7 @@ export type ServerTask = {
   id: string
   title?: string
   description?: string
-  status: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status: "DRAFT" | "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   voiceUrl?: string | null
   latitude: number
   longitude: number
@@ -344,6 +344,9 @@ export type ServerTask = {
   ratingByHelper?: number | null
   requesterAvgRating?: number | null
   helperAvgRating?: number | null
+  offerAmount?: number | null
+  offerCurrency?: string | null
+  offerUpdatedAt?: string | null
 }
 
 export type Page<T> = {
@@ -390,6 +393,42 @@ export type UserStats = {
   completedHelps?: number | null
 }
 
+export type PaymentPayerRole = "REQUESTER" | "HELPER"
+
+export type OfferUpdateApiResponse = {
+  taskId: string
+  offerAmount?: number | null
+  offerCurrency?: string | null
+  offerUpdatedAt?: string | null
+  notificationSuppressed?: boolean
+}
+
+export type PaymentRequestApiResponse = {
+  id: string
+  taskId?: string
+  status?: string
+  upiIntent?: string
+  payerUserId?: string
+  requesterUserId?: string
+  helperUserId?: string
+  payerRole?: PaymentPayerRole
+  canPay?: boolean
+  snapshot?: {
+    taskId?: string
+    payeeVpa?: string | null
+    payeeName?: string | null
+    mcc?: string | null
+    merchantId?: string | null
+    txnRef?: string | null
+    amountRequested?: number | null
+    currency?: string | null
+    note?: string | null
+    createdAt?: string | null
+    expiresAt?: string | null
+    status?: string | null
+  }
+}
+
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
@@ -403,6 +442,8 @@ type CreateTaskPayload = {
   title: string
   latitude: number
   longitude: number
+  offerAmount?: number | null
+  offerCurrency?: string
 }
 
 const toClientTask = (t: ServerTask): Task => ({ ...t })
@@ -475,6 +516,9 @@ export const OolshikApi = {
 
   reassignTask: (taskId: string) => api.post(`/requests/${taskId}/reassign`, {}),
 
+  updateTaskOffer: (taskId: string, payload: { offerAmount?: number | null; offerCurrency?: string }) =>
+    api.patch<OfferUpdateApiResponse>(`/requests/${taskId}/offer`, payload),
+
   // Reviews
   addReview: (payload: { taskId: string; rating: number; comment?: string }) =>
     api.post("/reviews", payload),
@@ -496,6 +540,10 @@ export const OolshikApi = {
 
   // Profile stats
   getMyStats: () => api.get<UserStats>("/users/me/stats"),
+
+  // Helper location heartbeat
+  updateHelperLocation: (latitude: number, longitude: number) =>
+    api.post("/helpers/location", { latitude, longitude }),
 
   // Media: pre-signed URL
   getPresigned: (contentType: string) =>
@@ -522,9 +570,28 @@ export const OolshikApi = {
   // Expect { phoneNumber: string revealCount: number }
 
   // Payment APIs (if any) can go here
-  createPaymentRequest: (body: any) => api.post("/payments/qr-scan", body),
+  createPaymentRequest: (body: {
+    taskId: string
+    rawPayload: string
+    format: string
+    payeeVpa?: string
+    payeeName?: string
+    mcc?: string
+    merchantId?: string
+    txnRef?: string
+    amount?: number
+    currency?: string
+    note?: string
+    scanLocation?: { lat: number; lon: number }
+    appVersion?: string
+    deviceId?: string
+    payerRole?: PaymentPayerRole
+  }) => api.post<PaymentRequestApiResponse>("/payments/qr-scan", body),
 
-  getPaymentRequest: (id: string) => api.get(`/payments/${id}`),
+  getPaymentRequest: (id: string) => api.get<PaymentRequestApiResponse>(`/payments/${id}`),
+
+  getActivePaymentRequest: (taskId: string) =>
+    api.get<PaymentRequestApiResponse>(`/payments/task/${taskId}/active`),
 
   initiatePayment: (id: string) => api.post(`/payments/${id}/initiate`, {}),
 

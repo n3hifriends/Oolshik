@@ -16,6 +16,7 @@ import { FLAGS } from "@/config/flags"
 import { useTaskStore } from "@/store/taskStore"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
 import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
+import { parseOfferInput } from "@/utils/offerRules"
 
 type Radius = 1 | 2 | 5
 
@@ -32,6 +33,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [radiusKm, setRadiusKm] = useState<Radius>(1)
+  const [offerInput, setOfferInput] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [audioAccepted, setAudioAccepted] = useState(false)
   const soundRef = useRef<Audio.Sound | null>(null)
@@ -171,6 +173,13 @@ export default function CreateTaskScreen({ navigation }: any) {
       return
     }
 
+    const parsedOffer = parseOfferInput(offerInput)
+    if (!parsedOffer.ok) {
+      Alert.alert("Invalid offer", parsedOffer.error || "Please enter a valid offer amount.")
+      return
+    }
+    const offerAmount = parsedOffer.amount
+
     setSubmitting(true)
     try {
       const voiceUrl = await uploadVoiceIfNeeded()
@@ -184,6 +193,8 @@ export default function CreateTaskScreen({ navigation }: any) {
         createdById: userId,
         createdByName: userName,
         createdAt: new Date().toISOString(),
+        offerAmount,
+        offerCurrency: offerAmount == null ? undefined : "INR",
       }
 
       const res = await OolshikApi.createTask(payload)
@@ -282,6 +293,19 @@ export default function CreateTaskScreen({ navigation }: any) {
           style={{ alignSelf: "flex-end" }}
           preset="default"
           text={`${description.length}/${MAX_DESC}`}
+        />
+      </View>
+
+      {/* Offer */}
+      <View style={{ gap: 6 }}>
+        <Text text="Offer (INR)" style={{ fontWeight: "600", opacity: 0.9 }} />
+        <TextField
+          value={offerInput}
+          onChangeText={setOfferInput}
+          placeholder="Optional amount"
+          keyboardType="decimal-pad"
+          autoCapitalize="none"
+          autoCorrect={false}
         />
       </View>
 
