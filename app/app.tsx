@@ -23,6 +23,7 @@ import { useFonts } from "expo-font"
 import * as Linking from "expo-linking"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
+import i18n from "i18next"
 
 import { AuthProvider } from "./context/AuthContext" // @demo remove-current-line
 import { AlertOverrideProvider } from "./components/AlertDialog/AlertOverrideProvider"
@@ -45,8 +46,11 @@ import { ThemeProvider } from "./theme/context"
 import { customFontsToLoad } from "./theme/typography"
 import { loadDateFnsLocale } from "./utils/formatDate"
 import * as storage from "./utils/storage"
-import { getProfileExtras } from "./features/profile/storage/profileExtrasStore"
+import { getProfileExtras, updateProfileExtras } from "./features/profile/storage/profileExtrasStore"
 import { useFeedbackQueue } from "./features/feedback/storage/feedbackQueue"
+import { OolshikApi } from "./api"
+import { tokens } from "./auth/tokens"
+import { pickDeviceLocaleTag, resolvePreferredLocale, normalizeLocaleTag } from "./i18n/locale"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -91,21 +95,67 @@ export function App() {
     let mounted = true
     ;(async () => {
       const instance = await initI18n()
+      let serverPreference: string | null = null
+      let localPreference: string | null = null
       try {
         const extras = await getProfileExtras()
-        const lang = extras.language
-        if (lang) {
-          await instance.changeLanguage(lang)
+        localPreference = extras.preferredLanguage ?? extras.language ?? null
+      } catch {
+        // best-effort
+      }
+      try {
+        if (tokens.access) {
+          const me = await OolshikApi.me()
+          if (me?.ok && me.data) {
+            const profile = me.data
+            serverPreference = profile.preferredLanguage ?? profile.locale ?? profile.languages ?? null
+          }
         }
       } catch {
         // best-effort
       }
+
+      const resolvedLocale = resolvePreferredLocale({
+        serverPreference,
+        localPreference,
+        deviceLocaleTag: pickDeviceLocaleTag(),
+      })
+      await instance.changeLanguage(normalizeLocaleTag(resolvedLocale))
+
+      try {
+        if (!localPreference || normalizeLocaleTag(localPreference) !== resolvedLocale) {
+          await updateProfileExtras({
+            preferredLanguage: resolvedLocale,
+            language: resolvedLocale,
+          })
+        }
+      } catch {
+        // best-effort
+      }
+
+      try {
+        if (tokens.access && !serverPreference) {
+          await OolshikApi.updatePreferredLanguage(resolvedLocale)
+        }
+      } catch {
+        // best-effort
+      }
+      await loadDateFnsLocale()
       if (!mounted) return
       setIsI18nInitialized(true)
-      await loadDateFnsLocale()
     })()
     return () => {
       mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const onLanguageChanged = () => {
+      loadDateFnsLocale()
+    }
+    i18n.on("languageChanged", onLanguageChanged)
+    return () => {
+      i18n.off("languageChanged", onLanguageChanged)
     }
   }, [])
 

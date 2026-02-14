@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Animated, Easing, Pressable, TextInput, View } from "react-native"
+import { useTranslation } from "react-i18next"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
 import { typography } from "@/theme/typography"
@@ -22,6 +23,7 @@ export const ExpandableSearch: React.FC<Props> = ({
   onClear,
   inputRef,
 }) => {
+  const { t } = useTranslation()
   const anim = useRef(new Animated.Value(open ? 1 : 0)).current
   const [renderOpen, setRenderOpen] = useState(open)
 
@@ -67,7 +69,7 @@ export const ExpandableSearch: React.FC<Props> = ({
             setTimeout(() => inputRef.current?.focus(), 50)
           }}
           accessibilityRole="button"
-          accessibilityLabel="Open search"
+          accessibilityLabel={t("oolshik:search.open")}
           style={{
             width: 30,
             height: 30,
@@ -92,7 +94,7 @@ export const ExpandableSearch: React.FC<Props> = ({
                 ref={inputRef}
                 value={value}
                 onChangeText={onChangeText}
-                placeholder="Search title, description, name, phone, distance…"
+                placeholder={t("oolshik:search.placeholder")}
                 placeholderTextColor="#9CA3AF"
                 returnKeyType="search"
                 style={{
@@ -103,7 +105,11 @@ export const ExpandableSearch: React.FC<Props> = ({
                 }}
               />
               {value?.length ? (
-                <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel="Clear">
+                <Pressable
+                  onPress={onClear}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("oolshik:search.clear")}
+                >
                   <Text text="✕" style={{ fontSize: 16, color: "#6B7280" }} />
                 </Pressable>
               ) : null}
@@ -113,7 +119,7 @@ export const ExpandableSearch: React.FC<Props> = ({
                   setOpen(false)
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Close search"
+                accessibilityLabel={t("oolshik:search.close")}
                 style={{
                   marginLeft: 2,
                   paddingHorizontal: 8,
@@ -122,7 +128,7 @@ export const ExpandableSearch: React.FC<Props> = ({
                   backgroundColor: "#F3F4F6",
                 }}
               >
-                <Text text="Cancel" style={{ color: "#111827", fontWeight: "600" }} />
+                <Text text={t("oolshik:search.cancel")} style={{ color: "#111827", fontWeight: "600" }} />
               </Pressable>
             </View>
           </SectionCard>

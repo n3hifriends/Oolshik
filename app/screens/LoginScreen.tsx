@@ -12,6 +12,9 @@ import type { AppStackScreenProps } from "@/navigators/AppNavigator"
 import type { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { getAuth, signInWithPhoneNumber, FirebaseAuthTypes } from "@react-native-firebase/auth"
+import i18n from "i18next"
+import { normalizeLocaleTag } from "@/i18n/locale"
+import { updateProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 
 interface LoginScreenProps extends AppStackScreenProps<"Login"> {}
 
@@ -249,9 +252,23 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         // Profile complete success
         const prof = await OolshikApi.me()
         if (prof?.ok && prof.data) {
-          const profile = prof.data as { id?: string | number; displayName?: string }
+          const profile = prof.data as {
+            id?: string | number
+            displayName?: string
+            preferredLanguage?: string
+            locale?: string
+            languages?: string
+          }
           setUserName(profile.displayName ?? (displayName || "You"))
           if (profile.id != null) setUserId(String(profile.id))
+          const preferredLanguage = normalizeLocaleTag(
+            profile.preferredLanguage ?? profile.locale ?? profile.languages,
+          )
+          await i18n.changeLanguage(preferredLanguage)
+          await updateProfileExtras({
+            preferredLanguage,
+            language: preferredLanguage,
+          })
         } else {
           setUserName(displayName || "You")
         }

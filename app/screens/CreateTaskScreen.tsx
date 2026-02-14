@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react"
 import { View, Alert, ActivityIndicator, Linking } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
+import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -30,6 +31,7 @@ const normalizeRadius = (value?: number | null): Radius => {
 }
 
 export default function CreateTaskScreen({ navigation }: any) {
+  const { t } = useTranslation()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [radiusKm, setRadiusKm] = useState<Radius>(1)
@@ -164,18 +166,24 @@ export default function CreateTaskScreen({ navigation }: any) {
   const handleSubmitTask = async () => {
     if (status !== "ready" || !coords) {
       refresh()
-      Alert.alert("Location not ready", "Please enable location to post your request.")
+      Alert.alert(
+        t("task:create.alerts.locationNotReadyTitle"),
+        t("task:create.alerts.locationNotReadyBody"),
+      )
       return
     }
     const trimmedTitle = title.trim()
     if (!trimmedTitle) {
-      Alert.alert("Missing title", "Please enter a title for your request.")
+      Alert.alert(t("task:create.alerts.missingTitleTitle"), t("task:create.alerts.missingTitleBody"))
       return
     }
 
     const parsedOffer = parseOfferInput(offerInput)
     if (!parsedOffer.ok) {
-      Alert.alert("Invalid offer", parsedOffer.error || "Please enter a valid offer amount.")
+      Alert.alert(
+        t("task:create.alerts.invalidOfferTitle"),
+        parsedOffer.error || t("task:create.alerts.invalidOfferBody"),
+      )
       return
     }
     const offerAmount = parsedOffer.amount
@@ -213,11 +221,11 @@ export default function CreateTaskScreen({ navigation }: any) {
         await fetchNearby(coords.latitude, coords.longitude)
       } catch {}
 
-      Alert.alert("Posted", "Your request has been created successfully.", [
-        { text: "OK", onPress: () => navigation.goBack() },
+      Alert.alert(t("task:create.alerts.postedTitle"), t("task:create.alerts.postedBody"), [
+        { text: t("common:ok"), onPress: () => navigation.goBack() },
       ])
     } catch (e: any) {
-      Alert.alert("Create failed", e?.message ?? "Unexpected error occurred.")
+      Alert.alert(t("task:create.alerts.createFailedTitle"), e?.message ?? t("task:create.alerts.createFailedBody"))
     } finally {
       setSubmitting(false)
     }
@@ -227,7 +235,10 @@ export default function CreateTaskScreen({ navigation }: any) {
     try {
       await start()
     } catch (e: any) {
-      Alert.alert("Recorder error", e?.message ?? "Microphone not available")
+      Alert.alert(
+        t("task:create.alerts.recorderErrorTitle"),
+        e?.message ?? t("task:create.alerts.recorderErrorBody"),
+      )
     }
   }
 
@@ -237,26 +248,26 @@ export default function CreateTaskScreen({ navigation }: any) {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: 16, gap: 12 }}
     >
-      <Text preset="heading" text="Create Task" />
+      <Text preset="heading" text={t("task:create.heading")} />
 
       {status !== "ready" && (
         <View style={{ gap: 10 }}>
           {status === "loading" || status === "idle" ? (
             <View style={{ alignItems: "center", gap: 8 }}>
               <ActivityIndicator />
-              <Text text="Getting your location…" />
+              <Text text={t("task:create.gettingLocation")} />
             </View>
           ) : status === "denied" ? (
             <>
-              <Text preset="heading" text="Location permission denied" />
-              <Text text="Enable location to post your request." />
-              <Button text="Open Settings" onPress={() => Linking.openSettings()} />
+              <Text preset="heading" text={t("task:create.locationDeniedTitle")} />
+              <Text text={t("task:create.locationDeniedBody")} />
+              <Button text={t("task:create.openSettings")} onPress={() => Linking.openSettings()} />
             </>
           ) : (
             <>
-              <Text preset="heading" text="Could not access location" />
-              <Text text={locationError ?? "Please try again."} />
-              <Button text="Retry" onPress={refresh} />
+              <Text preset="heading" text={t("task:create.locationErrorTitle")} />
+              <Text text={locationError ?? t("errors:fallback")} />
+              <Button text={t("task:create.retry")} onPress={refresh} />
             </>
           )}
         </View>
@@ -264,11 +275,11 @@ export default function CreateTaskScreen({ navigation }: any) {
 
       {/* Title */}
       <View style={{ gap: 6 }}>
-        <Text text="Title" style={{ fontWeight: "600", opacity: 0.9 }} />
+        <Text text={t("task:create.titleLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
         <TextField
           value={title}
           onChangeText={setTitle}
-          placeholder="Give a short title"
+          placeholder={t("task:create.titlePlaceholder")}
           maxLength={80}
           autoCapitalize="sentences"
           autoCorrect
@@ -278,11 +289,11 @@ export default function CreateTaskScreen({ navigation }: any) {
 
       {/* Description */}
       <View style={{ gap: 6 }}>
-        <Text text="Description" style={{ fontWeight: "600", opacity: 0.9 }} />
+        <Text text={t("task:create.descriptionLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
         <TextField
           value={description}
           onChangeText={(t) => setDescription(t.slice(0, MAX_DESC))}
-          placeholder="Describe what you need (optional)"
+          placeholder={t("task:create.descriptionPlaceholder")}
           multiline
           numberOfLines={5}
           style={{ minHeight: 120, textAlignVertical: "top" }}
@@ -298,11 +309,11 @@ export default function CreateTaskScreen({ navigation }: any) {
 
       {/* Offer */}
       <View style={{ gap: 6 }}>
-        <Text text="Offer (INR)" style={{ fontWeight: "600", opacity: 0.9 }} />
+        <Text text={t("task:create.offerLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
         <TextField
           value={offerInput}
           onChangeText={setOfferInput}
-          placeholder="Optional amount"
+          placeholder={t("task:create.offerPlaceholder")}
           keyboardType="decimal-pad"
           autoCapitalize="none"
           autoCorrect={false}
@@ -312,7 +323,7 @@ export default function CreateTaskScreen({ navigation }: any) {
       {/* Radius */}
       <View style={{ gap: 6 }}>
         <Text
-          text="Show my request to helpers within:"
+          text={t("task:create.radiusLabel")}
           style={{ fontWeight: "600", opacity: 0.9 }}
         />
         <RadioGroup
@@ -329,12 +340,12 @@ export default function CreateTaskScreen({ navigation }: any) {
       </View>
       {/* Recorder */}
       <View style={{ flexDirection: "column", gap: 10, marginTop: 12, marginBottom: 24 }}>
-        <Text text="Record Voice Note (30s max):" style={{ fontWeight: "600", opacity: 0.9 }} />
-        {!recording && !uri && <Button text="Record ≤30s" onPress={onStartPress} />}
+        <Text text={t("task:create.recordLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
+        {!recording && !uri && <Button text={t("task:create.recordCta")} onPress={onStartPress} />}
         {recording && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <ActivityIndicator />
-            <Button text={`Stop (${durationSec}s)`} onPress={stop} />
+            <Button text={t("task:create.stopCta", { seconds: durationSec })} onPress={stop} />
           </View>
         )}
         {!recording && uri && (
@@ -348,28 +359,28 @@ export default function CreateTaskScreen({ navigation }: any) {
               gap: 10,
             }}
           >
-            <Text preset="subheading" text="Preview your recording" />
+            <Text preset="subheading" text={t("task:create.previewHeading")} />
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Button text={isPlaying ? "Pause" : "Play"} onPress={togglePlay} />
+              <Button text={isPlaying ? t("task:create.pause") : t("task:create.play")} onPress={togglePlay} />
               <Text
                 text={`${playbackSecs}s / ${Math.max(durationSec, Math.ceil(playbackSecs))}s`}
               />
             </View>
             <View style={{ flexDirection: "row", gap: 8 }}>
               {!audioAccepted && (
-                <Button text="Use this audio" onPress={() => setAudioAccepted(true)} />
+                <Button text={t("task:create.useAudio")} onPress={() => setAudioAccepted(true)} />
               )}
               {audioAccepted && (
                 <Text
-                  text="Audio selected"
+                  text={t("task:create.audioSelected")}
                   style={{ color: "#16a34a", fontWeight: "600", paddingVertical: 10 }}
                 />
               )}
-              <Button text="Discard & Re-record" onPress={discardRecording} />
+              <Button text={t("task:create.discardAudio")} onPress={discardRecording} />
             </View>
             {!audioAccepted && (
               <Text
-                text={'(Audio will not be attached unless you tap "Use this audio")'}
+                text={t("task:create.audioHint")}
                 style={{ opacity: 0.7 }}
               />
             )}
@@ -379,7 +390,7 @@ export default function CreateTaskScreen({ navigation }: any) {
 
       {/* Submit */}
       <Button
-        text={submitting ? "Posting..." : "Post"}
+        text={submitting ? t("task:create.posting") : t("task:create.post")}
         onPress={handleSubmitTask}
         // disabled={submitting || !coords}
       />

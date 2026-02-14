@@ -1,5 +1,6 @@
 import React from "react"
 import { View, Pressable, ActivityIndicator } from "react-native"
+import { useTranslation } from "react-i18next"
 import { Card } from "@/components/Card"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -28,18 +29,18 @@ function getInitials(name?: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
-function minsAgo(iso?: string) {
+function minsAgo(iso: string | undefined, t: (key: string, options?: any) => string) {
   if (!iso) return ""
   const date = new Date(iso)
   const diffMs = Date.now() - date.getTime()
   const mins = Math.max(0, Math.round(diffMs / 60000))
 
-  if (mins < 1) return "just now"
-  if (mins === 1) return "1 min ago"
-  if (mins < 60) return `${mins} mins ago`
+  if (mins < 1) return t("oolshik:relativeTime.justNow")
+  if (mins === 1) return t("oolshik:relativeTime.oneMinAgo")
+  if (mins < 60) return t("oolshik:relativeTime.minsAgo", { count: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs === 1) return "1 hr ago"
-  if (hrs < 24) return `${hrs} hrs ago`
+  if (hrs === 1) return t("oolshik:relativeTime.oneHrAgo")
+  if (hrs < 24) return t("oolshik:relativeTime.hrsAgo", { count: hrs })
 
   // For older than a day, show readable date
   return date.toLocaleString(undefined, {
@@ -53,7 +54,7 @@ function minsAgo(iso?: string) {
 
 export function TaskCard({
   id,
-  title = "Voice task",
+  title,
   distanceMtr,
   onAccept,
   status = "PENDING",
@@ -65,6 +66,7 @@ export function TaskCard({
   onTitleRefresh,
   titleRefreshDisabled = false,
 }: Props) {
+  const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
@@ -81,11 +83,11 @@ export function TaskCard({
   const neutral700 = colors.palette.neutral700
 
   const statusMap = {
-    PENDING: { label: "Pending", bg: colors.palette.primary200, fg: neutral700 },
-    PENDING_AUTH: { label: "Awaiting approval", bg: colors.palette.primary100, fg: neutral700 },
-    ASSIGNED: { label: "Assigned", bg: colors.palette.warningSoft400, fg: neutral700 },
-    COMPLETED: { label: "Completed", bg: colors.palette.successSoft400, fg: neutral700 },
-    CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
+    PENDING: { label: t("oolshik:status.pending"), bg: colors.palette.primary200, fg: neutral700 },
+    PENDING_AUTH: { label: t("oolshik:status.pendingAuth"), bg: colors.palette.primary100, fg: neutral700 },
+    ASSIGNED: { label: t("oolshik:status.assigned"), bg: colors.palette.warningSoft400, fg: neutral700 },
+    COMPLETED: { label: t("oolshik:status.completed"), bg: colors.palette.successSoft400, fg: neutral700 },
+    CANCELLED: { label: t("oolshik:status.cancelled"), bg: colors.palette.neutral200, fg: neutral700 },
   } as const
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
@@ -95,7 +97,7 @@ export function TaskCard({
   const FooterComponent = canAccept ? (
     <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
       <Button
-        text="Accept"
+        text={t("oolshik:taskCard.accept")}
         onPress={onAccept}
         style={{
           paddingHorizontal: spacing.lg,
@@ -124,22 +126,26 @@ export function TaskCard({
           alignItems: "center",
           justifyContent: "center",
         }}
-        accessibilityLabel={createdByName ? `${createdByName} avatar` : "User avatar"}
+        accessibilityLabel={
+          createdByName
+            ? t("oolshik:taskCard.avatarA11y", { name: createdByName })
+            : t("oolshik:taskCard.userAvatarA11y")
+        }
       >
         <Text text={getInitials(createdByName)} size="xs" weight="bold" />
       </View>
 
       <View style={{ flex: 1 }}>
         {/* Poster name */}
-        <Text text={createdByName ?? "Someone nearby"} weight="medium" />
+        <Text text={createdByName ?? t("oolshik:taskCard.someoneNearby")} weight="medium" />
         {/* When posted */}
-        <Text text={minsAgo(createdAt)} size="xs" />
+        <Text text={minsAgo(createdAt, t)} size="xs" />
       </View>
       {voiceUrl ? <VoicePlayButton uri={voiceUrl} playKey={id} /> : undefined}
       {canAccept ? (
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Button
-            text="Accept"
+            text={t("oolshik:taskCard.accept")}
             onPress={onAccept}
             style={{
               paddingHorizontal: spacing.lg,
@@ -183,13 +189,13 @@ export function TaskCard({
             onPress={onTitleRefresh}
             disabled={titleRefreshDisabled}
             accessibilityRole="button"
-            accessibilityLabel="Refresh title"
+            accessibilityLabel={t("oolshik:taskCard.refreshTitleA11y")}
             accessibilityState={{ disabled: titleRefreshDisabled }}
           >
-            <Text text="Refresh" style={{ color: primary }} />
+            <Text text={t("oolshik:taskCard.refreshTitle")} style={{ color: primary }} />
           </Pressable>
         ) : (
-          <Text text={title} weight="bold" style={{ color: neutral700, flex: 1 }} />
+          <Text text={title || t("oolshik:taskCard.voiceTask")} weight="bold" style={{ color: neutral700, flex: 1 }} />
         )}
       </View>
 
@@ -202,7 +208,7 @@ export function TaskCard({
           gap: spacing.sm,
         }}
       >
-        {<Text text={distance} size="xs" style={{ color: neutral700 }} />}
+        {<Text text={t("oolshik:taskCard.distanceAway", { distance })} size="xs" style={{ color: neutral700 }} />}
 
         <View
           style={{
@@ -239,6 +245,7 @@ const VoicePlayButton = React.memo(function VoicePlayButton({
   playKey: string
 }) {
   const { theme } = useAppTheme()
+  const { t } = useTranslation()
   const { spacing, colors } = theme
   const primary = colors.palette.primary500
   const { status: playbackStatus, toggle } = useAudioPlaybackForUri(uri, playKey)
@@ -259,7 +266,13 @@ const VoicePlayButton = React.memo(function VoicePlayButton({
         opacity: audioLoading ? 0.7 : 1,
       }}
       accessibilityRole="button"
-      accessibilityLabel={audioLoading ? "Loading voice" : playing ? "Stop voice" : "Play voice"}
+      accessibilityLabel={
+        audioLoading
+          ? t("oolshik:taskCard.loadingVoice")
+          : playing
+            ? t("oolshik:taskCard.stopVoice")
+            : t("oolshik:taskCard.playVoice")
+      }
       accessibilityState={{ disabled: audioLoading }}
     >
       {audioLoading ? (

@@ -10,6 +10,7 @@ import {
   Linking,
 } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
+import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TaskCard } from "@/components/TaskCard"
@@ -69,6 +70,7 @@ function getInitials(name?: string, fallback?: string) {
 }
 
 export default function HomeFeedScreen({ navigation }: any) {
+  const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { colors: themeColors, spacing, isDark } = theme
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
@@ -254,12 +256,12 @@ export default function HomeFeedScreen({ navigation }: any) {
   const onAcceptPress = async (taskId: string) => {
     if (!coords) {
       refresh()
-      alert("Location not available")
+      Alert.alert(t("oolshik:homeScreen.locationNotAvailableTitle"))
       return
     }
     const res = await accept(taskId, coords.latitude, coords.longitude)
     if (res != "OK") {
-      alert("Failed to accept")
+      Alert.alert(t("oolshik:homeScreen.failedToAccept"))
       return
     }
 
@@ -303,7 +305,10 @@ export default function HomeFeedScreen({ navigation }: any) {
       if (loading) return
       if (status !== "ready" || !coords) {
         refresh()
-        Alert.alert("Location not available", "Enable location and try again.")
+        Alert.alert(
+          t("oolshik:homeScreen.locationNotAvailableTitle"),
+          t("oolshik:homeScreen.locationNotAvailableBody"),
+        )
         return
       }
       if (isTitleRefreshCooling(taskId)) return
@@ -385,17 +390,17 @@ export default function HomeFeedScreen({ navigation }: any) {
       const title = text.trim()
       const isVoice = mode === "voice"
       if (!title) {
-        throw new Error("Please enter a title.")
+        throw new Error(t("oolshik:homeScreen.enterTitle"))
       }
       if (!coords) {
         refresh()
-        throw new Error("Location not available. Please enable location and try again.")
+        throw new Error(t("oolshik:homeScreen.locationRequired"))
       }
       if (isVoice && !voiceNote) {
-        throw new Error("Recording not found. Please record again.")
+        throw new Error(t("oolshik:homeScreen.recordingMissing"))
       }
       if (creatingTask) {
-        throw new Error("Already submitting, please wait.")
+        throw new Error(t("oolshik:homeScreen.alreadySubmitting"))
       }
 
       const uploadVoiceIfNeeded = async () => {
@@ -407,7 +412,7 @@ export default function HomeFeedScreen({ navigation }: any) {
           durationMs: voiceNote.durationSec * 1000,
         })
         if (!res.ok) {
-          throw new Error("Upload failed. Please try again.")
+          throw new Error(t("oolshik:homeScreen.uploadFailed"))
         }
         return res.url
       }
@@ -436,7 +441,7 @@ export default function HomeFeedScreen({ navigation }: any) {
             (res as any)?.data?.message ||
             (res as any)?.problem ||
             (res as any)?.originalError?.message ||
-            "Please try again."
+            t("oolshik:homeScreen.tryAgain")
           throw new Error(errMsg)
         }
 
@@ -450,41 +455,44 @@ export default function HomeFeedScreen({ navigation }: any) {
         setCreatingTask(false)
       }
     },
-    [coords, creatingTask, fetchNearby, preferredRadiusKm, radiusMeters, refresh, userId, userName],
+    [coords, creatingTask, fetchNearby, preferredRadiusKm, radiusMeters, refresh, t, userId, userName],
   )
 
   const onOpenSettings = useCallback(async () => {
     try {
       await Linking.openSettings()
     } catch {
-      Alert.alert("Unable to open settings", "Please open Settings and enable location access.")
+      Alert.alert(
+        t("oolshik:homeScreen.settingsOpenFailedTitle"),
+        t("oolshik:homeScreen.settingsOpenFailedBody"),
+      )
     }
-  }, [])
+  }, [t])
 
   const renderLocationState = () => {
     if (status === "loading" || status === "idle") {
       return (
         <View style={{ paddingVertical: 24, alignItems: "center", gap: 8 }}>
           <ActivityIndicator />
-          <Text text="Getting your location…" />
+          <Text text={t("oolshik:homeScreen.gettingLocation")} />
         </View>
       )
     }
     if (status === "denied") {
       return (
         <View style={{ paddingVertical: 24, gap: 12 }}>
-          <Text text="Location permission denied" preset="heading" />
-          <Text text="Enable location to see nearby tasks." />
-          <Button text="Open Settings" onPress={onOpenSettings} />
+          <Text text={t("oolshik:homeScreen.locationDeniedTitle")} preset="heading" />
+          <Text text={t("oolshik:homeScreen.locationDeniedBody")} />
+          <Button text={t("task:create.openSettings")} onPress={onOpenSettings} />
         </View>
       )
     }
     if (status === "error") {
       return (
         <View style={{ paddingVertical: 24, gap: 12 }}>
-          <Text text="Could not access location" preset="heading" />
-          <Text text={locationError ?? "Please try again."} />
-          <Button text="Retry" onPress={refresh} />
+          <Text text={t("oolshik:homeScreen.locationErrorTitle")} preset="heading" />
+          <Text text={locationError ?? t("oolshik:homeScreen.tryAgain")} />
+          <Button text={t("task:create.retry")} onPress={refresh} />
         </View>
       )
     }
@@ -503,10 +511,10 @@ export default function HomeFeedScreen({ navigation }: any) {
 
       <Pressable
         onPress={() =>
-          Alert.alert("Logout", "Are you sure you want to logout?", [
-            { text: "Cancel", style: "cancel" },
+          Alert.alert(t("oolshik:homeScreen.logoutTitle"), t("oolshik:homeScreen.logoutBody"), [
+            { text: t("common:cancel"), style: "cancel" },
             {
-              text: "Logout",
+              text: t("common:logOut"),
               style: "destructive",
               onPress: () => {
                 logout()
@@ -515,7 +523,7 @@ export default function HomeFeedScreen({ navigation }: any) {
           ])
         }
         accessibilityRole="button"
-        accessibilityLabel="Logout"
+        accessibilityLabel={t("oolshik:homeScreen.logoutA11y")}
         style={({ pressed }) => ({
           position: "absolute",
           top: 8,
@@ -551,8 +559,8 @@ export default function HomeFeedScreen({ navigation }: any) {
           <Pressable
             onPress={() => navigation.navigate("OolshikProfile")}
             accessibilityRole="button"
-            accessibilityLabel="Open profile"
-            accessibilityHint="View your profile and settings"
+            accessibilityLabel={t("oolshik:homeScreen.openProfile")}
+            accessibilityHint={t("oolshik:homeScreen.openProfileHint")}
             hitSlop={8}
             style={({ pressed }) => [
               {
@@ -631,7 +639,7 @@ export default function HomeFeedScreen({ navigation }: any) {
             {[1, 2, 5].map((km) => (
               <Pill
                 key={km}
-                label={`${km} km`}
+                label={t("oolshik:homeScreen.radiusOption", { km })}
                 active={radiusMeters === km}
                 onPress={() => {
                   setRadius(km as Radius)

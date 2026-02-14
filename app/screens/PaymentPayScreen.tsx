@@ -11,6 +11,8 @@ import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { OolshikApi } from "@/api/client"
+import { useTranslation } from "react-i18next"
+import { normalizeLocaleTag } from "@/i18n/locale"
 
 type PaymentBreakdownItem = {
   label: string
@@ -51,7 +53,7 @@ type BuildSeedArgs = {
   taskContext?: PaymentTaskContext
 }
 
-const DEFAULT_STATUS = "Awaiting payment"
+const DEFAULT_STATUS = "PENDING"
 
 const ensureStringArray = (list?: string[] | null) => (list && list.length ? [...list] : undefined)
 
@@ -146,6 +148,8 @@ interface PaymentPayScreenProps extends OolshikStackScreenProps<"PaymentPay"> {}
 
 export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navigation }) => {
   const { taskId, paymentRequestId, scanPayload, taskContext, upiIntentOverride } = route.params
+  const { t, i18n } = useTranslation()
+  const localeTag = normalizeLocaleTag(i18n.language)
   const { theme } = useAppTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
 
@@ -199,7 +203,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const handleLaunchUpi = useCallback(async () => {
     const upiIntent = payment?.upiIntent ?? seedPayment?.upiIntent
     if (!upiIntent) {
-      Alert.alert("Unavailable", "We couldn't find a UPI link for this request.")
+      Alert.alert(t("payment:pay.unavailableTitle"), t("payment:pay.noUpiBody"))
       return
     }
     setIsLaunchingPayment(true)
@@ -212,50 +216,50 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       const isSupported = await Linking.canOpenURL(upiIntent)
       if (!isSupported) {
         Alert.alert(
-          "No UPI app found",
-          "Install any UPI compatible app to continue or copy the link:\n\n" + upiIntent,
+          t("payment:pay.noUpiAppTitle"),
+          t("payment:pay.noUpiAppBody", { upiLink: upiIntent }),
         )
         return
       }
       await Linking.openURL(upiIntent)
     } catch (err) {
-      Alert.alert("Failed to start payment", extractErrorMessage(err))
+      Alert.alert(t("payment:pay.launchFailTitle"), extractErrorMessage(err))
     } finally {
       setIsLaunchingPayment(false)
     }
-  }, [payment, paymentRequestId, seedPayment])
+  }, [payment, paymentRequestId, seedPayment, t])
 
   const handleMarkPaid = useCallback(async () => {
     const identifier =
       paymentRequestId ?? payment?.snapshot.id ?? seedPayment?.snapshot.id ?? taskId
     if (!identifier) {
-      Alert.alert("Unavailable", "We don't have a payment request reference yet.")
+      Alert.alert(t("payment:pay.unavailableTitle"), t("payment:pay.noRequestIdBody"))
       return
     }
     Alert.alert(
-      "Confirm payment received?",
-      "Only use this when the transfer is complete and verified.",
+      t("payment:pay.confirmPaidTitle"),
+      t("payment:pay.confirmPaidBody"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common:cancel"), style: "cancel" },
         {
-          text: "Yes, mark as paid",
+          text: t("payment:pay.confirmPaidCta"),
           style: "default",
           onPress: async () => {
             setIsConfirming(true)
             try {
               await OolshikApi.markPaid(identifier, {})
               Alert.alert(
-                "Marked as paid",
-                "Thanks! We'll notify the requester that payment is complete.",
+                t("payment:pay.paidTitle"),
+                t("payment:pay.paidBody"),
                 [
                   {
-                    text: "Close",
+                    text: t("payment:pay.close"),
                     onPress: () => navigation.goBack(),
                   },
                 ],
               )
             } catch (err) {
-              Alert.alert("Unable to mark as paid", extractErrorMessage(err))
+              Alert.alert(t("payment:pay.markFailTitle"), extractErrorMessage(err))
             } finally {
               setIsConfirming(false)
             }
@@ -264,7 +268,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       ],
       { cancelable: true },
     )
-  }, [payment, paymentRequestId, seedPayment])
+  }, [navigation, payment, paymentRequestId, seedPayment, t, taskId])
 
   const handleSupportPress = useCallback(async () => {
     const supportLink = payment?.supportLink ?? seedPayment?.supportLink
@@ -273,23 +277,23 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       const supported = await Linking.canOpenURL(supportLink)
       if (!supported) {
         Alert.alert(
-          "Unable to open support link",
-          "Copy and open this link manually:\n\n" + supportLink,
+          t("payment:pay.supportFailTitle"),
+          t("payment:pay.supportFailBody", { link: supportLink }),
         )
         return
       }
       await Linking.openURL(supportLink)
     } catch (err) {
-      Alert.alert("Unable to open support", extractErrorMessage(err))
+      Alert.alert(t("payment:pay.supportFailTitle"), extractErrorMessage(err))
     }
-  }, [payment, seedPayment])
+  }, [payment, seedPayment, t])
 
   if (loading && !payment) {
     return (
       <Screen style={$root} preset="fixed">
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={theme.colors.palette.primary500} />
-          <Text style={styles.loadingText} text="Preparing payment summary…" />
+          <Text style={styles.loadingText} text={t("payment:pay.fallbackLoading")} />
         </View>
       </Screen>
     )
@@ -299,10 +303,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     return (
       <Screen style={$root} preset="fixed">
         <View style={styles.fallbackState}>
-          <Text preset="heading" style={styles.fallbackTitle} text="Payment not ready" />
+          <Text preset="heading" style={styles.fallbackTitle} text={t("payment:pay.fallbackNotReadyTitle")} />
           <Text style={styles.fallbackMessage}>{error}</Text>
           <Button
-            text="Try again"
+            text={t("payment:pay.retry")}
             onPress={handleRetry}
             style={styles.primaryButton}
             textStyle={styles.primaryButtonText}
@@ -316,12 +320,12 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     return (
       <Screen style={$root} preset="fixed">
         <View style={styles.fallbackState}>
-          <Text preset="heading" style={styles.fallbackTitle} text="Missing payment details" />
+          <Text preset="heading" style={styles.fallbackTitle} text={t("payment:pay.fallbackMissingTitle")} />
           <Text style={styles.fallbackMessage}>
-            We couldn't find the payment request for this task.
+            {t("payment:pay.fallbackMissingBody")}
           </Text>
           <Button
-            text="Reload"
+            text={t("payment:pay.reload")}
             onPress={handleRetry}
             style={styles.primaryButton}
             textStyle={styles.primaryButtonText}
@@ -332,45 +336,62 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   }
 
   const snapshot = payment.snapshot
-  const amountDisplay = formatCurrency(snapshot.amountRequested)
-  const dueDisplay = formatDate(snapshot.dueDate, {
+  const amountDisplay = formatCurrency(snapshot.amountRequested, localeTag)
+  const dueDisplay = formatDate(snapshot.dueDate, localeTag, {
     day: "2-digit",
     month: "short",
     year: "numeric",
   })
-  const updatedDisplay = formatDate(snapshot.lastUpdated ?? scanPayload.scannedAt)
+  const updatedDisplay = formatDate(snapshot.lastUpdated ?? scanPayload.scannedAt, localeTag)
   const breakdown = snapshot.breakdown ?? []
   const highlights = snapshot.highlights ?? []
   const disclaimers = snapshot.disclaimers ?? scanPayload.guidelines ?? []
   const breakdownTotal = breakdown.reduce((sum, item) => sum + (item.amount ?? 0), 0)
   const inlineError = error && payment ? error : null
   const supportLink = payment?.supportLink ?? seedPayment?.supportLink
+  const statusText = useMemo(() => {
+    const status = (snapshot.status ?? DEFAULT_STATUS).toUpperCase()
+    switch (status) {
+      case "PENDING":
+        return t("payment:pay.status.pending")
+      case "INITIATED":
+        return t("payment:pay.status.initiated")
+      case "PAID_MARKED":
+        return t("payment:pay.status.paidMarked")
+      case "DISPUTED":
+        return t("payment:pay.status.disputed")
+      case "EXPIRED":
+        return t("payment:pay.status.expired")
+      default:
+        return t("payment:pay.defaultStatus")
+    }
+  }, [snapshot.status, t])
 
   return (
     <Screen style={$root} preset="scroll" contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.heroLabel} text="Transfer amount" />
+        <Text style={styles.heroLabel} text={t("payment:pay.transferAmount")} />
         <Text style={styles.heroAmount} text={amountDisplay} />
         <View style={styles.heroMetaRow}>
           <View style={styles.heroChip}>
             <Text
               style={styles.heroChipText}
-              text={(snapshot.status ?? DEFAULT_STATUS).toUpperCase()}
+              text={statusText.toUpperCase()}
             />
           </View>
-          {dueDisplay ? <Text style={styles.heroMetaText} text={`Due ${dueDisplay}`} /> : null}
+          {dueDisplay ? <Text style={styles.heroMetaText} text={t("payment:pay.duePrefix", { date: dueDisplay })} /> : null}
         </View>
         {snapshot.note ? <Text style={styles.heroNote}>{snapshot.note}</Text> : null}
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle} text="Payee details" />
+        <Text style={styles.cardTitle} text={t("payment:pay.payeeDetails")} />
         <View style={styles.row}>
-          <Text style={styles.rowLabel} text="Recipient" />
+          <Text style={styles.rowLabel} text={t("payment:pay.recipient")} />
           <Text style={styles.rowValue} numberOfLines={1} text={snapshot.payeeName ?? "—"} />
         </View>
         <View style={styles.row}>
-          <Text style={styles.rowLabel} text="UPI ID" />
+          <Text style={styles.rowLabel} text={t("payment:pay.upiId")} />
           <Text
             style={[styles.rowValue, styles.monoValue]}
             numberOfLines={1}
@@ -379,13 +400,13 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         </View>
         {snapshot.paymentWindow ? (
           <View style={styles.row}>
-            <Text style={styles.rowLabel} text="Payment window" />
+            <Text style={styles.rowLabel} text={t("payment:pay.paymentWindow")} />
             <Text style={styles.rowValue} numberOfLines={2} text={snapshot.paymentWindow} />
           </View>
         ) : null}
         {snapshot.contactNumber ? (
           <View style={styles.row}>
-            <Text style={styles.rowLabel} text="Contact" />
+            <Text style={styles.rowLabel} text={t("payment:pay.contact")} />
             <Text
               style={styles.rowValue}
               numberOfLines={1}
@@ -395,7 +416,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         ) : null}
         {snapshot.id ? (
           <View style={styles.row}>
-            <Text style={styles.rowLabel} text="Request ID" />
+            <Text style={styles.rowLabel} text={t("payment:pay.requestId")} />
             <Text style={styles.rowValue} numberOfLines={1} text={snapshot.id} />
           </View>
         ) : null}
@@ -413,45 +434,45 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
 
       {breakdown.length ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle} text="Breakdown" />
+          <Text style={styles.cardTitle} text={t("payment:pay.breakdown")} />
           {breakdown.map((item) => (
             <View style={styles.row} key={item.label}>
               <Text style={styles.rowLabel} text={item.label} />
-              <Text style={styles.rowValue} text={formatCurrency(item.amount)} />
+              <Text style={styles.rowValue} text={formatCurrency(item.amount, localeTag)} />
             </View>
           ))}
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel} text="Total payable" />
+            <Text style={styles.rowLabel} text={t("payment:pay.totalPayable")} />
             <Text style={[styles.rowValue, styles.totalValue]} text={amountDisplay} />
           </View>
           {breakdownTotal && breakdownTotal !== snapshot.amountRequested ? (
             <Text style={styles.breakdownHint}>
-              Totals differ from requested amount because of manual adjustments.
+              {t("payment:pay.breakdownHint")}
             </Text>
           ) : null}
         </View>
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle} text="Take action" />
+        <Text style={styles.cardTitle} text={t("payment:pay.takeAction")} />
         <Text style={styles.cardSupport}>
-          Use your preferred UPI app to complete the transfer and return to Oolshik to confirm.
+          {t("payment:pay.actionHelp")}
         </Text>
         {loading && paymentRequestId ? (
-          <Text style={styles.statusText}>Refreshing payment request…</Text>
+          <Text style={styles.statusText}>{t("payment:pay.refreshing")}</Text>
         ) : null}
         {inlineError ? <Text style={styles.errorText}>{inlineError}</Text> : null}
         <View style={styles.actions}>
           <Button
-            text={isLaunchingPayment ? "Opening UPI…" : "Pay with UPI"}
+            text={isLaunchingPayment ? t("payment:pay.openingUpi") : t("payment:pay.openUpi")}
             onPress={handleLaunchUpi}
             style={styles.primaryButton}
             textStyle={styles.primaryButtonText}
             disabled={isLaunchingPayment}
           />
           <Button
-            text={isConfirming ? "Marking…" : "Mark paid already"}
+            text={isConfirming ? t("payment:pay.markingPaid") : t("payment:pay.markPaid")}
             onPress={handleMarkPaid}
             style={styles.secondaryButton}
             textStyle={styles.secondaryButtonText}
@@ -462,7 +483,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
 
       {disclaimers.length ? (
         <View style={styles.infoCard}>
-          <Text style={styles.cardTitle} text="Before you mark as paid" />
+          <Text style={styles.cardTitle} text={t("payment:pay.beforePaid")} />
           {disclaimers.map((line, index) => (
             <View style={styles.bulletRow} key={`${index}-${line}`}>
               <View style={styles.bullet} />
@@ -474,12 +495,12 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
 
       {supportLink ? (
         <Text style={styles.supportLink} onPress={handleSupportPress}>
-          Need help? Contact support
+          {t("payment:pay.needHelp")}
         </Text>
       ) : null}
 
       {updatedDisplay ? (
-        <Text style={styles.updatedText} text={`Last updated ${updatedDisplay}`} />
+        <Text style={styles.updatedText} text={t("payment:pay.updatedAt", { date: updatedDisplay })} />
       ) : null}
     </Screen>
   )
@@ -489,19 +510,25 @@ const $root: ViewStyle = {
   flex: 1,
 }
 
-const formatCurrency = (value?: number | null) => {
+const formatCurrency = (value: number | null | undefined, localeTag: string) => {
   if (typeof value !== "number" || Number.isNaN(value)) return "—"
-  return `₹${value.toLocaleString("en-IN", {
+  return new Intl.NumberFormat(localeTag, {
+    style: "currency",
+    currency: "INR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`
+  }).format(value)
 }
 
-const formatDate = (value?: string | null, overrides?: Intl.DateTimeFormatOptions) => {
+const formatDate = (
+  value: string | null | undefined,
+  localeTag: string,
+  overrides?: Intl.DateTimeFormatOptions,
+) => {
   if (!value) return undefined
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return undefined
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat(localeTag, {
     day: "2-digit",
     month: "short",
     year: "numeric",

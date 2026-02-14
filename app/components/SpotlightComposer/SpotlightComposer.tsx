@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { useTranslation } from "react-i18next"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import Animated, {
   Easing,
@@ -109,6 +110,7 @@ const lerp = (a: number, b: number, t: number): number => {
 }
 
 export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
+  const { t } = useTranslation()
   const { theme } = useAppTheme()
   const reduceMotion = useReduceMotion()
   const insets = useSafeAreaInsets()
@@ -260,12 +262,12 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         startRecording()
       }, 100)
     } catch {
-      Alert.alert("Microphone unavailable", "Please allow microphone access and try again.", [
-        { text: "OK", onPress: closeComposer },
+      Alert.alert(t("oolshik:composer.micUnavailableTitle"), t("oolshik:composer.micUnavailableBody"), [
+        { text: t("common:ok"), onPress: closeComposer },
       ])
       closeComposer()
     }
-  }, [closeComposer, start, triggerHaptic])
+  }, [closeComposer, start, t, triggerHaptic])
 
   const handleOpen = useCallback(
     (nextMode: ComposerMode) => {
@@ -353,7 +355,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim()
-    const safeText = trimmed || (mode === "voice" && voiceNote ? "Voice task" : "")
+    const safeText = trimmed || (mode === "voice" && voiceNote ? t("oolshik:taskCard.voiceTask") : "")
     if (!safeText) return
     setState("submitting")
     try {
@@ -364,34 +366,34 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       })
       if (Platform.OS === "android") {
         const ToastAndroid = require("react-native").ToastAndroid
-        ToastAndroid.show("Task submitted", ToastAndroid.SHORT)
+        ToastAndroid.show(t("oolshik:composer.submittedBody"), ToastAndroid.SHORT)
       } else {
-        Alert.alert("Submitted", "Task submitted")
+        Alert.alert(t("oolshik:composer.submittedTitle"), t("oolshik:composer.submittedBody"))
       }
     } catch {
-      Alert.alert("Unable to submit", "Please try again.")
+      Alert.alert(t("oolshik:composer.unableSubmitTitle"), t("oolshik:composer.unableSubmitBody"))
       setState("editing")
       return
     }
     closeComposer()
-  }, [closeComposer, mode, onSubmitTask, text, voiceNote])
+  }, [closeComposer, mode, onSubmitTask, t, text, voiceNote])
 
   const onScrimPress = useCallback(() => {
     if (state === "voice_recording") {
-      Alert.alert("Stop recording?", "Your current recording will be discarded.", [
-        { text: "Keep recording", style: "cancel" },
+      Alert.alert(t("oolshik:composer.stopRecordingTitle"), t("oolshik:composer.stopRecordingBody"), [
+        { text: t("oolshik:composer.keepRecording"), style: "cancel" },
         {
-          text: "Stop",
+          text: t("oolshik:composer.stopRecording"),
           style: "destructive",
           onPress: () => handleStopRecording(false),
         },
       ])
       return
     } else if (state === "editing" && text.trim().length > 0) {
-      Alert.alert("Discard changes?", "Your current changes will be discarded.", [
-        { text: "Keep editing", style: "cancel" },
+      Alert.alert(t("oolshik:composer.discardChangesTitle"), t("oolshik:composer.discardChangesBody"), [
+        { text: t("oolshik:composer.keepEditing"), style: "cancel" },
         {
-          text: "Discard",
+          text: t("oolshik:composer.discard"),
           style: "destructive",
           onPress: () => closeComposer(),
         },
@@ -401,7 +403,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     if (state !== "idle") {
       closeComposer()
     }
-  }, [closeComposer, handleStopRecording, state])
+  }, [closeComposer, handleStopRecording, state, t, text])
 
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: scrimOpacity.value,
@@ -464,7 +466,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     >
       <Animated.View style={[styles.fab, styles.fabPen, penFabStyle]}>
         <Pressable
-          accessibilityLabel="Type task"
+          accessibilityLabel={t("oolshik:composer.typeTaskA11y")}
           hitSlop={theme.spacing.sm}
           onPress={() => handleOpen("type")}
           style={[
@@ -482,7 +484,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       </Animated.View>
       <Animated.View style={[styles.fab, micFabStyle]}>
         <Pressable
-          accessibilityLabel="Record task"
+          accessibilityLabel={t("oolshik:composer.recordTaskA11y")}
           hitSlop={theme.spacing.sm}
           onPress={() => handleOpen("voice")}
           style={[
@@ -527,8 +529,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         style={[styles.timerText, { color: theme.colors.text }]}
       />
       <Button
-        text="Stop"
-        accessibilityLabel="Stop recording"
+        text={t("oolshik:composer.stop")}
+        accessibilityLabel={t("oolshik:composer.stopRecordingA11y")}
         onPress={() => handleStopRecording(true)}
         style={[styles.smallButton, { marginLeft: 12, alignSelf: "flex-end" }]}
         textStyle={{ fontSize: 14 }}
@@ -540,7 +542,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const renderTranscribing = () => (
     <View style={styles.contentRow}>
       <MaterialCommunityIcons name="microphone" size={20} color={theme.colors.text} />
-      <Text text="Transcribing…" style={styles.helperText} />
+      <Text text={t("oolshik:composer.transcribing")} style={styles.helperText} />
       <ActivityIndicator
         size="small"
         color={theme.colors.tint}
@@ -568,24 +570,24 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         ref={textInputRef}
         value={text}
         onChangeText={setText}
-        placeholder="Type your task…"
+        placeholder={t("oolshik:composer.typePlaceholder")}
         placeholderTextColor={theme.colors.textDim}
         style={[styles.input, { color: theme.colors.text }]}
-        accessibilityLabel="Task input"
+        accessibilityLabel={t("oolshik:composer.taskInputA11y")}
         autoFocus={false}
         autoCapitalize="sentences"
         keyboardAppearance={theme.isDark ? "dark" : "light"}
         multiline={false}
       />
       <TouchableOpacity
-        accessibilityLabel="Submit task"
+        accessibilityLabel={t("oolshik:composer.submitTaskA11y")}
         onPress={handleSubmit}
         style={[
           styles.submitPill,
           { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
         ]}
       >
-        <Text text="Submit" style={styles.submitText} />
+        <Text text={t("oolshik:composer.submit")} style={styles.submitText} />
       </TouchableOpacity>
     </View>
   )
@@ -599,18 +601,22 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         style={{ marginRight: 10 }}
       />
       <Text
-        text={voiceNote ? `Voice note ready (${voiceNote.durationSec}s)` : "Voice note ready"}
+        text={
+          voiceNote
+            ? t("oolshik:composer.voiceReadyWithDuration", { seconds: voiceNote.durationSec })
+            : t("oolshik:composer.voiceReady")
+        }
         style={{ color: theme.colors.text, flex: 1 }}
       />
       <TouchableOpacity
-        accessibilityLabel="Submit task"
+        accessibilityLabel={t("oolshik:composer.submitTaskA11y")}
         onPress={handleSubmit}
         style={[
           styles.submitPill,
           { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
         ]}
       >
-        <Text text="Submit" style={styles.submitText} />
+        <Text text={t("oolshik:composer.submit")} style={styles.submitText} />
       </TouchableOpacity>
     </View>
   )
@@ -696,7 +702,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
             {state !== "voice_recording" && (
               <TouchableOpacity
                 style={styles.close}
-                accessibilityLabel="Close composer"
+                accessibilityLabel={t("oolshik:composer.closeA11y")}
                 onPress={closeComposer}
               >
                 <Icon icon="x" />

@@ -28,14 +28,15 @@ import { useTaskStore } from "@/store/taskStore"
 import { loadString, saveString } from "@/utils/storage"
 import { useAuth } from "@/context/AuthContext"
 import { parseUpiQr } from "@/utils/upiQr"
+import { useTranslation } from "react-i18next"
 
 interface QrScannerScreenProps extends OolshikStackScreenProps<"QrScanner"> {}
 type Params = { taskId?: string; amount?: number | null }
 
-const DEFAULT_PAYMENT_GUIDELINES = [
-  "Transfers are only accepted from the registered bank account.",
-  "If your UPI app does not redirect back, upload the proof in Payments.",
-  "For discrepancies contact support before marking the request as paid.",
+const defaultPaymentGuidelines = (t: (key: string) => string) => [
+  t("payment:qr.defaultGuideline1"),
+  t("payment:qr.defaultGuideline2"),
+  t("payment:qr.defaultGuideline3"),
 ]
 
 const USE_QR_DEMO = false
@@ -100,6 +101,7 @@ async function resolveStableDeviceId(): Promise<string> {
 }
 
 export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
+  const { t } = useTranslation()
   const { params } = useRoute<any>() as { params: Params }
   const [permission, requestPermission] = useCameraPermissions()
   const [processing, setProcessing] = useState(false)
@@ -126,13 +128,13 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     if (permission?.granted) {
-      setStatusMessage("Align the QR code inside the frame")
+      setStatusMessage(t("payment:qr.alignHint"))
       setErrorMessage(null)
     } else if (permission && !permission.granted && !permission.canAskAgain) {
       setStatusMessage(null)
-      setErrorMessage("Camera access is blocked. Enable it in Settings to continue.")
+      setErrorMessage(t("payment:qr.blockedCamera"))
     }
-  }, [permission])
+  }, [permission, t])
 
   useFocusEffect(
     useCallback(() => {
@@ -146,7 +148,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   )
 
   function whoWillPayConfirmation(otherPayerLabel: string) {
-    const label = otherPayerLabel?.trim().length ? otherPayerLabel.trim() : "Requester"
+    const label = otherPayerLabel?.trim().length ? otherPayerLabel.trim() : t("payment:qr.requester")
     return new Promise<"SELF" | "OTHER" | "CANCEL">((resolve) => {
       let resolved = false
       const safeResolve = (value: "SELF" | "OTHER" | "CANCEL") => {
@@ -156,12 +158,12 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
       }
 
       Alert.alert(
-        "Transaction fee",
-        "Who will pay the transaction fee?",
+        t("payment:qr.transactionFeeTitle"),
+        t("payment:qr.transactionFeeBody"),
         [
-          { text: "Me", onPress: () => safeResolve("SELF") },
+          { text: t("payment:qr.me"), onPress: () => safeResolve("SELF") },
           { text: label, onPress: () => safeResolve("OTHER") },
-          { text: "Cancel", style: "cancel", onPress: () => safeResolve("CANCEL") },
+          { text: t("payment:qr.cancel"), style: "cancel", onPress: () => safeResolve("CANCEL") },
         ],
         { cancelable: true, onDismiss: () => safeResolve("CANCEL") },
       )
@@ -173,7 +175,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
       if (processing || handledRef.current) return
       handledRef.current = true
       setProcessing(true)
-      setStatusMessage("Processing QR code…")
+      setStatusMessage(t("payment:qr.processing"))
       setErrorMessage(null)
 
       let hadError = false
@@ -216,7 +218,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           note: parsed.note ?? null,
           scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : null,
           scannedAt: new Date().toISOString(),
-          guidelines: DEFAULT_PAYMENT_GUIDELINES,
+          guidelines: defaultPaymentGuidelines(t),
         }
 
         const taskContext: PaymentTaskContext | undefined = task
@@ -236,14 +238,15 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           !!task?.requesterId && !!userId && String(task.requesterId) === String(userId)
         const yourRole: PaymentPayerRole = scannerIsRequester ? "REQUESTER" : "HELPER"
         const otherRole: PaymentPayerRole = yourRole === "REQUESTER" ? "HELPER" : "REQUESTER"
-        const requesterLabel = taskContext?.createdByName ?? task?.createdByName ?? "Requester"
-        const otherPayerLabel = yourRole === "REQUESTER" ? "Helper" : requesterLabel
+        const requesterLabel =
+          taskContext?.createdByName ?? task?.createdByName ?? t("payment:qr.requester")
+        const otherPayerLabel = yourRole === "REQUESTER" ? t("payment:qr.helper") : requesterLabel
         const payerChoice = await whoWillPayConfirmation(otherPayerLabel)
 
         if (payerChoice === "CANCEL") {
           handledRef.current = false
           setProcessing(false)
-          setStatusMessage("Align the QR code inside the frame")
+          setStatusMessage(t("payment:qr.alignHint"))
           setErrorMessage(null)
           return
         }
@@ -275,14 +278,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           const res = await OolshikApi.createPaymentRequest(body)
           if (!res?.ok || !res.data) {
             const serverMessage =
-              (res?.data as any)?.message ?? res?.problem ?? "Server did not accept this QR code."
+              (res?.data as any)?.message ?? res?.problem ?? t("payment:qr.serverRejected")
             throw new Error(serverMessage)
           }
           const payload = res.data as any
           requestId = payload.id ?? payload?.snapshot?.id ?? undefined
           upiIntentOverride = payload.upiIntent ?? undefined
           if (!requestId) {
-            throw new Error("Payment request reference missing from server response.")
+            throw new Error(t("payment:qr.missingRef"))
           }
         } else {
           upiIntentOverride = data.startsWith("upi://") ? data : undefined
@@ -300,20 +303,20 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           return
         }
 
-        setStatusMessage("Payment request generated")
+        setStatusMessage(t("payment:qr.paymentGenerated"))
         const message = requestId
-          ? `Share this ID with ${otherPayerLabel}:\n${requestId}`
-          : "Payment request captured."
-        Alert.alert("Payment requested", message, [
+          ? t("payment:qr.shareRequestId", { name: otherPayerLabel, id: requestId })
+          : t("payment:qr.paymentCaptured")
+        Alert.alert(t("payment:qr.paymentRequestedTitle"), message, [
           {
-            text: "Close & proceed",
+            text: t("payment:qr.closeAndProceed"),
             onPress: () => navigation.goBack(),
           },
         ])
       } catch (e: any) {
         hadError = true
-        setErrorMessage(e?.message ?? "Unable to process this QR code.")
-        Alert.alert("Scan failed", e.message ?? String(e))
+        setErrorMessage(e?.message ?? t("payment:qr.serverRejected"))
+        Alert.alert(t("payment:qr.scanFailedTitle"), e.message ?? String(e))
         navigation.goBack()
       } finally {
         setProcessing(false)
@@ -321,12 +324,12 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           handledRef.current = false
           setStatusMessage(null)
         } else {
-          setStatusMessage("Align the QR code inside the frame")
+          setStatusMessage(t("payment:qr.alignHint"))
           setErrorMessage(null)
         }
       }
     },
-    [processing, params?.taskId, params?.amount, navigation, tasks, appVersion, getDeviceId, userId],
+    [processing, params?.taskId, params?.amount, navigation, tasks, appVersion, getDeviceId, userId, t],
   )
 
   // make hardcoded demo scan on load
@@ -344,7 +347,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
       <Screen style={$root} preset="fixed">
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color={theme.colors.palette.primary500} />
-          <Text style={styles.centerStateText} text="Checking camera permission…" />
+          <Text style={styles.centerStateText} text={t("payment:qr.checkingPermission")} />
         </View>
       </Screen>
     )
@@ -354,13 +357,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
     return (
       <Screen style={$root} preset="fixed">
         <View style={[styles.centerState, { paddingTop: insets.top }]}>
-          <Text preset="heading" style={styles.permissionTitle} text="Enable your camera" />
+          <Text preset="heading" style={styles.permissionTitle} text={t("payment:qr.enableCamera")} />
           <Text style={styles.permissionMessage}>
-            We need camera access to scan payment QR codes securely. You can enable it from system
-            settings or grant it now.
+            {t("payment:qr.blockedCamera")}
           </Text>
           <ButtonRow
-            primaryText={permission.canAskAgain ? "Allow camera" : "Open settings"}
+            primaryText={
+              permission.canAskAgain ? t("payment:qr.allowCamera") : t("task:create.openSettings")
+            }
             onPrimaryPress={async () => {
               if (permission.canAskAgain) {
                 await requestPermission()
@@ -368,7 +372,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
                 Linking.openSettings()
               }
             }}
-            secondaryText="Not now"
+            secondaryText={t("payment:qr.cancel")}
             onSecondaryPress={() => navigation.goBack()}
             styles={styles}
           />
@@ -407,36 +411,38 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         </View>
         <View style={[styles.topBar, { paddingTop: insets.top + theme.spacing.sm }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.topButton}>
-            <Text style={styles.topButtonText} text="Cancel" />
+            <Text style={styles.topButtonText} text={t("payment:qr.cancelScan")} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setTorchEnabled((prev) => !prev)}
             style={styles.topButton}
           >
-            <Text style={styles.topButtonText} text={torchEnabled ? "Light off" : "Light on"} />
+            <Text
+              style={styles.topButtonText}
+              text={torchEnabled ? t("payment:qr.lightOff") : t("payment:qr.lightOn")}
+            />
           </TouchableOpacity>
         </View>
         <View style={[styles.bottomCard, { paddingBottom: insets.bottom + theme.spacing.lg }]}>
-          <Text preset="heading" style={styles.bottomTitle} text="Scan QR to request payment" />
+          <Text preset="heading" style={styles.bottomTitle} text={t("payment:qr.heading")} />
           <Text style={styles.bottomSubtitle}>
-            Place the code inside the frame. We'll attach the location and task details
-            automatically.
+            {t("payment:qr.alignHint")}
           </Text>
           {statusMessage ? <Text style={styles.statusText}>{statusMessage}</Text> : null}
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
           <View style={styles.bottomActions}>
             <TouchableOpacity
               style={styles.textAction}
-              onPress={() => Alert.alert("Coming soon", "Manual entry will be available soon.")}
+              onPress={() => Alert.alert(t("payment:qr.manualSoonTitle"), t("payment:qr.manualSoonBody"))}
             >
-              <Text style={styles.textActionLabel} text="Enter reference code manually" />
+              <Text style={styles.textActionLabel} text={t("payment:qr.manualEntry")} />
             </TouchableOpacity>
           </View>
         </View>
         {processing ? (
           <View style={styles.processingOverlay}>
             <ActivityIndicator size="large" color={theme.colors.palette.neutral100} />
-            <Text style={styles.processingText} text="Processing…" />
+            <Text style={styles.processingText} text={t("payment:qr.processingShort")} />
           </View>
         ) : null}
       </View>

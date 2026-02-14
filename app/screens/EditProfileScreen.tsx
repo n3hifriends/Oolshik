@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react"
 import { Pressable, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -16,6 +17,7 @@ import {
 } from "@/features/profile/storage/profileExtrasStore"
 
 export default function EditProfileScreen({ navigation }: { navigation: any }) {
+  const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { userName, authEmail } = useAuth()
@@ -59,7 +61,7 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
     const radiusValue = radius.trim()
 
     if (canEditName && cleanedFullName && cleanedFullName.length < 2) {
-      setNameError("Name must be at least 2 characters.")
+      setNameError(t("oolshik:editProfileScreen.nameTooShort"))
       return
     }
 
@@ -67,7 +69,7 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
     if (radiusValue.length > 0) {
       const numeric = Number(radiusValue)
       if (!Number.isFinite(numeric) || numeric <= 0) {
-        setRadiusError("Enter a valid radius.")
+        setRadiusError(t("oolshik:editProfileScreen.radiusInvalid"))
         return
       }
       parsedRadius = numeric
@@ -88,7 +90,7 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
     await updateProfileExtras(patch)
     setSaving(false)
     navigation.goBack()
-  }, [available, canEditName, fullName, locality, nickname, radius, navigation])
+  }, [available, canEditName, fullName, locality, nickname, radius, navigation, t])
 
   return (
     <Screen
@@ -99,35 +101,35 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
       <Pressable
         onPress={() => navigation.goBack()}
         accessibilityRole="button"
-        accessibilityLabel="Back"
+        accessibilityLabel={t("oolshik:editProfileScreen.back")}
         hitSlop={8}
         style={{ alignSelf: "flex-start" }}
       >
-        <Text text="← Back" />
+        <Text text={`← ${t("oolshik:editProfileScreen.back")}`} />
       </Pressable>
 
-      <Text preset="heading" text="Edit Profile" />
+      <Text preset="heading" text={t("oolshik:editProfileScreen.heading")} />
 
       <SectionCard>
-        <Text text="Signed in as" size="xs" style={{ color: colors.textDim }} />
-        <Text text={authName ?? "Account"} weight="medium" />
+        <Text text={t("oolshik:editProfileScreen.signedInAs")} size="xs" style={{ color: colors.textDim }} />
+        <Text text={authName ?? t("oolshik:editProfileScreen.account")} weight="medium" />
         <Text text={authEmail || "—"} size="xs" style={{ color: colors.textDim }} />
       </SectionCard>
 
       <SectionCard>
         {canEditName ? (
           <TextField
-            label="Full name"
-            placeholder="Your name"
+            label={t("oolshik:editProfileScreen.fullName")}
+            placeholder={t("oolshik:editProfileScreen.yourName")}
             value={fullName}
             onChangeText={setFullName}
             autoCapitalize="words"
-            helper={nameError ?? "Shown only when account name is missing."}
+            helper={nameError ?? t("oolshik:editProfileScreen.fullNameHint")}
             status={nameError ? "error" : undefined}
           />
         ) : (
           <Text
-            text="Full name is managed by your login account."
+            text={t("oolshik:editProfileScreen.fullNameManaged")}
             size="xs"
             style={{ color: colors.textDim }}
           />
@@ -136,8 +138,8 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
         <View style={{ height: spacing.md }} />
 
         <TextField
-          label="Nickname"
-          placeholder="Optional"
+          label={t("oolshik:editProfileScreen.nickname")}
+          placeholder={t("oolshik:editProfileScreen.optional")}
           value={nickname}
           onChangeText={setNickname}
           autoCapitalize="words"
@@ -146,8 +148,8 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
         <View style={{ height: spacing.md }} />
 
         <TextField
-          label="Locality / Area"
-          placeholder="Optional"
+          label={t("oolshik:editProfileScreen.locality")}
+          placeholder={t("oolshik:editProfileScreen.optional")}
           value={locality}
           onChangeText={setLocality}
           autoCapitalize="words"
@@ -155,14 +157,14 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text="Helper defaults" style={{ marginBottom: spacing.sm }} />
+        <Text preset="subheading" text={t("oolshik:editProfileScreen.helperDefaults")} style={{ marginBottom: spacing.sm }} />
         <TextField
-          label="Preferred radius (km)"
-          placeholder="e.g., 2"
+          label={t("oolshik:editProfileScreen.preferredRadius")}
+          placeholder={t("oolshik:editProfileScreen.radiusExample")}
           value={radius}
           onChangeText={setRadius}
           keyboardType="numeric"
-          helper={radiusError ?? "Optional"}
+          helper={radiusError ?? t("oolshik:editProfileScreen.optional")}
           status={radiusError ? "error" : undefined}
         />
 
@@ -175,30 +177,30 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
           }}
         >
           <View style={{ flex: 1, paddingRight: spacing.md }}>
-            <Text text="Available to help" weight="medium" />
-            <Text text="Local-only setting" size="xs" style={{ color: colors.textDim }} />
+            <Text text={t("oolshik:editProfileScreen.availableToHelp")} weight="medium" />
+            <Text text={t("oolshik:editProfileScreen.localOnlySetting")} size="xs" style={{ color: colors.textDim }} />
           </View>
           <Switch
             value={available}
             onValueChange={setAvailable}
-            accessibilityLabel="Helper availability"
+            accessibilityLabel={t("oolshik:editProfileScreen.helperAvailabilityA11y")}
           />
         </View>
       </SectionCard>
 
       <View style={{ gap: spacing.sm }}>
         <Button
-          text={saving ? "Saving..." : "Save"}
+          text={saving ? t("oolshik:editProfileScreen.saving") : t("oolshik:editProfileScreen.save")}
           onPress={handleSave}
           disabled={saving}
           style={{ borderRadius: 10, minHeight: 44 }}
-          accessibilityLabel="Save profile"
+          accessibilityLabel={t("oolshik:editProfileScreen.saveProfileA11y")}
         />
         <Button
-          text="Cancel"
+          text={t("oolshik:editProfileScreen.cancel")}
           onPress={() => navigation.goBack()}
           style={{ borderRadius: 10, minHeight: 44 }}
-          accessibilityLabel="Cancel"
+          accessibilityLabel={t("oolshik:editProfileScreen.cancelA11y")}
         />
       </View>
     </Screen>

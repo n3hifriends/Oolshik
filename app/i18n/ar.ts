@@ -32,6 +32,7 @@ const ar: Translations = {
   // @demo remove-block-start
   errors: {
     invalidEmail: "عنوان البريد الالكتروني غير صالح",
+    fallback: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
   },
   loginScreen: {
     logIn: "تسجيل الدخول",
