@@ -89,7 +89,7 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
       <Text
         text={label}
         size="xs"
-        style={{ color: active ? colors.palette.primary700 : colors.text }}
+        style={{ color: active ? colors.palette.primary600 : colors.text }}
       />
     </Pressable>
   )

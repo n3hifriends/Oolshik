@@ -9,6 +9,7 @@ import {
   View,
   ViewStyle,
 } from "react-native"
+import * as Application from "expo-application"
 import type {
   OolshikStackScreenProps,
   PaymentScanPayload,
@@ -17,13 +18,15 @@ import type {
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import * as Location from "expo-location"
-import { OolshikApi } from "@/api/client"
+import { OolshikApi, PaymentPayerRole } from "@/api/client"
 import { useFocusEffect, useRoute } from "@react-navigation/native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTaskStore } from "@/store/taskStore"
+import { loadString, saveString } from "@/utils/storage"
+import { useAuth } from "@/context/AuthContext"
 
 interface QrScannerScreenProps extends OolshikStackScreenProps<"QrScanner"> {}
 type Params = { taskId?: string }
@@ -44,6 +47,56 @@ const DEMO_TASK_CONTEXT: PaymentTaskContext = {
   createdByName: "Netra Patil",
   createdByPhoneNumber: "+91 98765 43210",
 }
+const QR_DEVICE_ID_KEY = "payment.qr.device-id.v1"
+
+function normalizeIdentifier(value: string | null | undefined): string | null {
+  if (!value) return null
+  const normalized = value.trim()
+  if (!normalized) return null
+  const lowered = normalized.toLowerCase()
+  if (
+    lowered === "unknown" ||
+    lowered === "null" ||
+    lowered === "undefined" ||
+    lowered === "9774d56d682e549c"
+  ) {
+    return null
+  }
+  return normalized
+}
+
+function fallbackInstallationId() {
+  return `${Platform.OS}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function buildAppVersionLabel() {
+  const appId = normalizeIdentifier(Application.applicationId) ?? "oolshik"
+  const version = normalizeIdentifier(Application.nativeApplicationVersion) ?? "unknown"
+  const build = normalizeIdentifier(Application.nativeBuildVersion)
+  return build ? `${appId}/${version} (${build})` : `${appId}/${version}`
+}
+
+async function resolveStableDeviceId(): Promise<string> {
+  const cached = normalizeIdentifier(loadString(QR_DEVICE_ID_KEY))
+  if (cached) return cached
+
+  let nativeId: string | null = null
+  if (Platform.OS === "android") {
+    nativeId = normalizeIdentifier((Application as any).androidId)
+  } else if (Platform.OS === "ios") {
+    try {
+      nativeId = normalizeIdentifier(await Application.getIosIdForVendorAsync())
+    } catch {
+      nativeId = null
+    }
+  }
+
+  const resolved = nativeId
+    ? `${Platform.OS}:native:${nativeId}`
+    : `${Platform.OS}:install:${fallbackInstallationId()}`
+  saveString(QR_DEVICE_ID_KEY, resolved)
+  return resolved
+}
 
 export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const { params } = useRoute<any>() as { params: Params }
@@ -55,10 +108,20 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const handledRef = useRef(false)
   const demoTriggeredRef = useRef(false)
   const { theme } = useAppTheme()
+  const { userId } = useAuth()
   const insets = useSafeAreaInsets()
   const styles = useMemo(() => createStyles(theme), [theme])
   const tasks = useTaskStore((state) => state.tasks)
   const [cameraActive, setCameraActive] = useState(false)
+  const appVersion = useMemo(() => buildAppVersionLabel(), [])
+  const deviceIdRef = useRef<string | null>(null)
+
+  const getDeviceId = useCallback(async () => {
+    if (deviceIdRef.current) return deviceIdRef.current
+    const resolved = await resolveStableDeviceId()
+    deviceIdRef.current = resolved
+    return resolved
+  }, [])
 
   useEffect(() => {
     if (permission?.granted) {
@@ -134,11 +197,11 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
     }, []),
   )
 
-  function whoWillPayConfirmation(payerLabel: string) {
-    const label = payerLabel?.trim().length ? payerLabel.trim() : "Neta"
-    return new Promise<"You" | "Neta" | "Cancel">((resolve) => {
+  function whoWillPayConfirmation(otherPayerLabel: string) {
+    const label = otherPayerLabel?.trim().length ? otherPayerLabel.trim() : "Requester"
+    return new Promise<"SELF" | "OTHER" | "CANCEL">((resolve) => {
       let resolved = false
-      const safeResolve = (value: "You" | "Neta" | "Cancel") => {
+      const safeResolve = (value: "SELF" | "OTHER" | "CANCEL") => {
         if (resolved) return
         resolved = true
         resolve(value)
@@ -148,11 +211,11 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         "Transaction fee",
         "Who will pay the transaction fee?",
         [
-          { text: "You", onPress: () => safeResolve("You") },
-          { text: label, onPress: () => safeResolve("Neta") },
-          { text: "Cancel", style: "cancel", onPress: () => safeResolve("Cancel") },
+          { text: "You", onPress: () => safeResolve("SELF") },
+          { text: label, onPress: () => safeResolve("OTHER") },
+          { text: "Cancel", style: "cancel", onPress: () => safeResolve("CANCEL") },
         ],
-        { cancelable: true, onDismiss: () => safeResolve("Cancel") },
+        { cancelable: true, onDismiss: () => safeResolve("CANCEL") },
       )
     })
   }
@@ -212,16 +275,23 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
             ? DEMO_TASK_CONTEXT
             : undefined
 
-        const netaLabel = taskContext?.createdByName ?? task?.createdByName ?? "Neta"
-        const payerChoice = await whoWillPayConfirmation(netaLabel)
+        const scannerIsRequester =
+          !!task?.requesterId && !!userId && String(task.requesterId) === String(userId)
+        const yourRole: PaymentPayerRole = scannerIsRequester ? "REQUESTER" : "HELPER"
+        const otherRole: PaymentPayerRole = yourRole === "REQUESTER" ? "HELPER" : "REQUESTER"
+        const requesterLabel = taskContext?.createdByName ?? task?.createdByName ?? "Requester"
+        const otherPayerLabel = yourRole === "REQUESTER" ? "Helper" : requesterLabel
+        const payerChoice = await whoWillPayConfirmation(otherPayerLabel)
 
-        if (payerChoice === "Cancel") {
+        if (payerChoice === "CANCEL") {
           handledRef.current = false
           setProcessing(false)
           setStatusMessage("Align the QR code inside the frame")
           setErrorMessage(null)
           return
         }
+
+        const payerRole: PaymentPayerRole = payerChoice === "SELF" ? yourRole : otherRole
 
         const body = {
           taskId,
@@ -233,8 +303,9 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           currency: (parsed as any).currency ?? undefined,
           note: (parsed as any).note ?? undefined,
           scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : undefined,
-          appVersion: `rn-0.73-${Platform.OS}`,
-          deviceId: "device-qr",
+          appVersion,
+          deviceId: await getDeviceId(),
+          payerRole,
         }
 
         let requestId: string | undefined
@@ -257,7 +328,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           upiIntentOverride = data.startsWith("upi://") ? data : undefined
         }
 
-        if (payerChoice === "You") {
+        if (payerChoice === "SELF") {
           setCameraActive(false)
           navigation.replace("PaymentPay", {
             taskId,
@@ -271,7 +342,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
 
         setStatusMessage("Payment request generated")
         const message = requestId
-          ? `Share this ID with Neta:\n${requestId}`
+          ? `Share this ID with ${otherPayerLabel}:\n${requestId}`
           : "Payment request captured."
         Alert.alert("Payment requested", message, [
           {
@@ -295,7 +366,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         }
       }
     },
-    [processing, params?.taskId, navigation, tasks],
+    [processing, params?.taskId, navigation, tasks, appVersion, getDeviceId, userId],
   )
 
   // make hardcoded demo scan on load

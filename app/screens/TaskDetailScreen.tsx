@@ -12,7 +12,7 @@ import { FLAGS } from "@/config/flags"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { SmileySlider } from "@/components/SmileySlider"
 import { RatingBadge } from "@/components/RatingBadge"
-import { Task } from "@/api/client"
+import { PaymentRequestApiResponse, Task } from "@/api/client"
 import { useAuth } from "@/context/AuthContext"
 import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
 import {
@@ -20,6 +20,7 @@ import {
   hasSubmittedFeedback,
   markSubmittedFeedback,
 } from "@/features/feedback/storage/feedbackQueue"
+import { PaymentScanPayload, PaymentTaskContext } from "@/navigators/OolshikNavigator"
 
 type RouteParams = { id: string }
 type RecoveryAction = "cancel" | "release" | "reject"
@@ -56,6 +57,46 @@ function minsAgo(iso?: string) {
   })
 }
 
+function paymentExpiryText(iso?: string | null) {
+  if (!iso) return ""
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+
+  const diffMs = date.getTime() - Date.now()
+  const absMs = Math.abs(diffMs)
+  const mins = Math.round(absMs / 60000)
+
+  if (diffMs >= 0) {
+    if (mins < 1) return "Expires soon"
+    if (mins === 1) return "Expires in 1 min"
+    if (mins < 60) return `Expires in ${mins} mins`
+    const hrs = Math.round(mins / 60)
+    if (hrs === 1) return "Expires in 1 hr"
+    if (hrs < 24) return `Expires in ${hrs} hrs`
+    return `Expires on ${date.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`
+  }
+
+  if (mins < 1) return "Expired just now"
+  if (mins === 1) return "Expired 1 min ago"
+  if (mins < 60) return `Expired ${mins} mins ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs === 1) return "Expired 1 hr ago"
+  if (hrs < 24) return `Expired ${hrs} hrs ago`
+  return `Expired on ${date.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`
+}
+
 function maskPhoneNumber(input?: string) {
   if (!input) return ""
   // keep non-digits as-is, mask all digits except the last 4
@@ -78,6 +119,24 @@ function maskPhoneNumber(input?: string) {
     }
   }
   return out
+}
+
+function paymentStatusLabel(value?: string | null) {
+  const status = (value || "").toUpperCase()
+  switch (status) {
+    case "PENDING":
+      return "Pending payment"
+    case "INITIATED":
+      return "Payment initiated"
+    case "PAID_MARKED":
+      return "Marked paid"
+    case "DISPUTED":
+      return "Payment disputed"
+    case "EXPIRED":
+      return "Payment expired"
+    default:
+      return status || "Payment"
+  }
 }
 
 export default function TaskDetailScreen({ navigation }: any) {
@@ -126,6 +185,8 @@ export default function TaskDetailScreen({ navigation }: any) {
     reasonCode?: string
     reasonText?: string
   }>({ visible: false })
+  const [activePayment, setActivePayment] = useState<PaymentRequestApiResponse | null>(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -236,6 +297,30 @@ export default function TaskDetailScreen({ navigation }: any) {
   const isRequester = !!current?.requesterId && !!userId && current.requesterId === userId
 
   const isHelper = !!current?.helperId && !!userId && current.helperId === userId
+  const loadActivePayment = useCallback(async () => {
+    if (!taskId || (!isRequester && !isHelper)) {
+      setActivePayment(null)
+      return
+    }
+    setPaymentLoading(true)
+    try {
+      const res = await OolshikApi.getActivePaymentRequest(taskId)
+      if (res?.ok && res.data) {
+        setActivePayment(res.data)
+        return
+      }
+      if (res?.status === 404) {
+        setActivePayment(null)
+        return
+      }
+      setActivePayment(null)
+    } catch {
+      setActivePayment(null)
+    } finally {
+      setPaymentLoading(false)
+    }
+  }, [taskId, isRequester, isHelper])
+
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
   const contactLabel = isRequester ? "Helper phone" : "Requester phone"
@@ -329,6 +414,18 @@ export default function TaskDetailScreen({ navigation }: any) {
     refreshTask()
   }, [coords, fetchNearby, msUntilAuthExpiry, rawStatus, status, taskId])
 
+  useEffect(() => {
+    if (!current?.id) {
+      setActivePayment(null)
+      return
+    }
+    if (rawStatus === "CANCELLED" || rawStatus === "COMPLETED" || rawStatus === "OPEN") {
+      setActivePayment(null)
+      return
+    }
+    loadActivePayment()
+  }, [current?.id, current?.updatedAt, rawStatus, loadActivePayment])
+
   const msUntilReassign = reassignAvailableAtMs ? Math.max(0, reassignAvailableAtMs - nowMs) : null
   const authExpired = msUntilAuthExpiry !== null && msUntilAuthExpiry <= 0
   const canReassign =
@@ -352,15 +449,66 @@ export default function TaskDetailScreen({ navigation }: any) {
     const secs = String(totalSeconds % 60).padStart(2, "0")
     return `${mins}:${secs}`
   }, [msUntilAuthExpiry])
+  const activePaymentStatus = (
+    activePayment?.status ??
+    activePayment?.snapshot?.status ??
+    ""
+  ).toUpperCase()
+  const paymentAwaitingUser =
+    activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"
+  const paymentCanAct = !!activePayment?.canPay && paymentAwaitingUser
+  const paymentStatusText = paymentStatusLabel(activePaymentStatus)
+  const paymentExpiresText = paymentExpiryText(activePayment?.snapshot?.expiresAt)
+
+  const openPaymentFlow = () => {
+    if (!current || !activePayment?.id) return
+    const paymentScanPayload: PaymentScanPayload = {
+      rawPayload: activePayment.upiIntent ?? "",
+      format: "upi-uri",
+      payeeVpa: activePayment?.snapshot?.payeeVpa ?? null,
+      payeeName: activePayment?.snapshot?.payeeName ?? null,
+      amount:
+        typeof activePayment?.snapshot?.amountRequested === "number"
+          ? activePayment.snapshot.amountRequested
+          : null,
+      currency: activePayment?.snapshot?.currency ?? "INR",
+      note: activePayment?.snapshot?.note ?? null,
+      scanLocation: null,
+      scannedAt: activePayment?.snapshot?.createdAt ?? new Date().toISOString(),
+      guidelines: [
+        "Verify recipient and amount before transfer.",
+        "Mark paid only after successful UPI confirmation.",
+      ],
+    }
+    const taskContext: PaymentTaskContext = {
+      id: String(current.id),
+      title: current.title ?? current.description ?? null,
+      createdByName: current.createdByName ?? null,
+      createdByPhoneNumber: current.createdByPhoneNumber
+        ? String(current.createdByPhoneNumber)
+        : null,
+    }
+    navigation.navigate("PaymentPay", {
+      taskId: String(current.id),
+      paymentRequestId: activePayment.id,
+      scanPayload: paymentScanPayload,
+      taskContext,
+      upiIntentOverride: activePayment.upiIntent,
+    })
+  }
 
   const onRevealPhone = async () => {
+    if (true) {
+      navigation.navigate("QrScanner", { taskId: current?.id })
+      return
+    }
     if (!current) return
     try {
       setRevealLoading(true)
       setIsRevealed(true)
 
       // Calls backend to log & return full number
-      const res = await OolshikApi.revealPhone(current.id as any)
+      const res = await OolshikApi.revealPhone(current?.id as any)
       if (res?.ok) {
         const num = res.data?.phoneNumber ?? fullPhone
         // const num = (res.data as { phoneNumber?: string })?.phoneNumber ?? fullPhone
@@ -777,7 +925,6 @@ export default function TaskDetailScreen({ navigation }: any) {
               transform: [{ scale: pressed ? 0.98 : 1 }],
               alignItems: "center",
               justifyContent: "center",
-              minHeight: 32,
             })}
           >
             {refreshing ? (
@@ -1164,6 +1311,62 @@ export default function TaskDetailScreen({ navigation }: any) {
               )}
             </View>
           ) : null}
+          {(isRequester || isHelper) && activePayment ? (
+            <View
+              style={{
+                gap: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.palette.primary200,
+                backgroundColor: colors.palette.primary100,
+                marginHorizontal: 16,
+                paddingBottom: 14,
+                marginVertical: 5,
+                paddingTop: 12,
+              }}
+            >
+              <Text text="Payment update" preset="subheading" />
+              <Text text={paymentStatusText} size="xs" style={{ color: neutral700 }} />
+              {typeof activePayment?.snapshot?.amountRequested === "number" && (
+                <Text
+                  text={`Amount: ₹${activePayment.snapshot.amountRequested.toFixed(2)}`}
+                  size="xs"
+                  style={{ color: neutral700 }}
+                />
+              )}
+              {paymentExpiresText ? (
+                <Text
+                  text={paymentExpiresText}
+                  size="xs"
+                  style={{ color: neutral600 }}
+                />
+              ) : null}
+              {paymentLoading ? (
+                <Text text="Refreshing payment status..." size="xs" style={{ color: neutral600 }} />
+              ) : null}
+              {isRequester && paymentCanAct ? (
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  <Button
+                    text="Pay with UPI"
+                    onPress={openPaymentFlow}
+                    style={{ flex: 1, paddingVertical: spacing.xs }}
+                  />
+                  <Button
+                    text="Refresh"
+                    onPress={loadActivePayment}
+                    style={{ flex: 1, paddingVertical: spacing.xs }}
+                  />
+                </View>
+              ) : isHelper && activePayment?.payerRole === "REQUESTER" ? (
+                <Text
+                  text="Requester has been notified to complete payment."
+                  size="xs"
+                  style={{ color: neutral600 }}
+                />
+              ) : null}
+            </View>
+          ) : null}
           {canRate ? (
             <View
               style={{
@@ -1220,13 +1423,18 @@ export default function TaskDetailScreen({ navigation }: any) {
                 borderColor: colors.palette.neutral300,
                 backgroundColor: colors.palette.neutral100,
                 marginHorizontal: 16,
+                marginVertical: 5,
                 paddingBottom: 16,
                 paddingTop: 12,
               }}
             >
               <Text text="How was the overall experience?" preset="subheading" />
               {csatSubmitted ? (
-                <Text text="Thanks for the feedback." size="xs" style={{ color: neutral600 }} />
+                <Text
+                  text="You have submitted. Thanks for the feedback."
+                  size="xs"
+                  style={{ color: neutral600 }}
+                />
               ) : (
                 <>
                   <View style={{ flexDirection: "row", gap: spacing.xs }}>
@@ -1258,12 +1466,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                   <View style={{ gap: spacing.xs }}>
                     <Text text="Quick tag (optional)" size="xs" style={{ color: neutral600 }} />
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
-                      {[
-                        "Smooth",
-                        "Helpful",
-                        "Clear communication",
-                        "Could improve",
-                      ].map((tag) => {
+                      {["Smooth", "Helpful", "Clear communication", "Could improve"].map((tag) => {
                         const active = csatTag === tag
                         return (
                           <Pressable
@@ -1281,7 +1484,11 @@ export default function TaskDetailScreen({ navigation }: any) {
                             accessibilityRole="button"
                             accessibilityLabel={`Tag ${tag}`}
                           >
-                            <Text text={tag} size="xs" style={{ color: active ? primary : neutral700 }} />
+                            <Text
+                              text={tag}
+                              size="xs"
+                              style={{ color: active ? primary : neutral700 }}
+                            />
                           </Pressable>
                         )
                       })}

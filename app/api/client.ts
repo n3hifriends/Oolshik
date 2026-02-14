@@ -390,6 +390,31 @@ export type UserStats = {
   completedHelps?: number | null
 }
 
+export type PaymentPayerRole = "REQUESTER" | "HELPER"
+
+export type PaymentRequestApiResponse = {
+  id: string
+  taskId?: string
+  status?: string
+  upiIntent?: string
+  payerUserId?: string
+  requesterUserId?: string
+  helperUserId?: string
+  payerRole?: PaymentPayerRole
+  canPay?: boolean
+  snapshot?: {
+    taskId?: string
+    payeeVpa?: string | null
+    payeeName?: string | null
+    amountRequested?: number | null
+    currency?: string | null
+    note?: string | null
+    createdAt?: string | null
+    expiresAt?: string | null
+    status?: string | null
+  }
+}
+
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
@@ -522,9 +547,25 @@ export const OolshikApi = {
   // Expect { phoneNumber: string revealCount: number }
 
   // Payment APIs (if any) can go here
-  createPaymentRequest: (body: any) => api.post("/payments/qr-scan", body),
+  createPaymentRequest: (body: {
+    taskId: string
+    rawPayload: string
+    format: string
+    payeeVpa?: string
+    payeeName?: string
+    amount?: number
+    currency?: string
+    note?: string
+    scanLocation?: { lat: number; lon: number }
+    appVersion?: string
+    deviceId?: string
+    payerRole?: PaymentPayerRole
+  }) => api.post<PaymentRequestApiResponse>("/payments/qr-scan", body),
 
-  getPaymentRequest: (id: string) => api.get(`/payments/${id}`),
+  getPaymentRequest: (id: string) => api.get<PaymentRequestApiResponse>(`/payments/${id}`),
+
+  getActivePaymentRequest: (taskId: string) =>
+    api.get<PaymentRequestApiResponse>(`/payments/task/${taskId}/active`),
 
   initiatePayment: (id: string) => api.post(`/payments/${id}/initiate`, {}),
 

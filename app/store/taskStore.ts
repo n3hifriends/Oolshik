@@ -18,6 +18,7 @@ type Task = {
   createdById?: string
   createdByName?: string
   createdAt?: string // ISO
+  updatedAt?: string // ISO
   createdByPhoneNumber?: string
   requesterPhoneNumber?: string
   helperPhoneNumber?: string
