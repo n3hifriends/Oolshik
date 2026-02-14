@@ -27,6 +27,7 @@ import { StatusChip } from "@/components/StatusChip"
 import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { useTaskFiltering, Status } from "@/hooks/useTaskFiltering"
 import { getDistanceMeters } from "@/utils/distance"
+import { kmDistance } from "@/utils/haversine"
 import { SpotlightComposer } from "@/components/SpotlightComposer"
 import { OolshikApi } from "@/api"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
@@ -90,6 +91,7 @@ export default function HomeFeedScreen({ navigation }: any) {
 
   const [titleRefreshCooldowns, setTitleRefreshCooldowns] = useState<Record<string, number>>({})
   const titleRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const lastLocationSyncRef = useRef<{ latitude: number; longitude: number; at: number } | null>(null)
 
   // search
   const [searchOpen, setSearchOpen] = useState(false)
@@ -149,6 +151,42 @@ export default function HomeFeedScreen({ navigation }: any) {
       refresh()
     }, [refresh]),
   )
+
+  useEffect(() => {
+    if (status !== "ready" || !coords) return
+
+    const now = Date.now()
+    const last = lastLocationSyncRef.current
+    const movedMeters = last
+      ? kmDistance(
+          { lat: last.latitude, lon: last.longitude },
+          { lat: coords.latitude, lon: coords.longitude },
+        ) * 1000
+      : Number.POSITIVE_INFINITY
+    const movedEnough = movedMeters >= 50
+    const staleEnough = !last || now - last.at >= 60_000
+    if (!movedEnough && !staleEnough) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await OolshikApi.updateHelperLocation(coords.latitude, coords.longitude)
+        if (!cancelled && res?.ok) {
+          lastLocationSyncRef.current = {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            at: Date.now(),
+          }
+        }
+      } catch {
+        // best-effort heartbeat; UI should stay silent
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [coords?.latitude, coords?.longitude, status])
 
   useFocusEffect(
     useCallback(() => {

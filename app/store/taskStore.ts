@@ -9,7 +9,7 @@ type Task = {
   title?: string
   description?: string
   distanceMtr?: number
-  status: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status: "DRAFT" | "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
   latitude?: number
   longitude?: number
   requesterId?: string
@@ -27,6 +27,9 @@ type Task = {
   ratingByHelper?: number | null
   requesterAvgRating?: number | null
   helperAvgRating?: number | null
+  offerAmount?: number | null
+  offerCurrency?: string | null
+  offerUpdatedAt?: string | null
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null
   pendingAuthExpiresAt?: string | null
@@ -45,7 +48,7 @@ const normalizeStatus = (
     .trim()
     .toUpperCase()
   if (!raw) return "OPEN"
-  if (raw === "PENDING") return "OPEN"
+  if (raw === "PENDING" || raw === "DRAFT") return "OPEN"
   if (raw === "CANCELED") return "CANCELLED"
   if (
     raw === "OPEN" ||

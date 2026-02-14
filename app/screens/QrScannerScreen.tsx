@@ -27,9 +27,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTaskStore } from "@/store/taskStore"
 import { loadString, saveString } from "@/utils/storage"
 import { useAuth } from "@/context/AuthContext"
+import { parseUpiQr } from "@/utils/upiQr"
 
 interface QrScannerScreenProps extends OolshikStackScreenProps<"QrScanner"> {}
-type Params = { taskId?: string }
+type Params = { taskId?: string; amount?: number | null }
 
 const DEFAULT_PAYMENT_GUIDELINES = [
   "Transfers are only accepted from the registered bank account.",
@@ -133,59 +134,6 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
     }
   }, [permission])
 
-  function parseUpiUri(uri: string) {
-    const qIndex = uri.indexOf("?")
-    if (qIndex < 0) {
-      return { format: "unknown" as const, raw: uri }
-    }
-
-    const query = uri.slice(qIndex + 1)
-    const params: Record<string, string> = Object.create(null)
-
-    const decode = (value: string) => {
-      if (value.length === 0) return ""
-      if (value.indexOf("+") !== -1) {
-        value = value.split("+").join(" ")
-      }
-      try {
-        return decodeURIComponent(value)
-      } catch {
-        return value
-      }
-    }
-
-    let start = 0
-    for (let i = 0; i <= query.length; i++) {
-      if (i === query.length || query.charCodeAt(i) === 38 /* & */) {
-        if (i > start) {
-          const segment = query.slice(start, i)
-          const eqIdx = segment.indexOf("=")
-          const key = eqIdx === -1 ? segment : segment.slice(0, eqIdx)
-          const rawValue = eqIdx === -1 ? "" : segment.slice(eqIdx + 1)
-          params[decode(key)] = decode(rawValue)
-        }
-        start = i + 1
-      }
-    }
-
-    const payeeVpa = params.pa?.trim()
-    const payeeName = params.pn?.trim()
-    const currency = params.cu?.trim()
-    const note = params.tn?.trim()
-    const amountRaw = params.am?.trim()
-    const amountNumber = amountRaw && amountRaw.length > 0 ? Number(amountRaw) : Number.NaN
-
-    return {
-      format: "upi-uri" as const,
-      raw: uri,
-      payeeVpa: payeeVpa && payeeVpa.length > 0 ? payeeVpa : null,
-      payeeName: payeeName && payeeName.length > 0 ? payeeName : null,
-      amount: Number.isFinite(amountNumber) ? amountNumber : null,
-      currency: currency && currency.length > 0 ? currency : "INR",
-      note: note && note.length > 0 ? note : null,
-    }
-  }
-
   useFocusEffect(
     useCallback(() => {
       handledRef.current = false
@@ -211,7 +159,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         "Transaction fee",
         "Who will pay the transaction fee?",
         [
-          { text: "You", onPress: () => safeResolve("SELF") },
+          { text: "Me", onPress: () => safeResolve("SELF") },
           { text: label, onPress: () => safeResolve("OTHER") },
           { text: "Cancel", style: "cancel", onPress: () => safeResolve("CANCEL") },
         ],
@@ -230,9 +178,15 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
 
       let hadError = false
       try {
-        const parsed = data.startsWith("upi://")
-          ? parseUpiUri(data)
-          : { format: "unknown" as const, raw: data }
+        const parsed = parseUpiQr(data)
+        const routeAmount =
+          typeof params?.amount === "number" && Number.isFinite(params.amount) && params.amount > 0
+            ? Number(params.amount.toFixed(2))
+            : null
+        const resolvedAmount =
+          typeof parsed.amount === "number" && Number.isFinite(parsed.amount)
+            ? parsed.amount
+            : routeAmount
         let coords: { latitude: number; longitude: number } | undefined
         try {
           const locPerm = await Location.requestForegroundPermissionsAsync()
@@ -252,11 +206,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         const scanPayload: PaymentScanPayload = {
           rawPayload: data,
           format: parsed.format,
-          payeeVpa: (parsed as any).payeeVpa ?? null,
-          payeeName: (parsed as any).payeeName ?? null,
-          amount: typeof (parsed as any).amount === "number" ? (parsed as any).amount : null,
-          currency: (parsed as any).currency ?? null,
-          note: (parsed as any).note ?? null,
+          payeeVpa: parsed.payeeVpa ?? null,
+          payeeName: parsed.payeeName ?? null,
+          txnRef: parsed.txnRef ?? null,
+          mcc: parsed.mcc ?? null,
+          merchantId: parsed.merchantId ?? null,
+          amount: resolvedAmount,
+          currency: parsed.currency ?? null,
+          note: parsed.note ?? null,
           scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : null,
           scannedAt: new Date().toISOString(),
           guidelines: DEFAULT_PAYMENT_GUIDELINES,
@@ -297,11 +254,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           taskId,
           rawPayload: data,
           format: parsed.format,
-          payeeVpa: (parsed as any).payeeVpa ?? undefined,
-          payeeName: (parsed as any).payeeName ?? undefined,
-          amount: (parsed as any).amount ?? undefined,
-          currency: (parsed as any).currency ?? undefined,
-          note: (parsed as any).note ?? undefined,
+          payeeVpa: parsed.payeeVpa ?? undefined,
+          payeeName: parsed.payeeName ?? undefined,
+          mcc: parsed.mcc ?? undefined,
+          merchantId: parsed.merchantId ?? undefined,
+          txnRef: parsed.txnRef ?? undefined,
+          amount: resolvedAmount ?? undefined,
+          currency: parsed.currency ?? undefined,
+          note: parsed.note ?? undefined,
           scanLocation: coords ? { lat: coords.latitude, lon: coords.longitude } : undefined,
           appVersion,
           deviceId: await getDeviceId(),
@@ -366,7 +326,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         }
       }
     },
-    [processing, params?.taskId, navigation, tasks, appVersion, getDeviceId, userId],
+    [processing, params?.taskId, params?.amount, navigation, tasks, appVersion, getDeviceId, userId],
   )
 
   // make hardcoded demo scan on load
@@ -426,7 +386,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           facing="back"
           enableTorch={torchEnabled}
-          isActive={cameraActive}
+          active={cameraActive}
           onBarcodeScanned={(evt) => {
             if (evt?.data) onScanned({ data: evt.data })
           }}

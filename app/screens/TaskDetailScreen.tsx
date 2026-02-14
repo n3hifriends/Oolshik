@@ -4,7 +4,7 @@ import { useFocusEffect, useRoute } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
-import { TextField } from "@/components/TextField"
+import { TextField, TextFieldAccessoryProps } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import { useTaskStore } from "@/store/taskStore"
 import { OolshikApi } from "@/api"
@@ -19,8 +19,12 @@ import {
   submitFeedback,
   hasSubmittedFeedback,
   markSubmittedFeedback,
+  getSubmittedFeedbackSnapshot,
+  saveSubmittedFeedbackSnapshot,
+  type SubmittedFeedbackSnapshot,
 } from "@/features/feedback/storage/feedbackQueue"
 import { PaymentScanPayload, PaymentTaskContext } from "@/navigators/OolshikNavigator"
+import { canEditOfferForTask, parseOfferInput } from "@/utils/offerRules"
 
 type RouteParams = { id: string }
 type RecoveryAction = "cancel" | "release" | "reject"
@@ -174,6 +178,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const [csatTag, setCsatTag] = useState<string | null>(null)
   const [csatSubmitting, setCsatSubmitting] = useState(false)
   const [csatSubmitted, setCsatSubmitted] = useState(false)
+  const [submittedCsat, setSubmittedCsat] = useState<SubmittedFeedbackSnapshot | null>(null)
 
   const [fullPhone, setFullPhone] = React.useState<string | null>(null)
   const [isRevealed, setIsRevealed] = React.useState(false)
@@ -187,6 +192,11 @@ export default function TaskDetailScreen({ navigation }: any) {
   }>({ visible: false })
   const [activePayment, setActivePayment] = useState<PaymentRequestApiResponse | null>(null)
   const [paymentLoading, setPaymentLoading] = useState(false)
+  const [offerInput, setOfferInput] = useState("")
+  const [offerSaving, setOfferSaving] = useState(false)
+  const [offerNotice, setOfferNotice] = useState<string | null>(null)
+  const [helperPaymentAmountInput, setHelperPaymentAmountInput] = useState("")
+  const [helperPaymentAmountError, setHelperPaymentAmountError] = useState<string | null>(null)
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -249,10 +259,12 @@ export default function TaskDetailScreen({ navigation }: any) {
   useEffect(() => {
     if (!current?.id) {
       setCsatSubmitted(false)
+      setSubmittedCsat(null)
       return
     }
     const key = `task:${current.id}:csat`
     setCsatSubmitted(hasSubmittedFeedback(key))
+    setSubmittedCsat(getSubmittedFeedbackSnapshot(key))
   }, [current?.id])
 
   // ensure we have the task (e.g., deep link / app resume)
@@ -356,6 +368,12 @@ export default function TaskDetailScreen({ navigation }: any) {
     isRequester &&
     (rawStatus === "OPEN" || rawStatus === "ASSIGNED" || rawStatus === "PENDING_AUTH")
   const canRelease = isHelper && rawStatus === "ASSIGNED"
+  const canEditOffer = canEditOfferForTask(isRequester, rawStatus, current?.helperId ?? null)
+  const currentOfferAmount = typeof current?.offerAmount === "number" ? current.offerAmount : null
+  const currentOfferText =
+    currentOfferAmount == null
+      ? "No offer"
+      : `₹${currentOfferAmount.toFixed(2)} ${current?.offerCurrency || "INR"}`
 
   const helperAcceptedAtMs = current?.helperAcceptedAt
     ? new Date(current.helperAcceptedAt).getTime()
@@ -415,6 +433,27 @@ export default function TaskDetailScreen({ navigation }: any) {
   }, [coords, fetchNearby, msUntilAuthExpiry, rawStatus, status, taskId])
 
   useEffect(() => {
+    if (currentOfferAmount == null) {
+      setOfferInput("")
+      return
+    }
+    setOfferInput(currentOfferAmount.toFixed(2))
+  }, [current?.id, currentOfferAmount])
+
+  useEffect(() => {
+    if (!offerNotice) return
+    const timer = setTimeout(() => setOfferNotice(null), 3000)
+    return () => clearTimeout(timer)
+  }, [offerNotice])
+
+  useEffect(() => {
+    if (!isHelper) return
+    const amount = activePayment?.snapshot?.amountRequested
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) return
+    setHelperPaymentAmountInput((prev) => (prev.trim().length ? prev : amount.toFixed(2)))
+  }, [isHelper, activePayment?.id, activePayment?.snapshot?.amountRequested])
+
+  useEffect(() => {
     if (!current?.id) {
       setActivePayment(null)
       return
@@ -459,6 +498,69 @@ export default function TaskDetailScreen({ navigation }: any) {
   const paymentCanAct = !!activePayment?.canPay && paymentAwaitingUser
   const paymentStatusText = paymentStatusLabel(activePaymentStatus)
   const paymentExpiresText = paymentExpiryText(activePayment?.snapshot?.expiresAt)
+  const canOpenPaymentsScanner = isHelper && !!current?.id && rawStatus === "ASSIGNED"
+
+  const sanitizePaymentAmountInput = useCallback((value: string) => {
+    const cleaned = value.replace(/[^0-9.]/g, "")
+    const firstDot = cleaned.indexOf(".")
+    if (firstDot < 0) return cleaned
+    const intPart = cleaned.slice(0, firstDot + 1)
+    const fracPart = cleaned
+      .slice(firstDot + 1)
+      .replace(/\./g, "")
+      .slice(0, 2)
+    return `${intPart}${fracPart}`
+  }, [])
+
+  const PaymentAmountPrefix = useCallback(
+    (props: TextFieldAccessoryProps) => (
+      <View style={[props.style, { justifyContent: "center" }]}>
+        <Text text="₹" weight="medium" style={{ color: neutral700 }} />
+      </View>
+    ),
+    [neutral700],
+  )
+
+  const onSaveOffer = async () => {
+    if (!current || !canEditOffer || offerSaving) return
+    const parsedOffer = parseOfferInput(offerInput)
+    if (!parsedOffer.ok) {
+      Alert.alert("Invalid offer", parsedOffer.error || "Please enter a valid offer amount.")
+      return
+    }
+    const nextAmount = parsedOffer.amount
+
+    setOfferSaving(true)
+    try {
+      const res = await OolshikApi.updateTaskOffer(String(current.id), {
+        offerAmount: nextAmount,
+        offerCurrency: "INR",
+      })
+      if (!res?.ok || !res.data) {
+        const message = (res?.data as any)?.message || "Unable to update offer."
+        Alert.alert("Offer update failed", message)
+        return
+      }
+      const data = res.data as any
+      setTask((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              offerAmount: typeof data.offerAmount === "number" ? data.offerAmount : nextAmount,
+              offerCurrency: data.offerCurrency ?? "INR",
+              offerUpdatedAt: data.offerUpdatedAt ?? new Date().toISOString(),
+            }
+          : prev,
+      )
+      setOfferNotice(
+        data.notificationSuppressed
+          ? "Offer unchanged; helpers not re-notified"
+          : "Offer updated and helpers notified",
+      )
+    } finally {
+      setOfferSaving(false)
+    }
+  }
 
   const openPaymentFlow = () => {
     if (!current || !activePayment?.id) return
@@ -467,6 +569,9 @@ export default function TaskDetailScreen({ navigation }: any) {
       format: "upi-uri",
       payeeVpa: activePayment?.snapshot?.payeeVpa ?? null,
       payeeName: activePayment?.snapshot?.payeeName ?? null,
+      txnRef: activePayment?.snapshot?.txnRef ?? null,
+      mcc: activePayment?.snapshot?.mcc ?? null,
+      merchantId: activePayment?.snapshot?.merchantId ?? null,
       amount:
         typeof activePayment?.snapshot?.amountRequested === "number"
           ? activePayment.snapshot.amountRequested
@@ -497,11 +602,28 @@ export default function TaskDetailScreen({ navigation }: any) {
     })
   }
 
-  const onRevealPhone = async () => {
-    if (true) {
-      navigation.navigate("QrScanner", { taskId: current?.id })
+  const openPaymentsScanner = () => {
+    if (rawStatus !== "ASSIGNED") return
+    if (!current?.id) return
+    const trimmed = helperPaymentAmountInput.trim()
+    if (!trimmed) {
+      setHelperPaymentAmountError("Enter amount")
       return
     }
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setHelperPaymentAmountError("Enter a valid amount")
+      return
+    }
+    if (parsed > 1000000) {
+      setHelperPaymentAmountError("Amount too high")
+      return
+    }
+    setHelperPaymentAmountError(null)
+    navigation.navigate("QrScanner", { taskId: String(current.id), amount: Number(parsed.toFixed(2)) })
+  }
+
+  const onRevealPhone = async () => {
     if (!current) return
     try {
       setRevealLoading(true)
@@ -724,6 +846,13 @@ export default function TaskDetailScreen({ navigation }: any) {
 
     if (res.ok || res.queued) {
       markSubmittedFeedback(key)
+      const snapshot: SubmittedFeedbackSnapshot = {
+        rating: cleanRating,
+        tags: csatTag ? [csatTag] : undefined,
+        submittedAt: new Date().toISOString(),
+      }
+      saveSubmittedFeedbackSnapshot(key, snapshot)
+      setSubmittedCsat(snapshot)
       setCsatSubmitted(true)
       setRecoveryNotice("Thanks for the feedback.")
       return
@@ -1012,6 +1141,41 @@ export default function TaskDetailScreen({ navigation }: any) {
                 weight="bold"
                 style={{ color: neutral700 }}
               />
+            </View>
+
+            <View
+              style={{
+                gap: spacing.xs,
+                padding: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.palette.neutral300,
+                backgroundColor: colors.palette.neutral100,
+              }}
+            >
+              <Text text="Offer" weight="medium" style={{ color: neutral700 }} />
+              <Text text={currentOfferText} size="sm" style={{ color: neutral700 }} />
+              {canEditOffer ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                  <View style={{ flex: 1 }}>
+                    <TextField
+                      value={offerInput}
+                      onChangeText={setOfferInput}
+                      placeholder="Set offer amount"
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                  <Button
+                    text={offerSaving ? "Saving..." : "Save"}
+                    onPress={onSaveOffer}
+                    disabled={offerSaving}
+                    style={{ minWidth: 92 }}
+                  />
+                </View>
+              ) : null}
+              {offerNotice ? (
+                <Text text={offerNotice} size="xs" style={{ color: neutral600 }} />
+              ) : null}
             </View>
 
             {/* Contact (masked -> reveal) */}
@@ -1311,6 +1475,55 @@ export default function TaskDetailScreen({ navigation }: any) {
               )}
             </View>
           ) : null}
+          {canOpenPaymentsScanner ? (
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginVertical: 5,
+                gap: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.palette.primary200,
+                backgroundColor: colors.palette.primary100,
+                paddingBottom: 12,
+                paddingTop: 12,
+              }}
+            >
+              <Text text="Payments" preset="subheading" />
+              <Text
+                text="Set amount and continue to scan UPI QR."
+                size="xs"
+                style={{ color: neutral700 }}
+              />
+              <Text text="Amount (INR)" size="xs" style={{ color: neutral600 }} />
+              <View style={{ flexDirection: "row", alignItems: "stretch", gap: spacing.xs }}>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    value={helperPaymentAmountInput}
+                    onChangeText={(value) => {
+                      setHelperPaymentAmountInput(sanitizePaymentAmountInput(value))
+                      if (helperPaymentAmountError) setHelperPaymentAmountError(null)
+                    }}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    status={helperPaymentAmountError ? "error" : undefined}
+                    LeftAccessory={PaymentAmountPrefix}
+                    inputWrapperStyle={{ minHeight: 48, borderRadius: 10 }}
+                    containerStyle={{ marginBottom: 0 }}
+                  />
+                </View>
+                <Button
+                  text="Payments"
+                  onPress={openPaymentsScanner}
+                  style={{ minWidth: 120, minHeight: 48, justifyContent: "center" }}
+                />
+              </View>
+              {helperPaymentAmountError ? (
+                <Text text={helperPaymentAmountError} size="xs" style={{ color: "#b91c1c" }} />
+              ) : null}
+            </View>
+          ) : null}
           {(isRequester || isHelper) && activePayment ? (
             <View
               style={{
@@ -1336,11 +1549,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                 />
               )}
               {paymentExpiresText ? (
-                <Text
-                  text={paymentExpiresText}
-                  size="xs"
-                  style={{ color: neutral600 }}
-                />
+                <Text text={paymentExpiresText} size="xs" style={{ color: neutral600 }} />
               ) : null}
               {paymentLoading ? (
                 <Text text="Refreshing payment status..." size="xs" style={{ color: neutral600 }} />
@@ -1430,11 +1639,22 @@ export default function TaskDetailScreen({ navigation }: any) {
             >
               <Text text="How was the overall experience?" preset="subheading" />
               {csatSubmitted ? (
-                <Text
-                  text="You have submitted. Thanks for the feedback."
-                  size="xs"
-                  style={{ color: neutral600 }}
-                />
+                <View style={{ gap: spacing.xxs }}>
+                  <Text
+                    text="You have submitted. Thanks for the feedback."
+                    size="xs"
+                    style={{ color: neutral600 }}
+                  />
+                  {submittedCsat?.rating != null ? (
+                    <Text text={`Rating submitted: ${submittedCsat.rating}/5`} size="xs" />
+                  ) : null}
+                  {submittedCsat?.tags?.length ? (
+                    <Text text={`Tag: ${submittedCsat.tags.join(", ")}`} size="xs" />
+                  ) : null}
+                  {submittedCsat?.message ? (
+                    <Text text={`Comment: ${submittedCsat.message}`} size="xs" />
+                  ) : null}
+                </View>
               ) : (
                 <>
                   <View style={{ flexDirection: "row", gap: spacing.xs }}>
