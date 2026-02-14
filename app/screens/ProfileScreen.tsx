@@ -19,6 +19,7 @@ import {
   getProfileExtras,
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
+import { fromLanguageCode, normalizeLocaleTag, toLanguageCode } from "@/i18n/locale"
 
 const SUPPORT_EMAIL = "support@oolshik.in"
 
@@ -33,7 +34,7 @@ function getInitials(name?: string, fallback?: string) {
 export default function ProfileScreen({ navigation }: { navigation: any }) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { logout, userName, authEmail, userId } = useAuth()
   const { status: locationStatus } = useForegroundLocation({ autoRequest: false })
 
@@ -51,10 +52,10 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       const next = data ?? {}
       setExtras(next)
 
-      const storedLang = next.language
-      const currentLang = i18n.language.split("-")[0]
-      if (storedLang && storedLang !== currentLang) {
-        i18n.changeLanguage(storedLang)
+      const storedLang = next.preferredLanguage ?? next.language
+      const currentLang = normalizeLocaleTag(i18n.language)
+      if (storedLang && normalizeLocaleTag(storedLang) !== currentLang) {
+        i18n.changeLanguage(normalizeLocaleTag(storedLang))
       }
     })
 
@@ -69,49 +70,58 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   }, [])
 
   const authName = userName && userName !== "You" ? userName : undefined
-  const nameToShow = authName || extras.fullNameOverride || "Set your name"
+  const nameToShow = authName || extras.fullNameOverride || t("oolshik:profileScreen.setYourName")
   const showSetNameCta = !authName && !extras.fullNameOverride
   const identifier = authEmail || "—"
   const initials = getInitials(authName || extras.fullNameOverride, authEmail)
 
   const languageValue = useMemo(() => {
-    const current = extras.language ?? i18n.language.split("-")[0]
-    return current === "mr" ? "mr" : "en"
-  }, [extras.language, i18n.language])
+    const current = extras.preferredLanguage ?? extras.language ?? i18n.language
+    return toLanguageCode(current)
+  }, [extras.preferredLanguage, extras.language, i18n.language])
 
   const notificationsEnabled = extras.notificationsEnabled ?? true
 
   const locationLabel = useMemo(() => {
-    if (locationStatus === "ready") return "Enabled"
-    if (locationStatus === "denied") return "Denied"
-    if (locationStatus === "error") return "Error"
-    if (locationStatus === "loading") return "Checking"
-    return "Unknown"
-  }, [locationStatus])
+    if (locationStatus === "ready") return t("oolshik:profileScreen.locationEnabled")
+    if (locationStatus === "denied") return t("oolshik:profileScreen.locationDenied")
+    if (locationStatus === "error") return t("oolshik:profileScreen.locationError")
+    if (locationStatus === "loading") return t("oolshik:profileScreen.locationChecking")
+    return t("oolshik:profileScreen.locationUnknown")
+  }, [locationStatus, t])
 
   const openSettings = useCallback(async () => {
     try {
       await Linking.openSettings()
     } catch {
-      Alert.alert("Unable to open settings")
+      Alert.alert(t("oolshik:profileScreen.settingsErrorTitle"))
     }
-  }, [])
+  }, [t])
 
   const onReportIssue = useCallback(async () => {
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Oolshik Support")}`
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t("oolshik:profileScreen.mailSubject"))}`
     try {
       const canOpen = await Linking.canOpenURL(url)
       if (!canOpen) throw new Error("Cannot open mail app")
       await Linking.openURL(url)
     } catch {
-      Alert.alert("Unable to open mail app", `Email us at ${SUPPORT_EMAIL}`)
+      Alert.alert(
+        t("oolshik:profileScreen.mailOpenFailedTitle"),
+        t("oolshik:profileScreen.mailOpenFailedBody", { email: SUPPORT_EMAIL }),
+      )
     }
-  }, [])
+  }, [t])
 
   const onLanguageChange = useCallback(
     async (lang: "mr" | "en") => {
-      i18n.changeLanguage(lang)
-      await applyExtras({ language: lang })
+      const preferredLanguage = fromLanguageCode(lang)
+      await i18n.changeLanguage(preferredLanguage)
+      await applyExtras({ language: preferredLanguage, preferredLanguage })
+      try {
+        await OolshikApi.updatePreferredLanguage(preferredLanguage)
+      } catch {
+        // best-effort; local preference is already persisted
+      }
     },
     [applyExtras, i18n],
   )
@@ -158,7 +168,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
     >
-      <Text preset="heading" text="Profile" />
+      <Text preset="heading" text={t("oolshik:profileScreen.heading")} />
 
       <SectionCard>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
@@ -171,7 +181,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               alignItems: "center",
               justifyContent: "center",
             }}
-            accessibilityLabel="Profile avatar"
+            accessibilityLabel={t("oolshik:profileScreen.avatarA11y")}
           >
             <Text text={initials} style={{ fontSize: 20, fontWeight: "700" }} />
           </View>
@@ -183,17 +193,17 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               style={showSetNameCta ? { color: colors.palette.primary600 } : undefined}
             />
             <Text text={identifier} size="xs" style={{ color: colors.textDim }} />
-            <Text text="Verification: Done" size="xxs" style={{ color: colors.textDim }} />
+            <Text text={t("oolshik:profileScreen.verificationDone")} size="xxs" style={{ color: colors.textDim }} />
           </View>
         </View>
 
         {showSetNameCta ? (
           <View style={{ marginTop: spacing.md }}>
             <Button
-              text="Set your name"
+              text={t("oolshik:profileScreen.setYourName")}
               onPress={() => navigation.navigate("OolshikProfileEdit")}
               style={{ borderRadius: 10, minHeight: 44 }}
-              accessibilityLabel="Set your name"
+              accessibilityLabel={t("oolshik:profileScreen.setYourNameA11y")}
             />
           </View>
         ) : null}
@@ -201,7 +211,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <Pressable
           onPress={() => setAdvancedOpen((v) => !v)}
           accessibilityRole="button"
-          accessibilityLabel="Advanced profile details"
+          accessibilityLabel={t("oolshik:profileScreen.advancedA11y")}
           style={{
             marginTop: spacing.md,
             paddingTop: spacing.md,
@@ -212,57 +222,61 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             justifyContent: "space-between",
           }}
         >
-          <Text text="Advanced" weight="medium" />
-          <Text text={advancedOpen ? "Hide" : "Show"} size="xs" />
+          <Text text={t("oolshik:profileScreen.advanced")} weight="medium" />
+          <Text text={advancedOpen ? t("oolshik:profileScreen.hide") : t("oolshik:profileScreen.show")} size="xs" />
         </Pressable>
 
         {advancedOpen ? (
           <View style={{ marginTop: spacing.sm }}>
-            <Text text={`User ID: ${userId ?? "—"}`} size="xs" style={{ color: colors.textDim }} />
+            <Text
+              text={t("oolshik:profileScreen.userId", { id: userId ?? "—" })}
+              size="xs"
+              style={{ color: colors.textDim }}
+            />
           </View>
         ) : null}
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text="Trust & Safety" style={{ marginBottom: spacing.sm }} />
+        <Text preset="subheading" text={t("oolshik:profileScreen.trustAndSafety")} style={{ marginBottom: spacing.sm }} />
         <View style={{ flexDirection: "row", gap: spacing.md }}>
           <View style={{ flex: 1 }}>
-            <Text text="Rating" size="xs" style={{ color: colors.textDim }} />
+            <Text text={t("oolshik:rating")} size="xs" style={{ color: colors.textDim }} />
             <Text text={ratingText} weight="medium" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text text="Completed helps" size="xs" style={{ color: colors.textDim }} />
+            <Text text={t("oolshik:profileScreen.completedHelps")} size="xs" style={{ color: colors.textDim }} />
             <Text text={completedText} weight="medium" />
           </View>
         </View>
 
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <Button
-            text="Safety tips"
+            text={t("oolshik:profileScreen.safetyTips")}
             onPress={() => setShowSafetyTips(true)}
             style={{ borderRadius: 10, minHeight: 44 }}
-            accessibilityLabel="Safety tips"
+            accessibilityLabel={t("oolshik:profileScreen.safetyTipsA11y")}
           />
           <Button
-            text="Report an issue"
+            text={t("oolshik:profileScreen.reportIssue")}
             onPress={onReportIssue}
             style={{ borderRadius: 10, minHeight: 44 }}
-            accessibilityLabel="Report an issue"
+            accessibilityLabel={t("oolshik:profileScreen.reportIssueA11y")}
           />
         </View>
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text="Preferences" style={{ marginBottom: spacing.sm }} />
+        <Text preset="subheading" text={t("oolshik:profileScreen.preferences")} style={{ marginBottom: spacing.sm }} />
 
         <View style={{ gap: spacing.sm }}>
-          <Text text="Language" size="xs" style={{ color: colors.textDim }} />
+          <Text text={t("oolshik:language")} size="xs" style={{ color: colors.textDim }} />
           <RadioGroup
             value={languageValue}
             onChange={(v) => onLanguageChange(v as "mr" | "en")}
             options={[
-              { label: "मराठी", value: "mr" },
-              { label: "English", value: "en" },
+              { label: t("oolshik:marathi"), value: "mr" },
+              { label: t("oolshik:english"), value: "en" },
             ]}
           />
         </View>
@@ -276,13 +290,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           }}
         >
           <View style={{ flex: 1, paddingRight: spacing.md }}>
-            <Text text="Notifications" weight="medium" />
-            <Text text="Local-only toggle" size="xs" style={{ color: colors.textDim }} />
+            <Text text={t("oolshik:profileScreen.notifications")} weight="medium" />
+            <Text text={t("oolshik:profileScreen.notificationsHint")} size="xs" style={{ color: colors.textDim }} />
           </View>
           <Switch
             value={notificationsEnabled}
             onValueChange={onToggleNotifications}
-            accessibilityLabel="Notifications toggle"
+            accessibilityLabel={t("oolshik:profileScreen.notificationsToggleA11y")}
           />
         </View>
 
@@ -296,14 +310,14 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           }}
         >
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text text="Location permission" weight="medium" />
+            <Text text={t("oolshik:profileScreen.locationPermission")} weight="medium" />
             <Text text={locationLabel} size="xs" style={{ color: colors.textDim }} />
           </View>
           <Button
-            text="Open Settings"
+            text={t("oolshik:profileScreen.openSettings")}
             onPress={openSettings}
             style={{ borderRadius: 10, minHeight: 44 }}
-            accessibilityLabel="Open settings"
+            accessibilityLabel={t("oolshik:profileScreen.openSettingsA11y")}
           />
         </View>
       </SectionCard>
@@ -320,26 +334,26 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             tx="oolshik:feedback.openFeedback"
             onPress={() => navigation.navigate("OolshikFeedbackHub")}
             style={{ borderRadius: 10, minHeight: 44 }}
-            accessibilityLabel="Open feedback"
+            accessibilityLabel={t("oolshik:profileScreen.openFeedbackA11y")}
           />
         </View>
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text="Account" style={{ marginBottom: spacing.sm }} />
+        <Text preset="subheading" text={t("oolshik:profileScreen.account")} style={{ marginBottom: spacing.sm }} />
         <View style={{ marginBottom: spacing.sm }}>
-          <Text text="App version" size="xs" style={{ color: colors.textDim }} />
+          <Text text={t("oolshik:profileScreen.appVersion")} size="xs" style={{ color: colors.textDim }} />
           <Text text={versionLabel} weight="medium" />
         </View>
         <View style={{ gap: spacing.sm }}>
           <Button
-            text="Edit Profile"
+            text={t("oolshik:profileScreen.editProfile")}
             onPress={() => navigation.navigate("OolshikProfileEdit")}
             style={{ borderRadius: 10, minHeight: 44 }}
-            accessibilityLabel="Edit profile"
+            accessibilityLabel={t("oolshik:profileScreen.editProfileA11y")}
           />
           <Button
-            text="Logout"
+            text={t("oolshik:profileScreen.logout")}
             onPress={logout}
             style={{
               borderRadius: 10,
@@ -348,13 +362,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               borderWidth: 0,
             }}
             textStyle={{ color: colors.palette.neutral100 }}
-            accessibilityLabel="Logout"
+            accessibilityLabel={t("oolshik:profileScreen.logoutA11y")}
           />
           <Button
-            text="Delete account (coming soon)"
+            text={t("oolshik:profileScreen.deleteAccountSoon")}
             disabled
             style={{ borderRadius: 10, minHeight: 44 }}
-            accessibilityLabel="Delete account"
+            accessibilityLabel={t("oolshik:profileScreen.deleteAccountA11y")}
           />
         </View>
       </SectionCard>
@@ -376,13 +390,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               maxHeight: "80%",
             }}
           >
-            <Text preset="heading" text="Safety tips" />
+            <Text preset="heading" text={t("oolshik:profileScreen.safetyTipsHeading")} />
             <ScrollView style={{ marginTop: spacing.md }}>
               {[
-                "Verify task details before accepting.",
-                "Use in-app chat and avoid sharing sensitive info.",
-                "Meet in public places when possible.",
-                "Report suspicious behavior immediately.",
+                t("oolshik:profileScreen.safetyTip1"),
+                t("oolshik:profileScreen.safetyTip2"),
+                t("oolshik:profileScreen.safetyTip3"),
+                t("oolshik:profileScreen.safetyTip4"),
               ].map((tip) => (
                 <View key={tip} style={{ marginBottom: spacing.sm }}>
                   <Text text={`• ${tip}`} />
@@ -391,10 +405,10 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             </ScrollView>
             <View style={{ marginTop: spacing.md }}>
               <Button
-                text="Close"
+                text={t("oolshik:profileScreen.close")}
                 onPress={() => setShowSafetyTips(false)}
                 style={{ borderRadius: 10, minHeight: 44 }}
-                accessibilityLabel="Close safety tips"
+                accessibilityLabel={t("oolshik:profileScreen.closeSafetyTipsA11y")}
               />
             </View>
           </View>

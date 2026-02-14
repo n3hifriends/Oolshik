@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, ActivityIndicator, Pressable, Linking, Platform, Alert, Modal } from "react-native"
 import { useFocusEffect, useRoute } from "@react-navigation/native"
+import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -38,18 +39,18 @@ function getInitials(name?: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
-function minsAgo(iso?: string) {
+function minsAgo(iso: string | undefined, t: (key: string, options?: any) => string) {
   if (!iso) return ""
   const date = new Date(iso)
   const diffMs = Date.now() - date.getTime()
   const mins = Math.max(0, Math.round(diffMs / 60000))
 
-  if (mins < 1) return "just now"
-  if (mins === 1) return "1 min ago"
-  if (mins < 60) return `${mins} mins ago`
+  if (mins < 1) return t("oolshik:relativeTime.justNow")
+  if (mins === 1) return t("oolshik:relativeTime.oneMinAgo")
+  if (mins < 60) return t("oolshik:relativeTime.minsAgo", { count: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs === 1) return "1 hr ago"
-  if (hrs < 24) return `${hrs} hrs ago`
+  if (hrs === 1) return t("oolshik:relativeTime.oneHrAgo")
+  if (hrs < 24) return t("oolshik:relativeTime.hrsAgo", { count: hrs })
 
   // For older than a day, show readable date
   return date.toLocaleString(undefined, {
@@ -61,7 +62,10 @@ function minsAgo(iso?: string) {
   })
 }
 
-function paymentExpiryText(iso?: string | null) {
+function paymentExpiryText(
+  iso: string | null | undefined,
+  t: (key: string, options?: any) => string,
+) {
   if (!iso) return ""
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ""
@@ -71,34 +75,34 @@ function paymentExpiryText(iso?: string | null) {
   const mins = Math.round(absMs / 60000)
 
   if (diffMs >= 0) {
-    if (mins < 1) return "Expires soon"
-    if (mins === 1) return "Expires in 1 min"
-    if (mins < 60) return `Expires in ${mins} mins`
+    if (mins < 1) return t("payment:pay.expiry.expiresSoon")
+    if (mins === 1) return t("payment:pay.expiry.expiresInOneMin")
+    if (mins < 60) return t("payment:pay.expiry.expiresInMins", { count: mins })
     const hrs = Math.round(mins / 60)
-    if (hrs === 1) return "Expires in 1 hr"
-    if (hrs < 24) return `Expires in ${hrs} hrs`
-    return `Expires on ${date.toLocaleString(undefined, {
+    if (hrs === 1) return t("payment:pay.expiry.expiresInOneHr")
+    if (hrs < 24) return t("payment:pay.expiry.expiresInHrs", { count: hrs })
+    return t("payment:pay.expiry.expiresOn", { date: date.toLocaleString(undefined, {
       day: "2-digit",
       month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    })}`
+    }) })
   }
 
-  if (mins < 1) return "Expired just now"
-  if (mins === 1) return "Expired 1 min ago"
-  if (mins < 60) return `Expired ${mins} mins ago`
+  if (mins < 1) return t("payment:pay.expiry.expiredNow")
+  if (mins === 1) return t("payment:pay.expiry.expiredOneMin")
+  if (mins < 60) return t("payment:pay.expiry.expiredMins", { count: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs === 1) return "Expired 1 hr ago"
-  if (hrs < 24) return `Expired ${hrs} hrs ago`
-  return `Expired on ${date.toLocaleString(undefined, {
+  if (hrs === 1) return t("payment:pay.expiry.expiredOneHr")
+  if (hrs < 24) return t("payment:pay.expiry.expiredHrs", { count: hrs })
+  return t("payment:pay.expiry.expiredOn", { date: date.toLocaleString(undefined, {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  })}`
+  }) })
 }
 
 function maskPhoneNumber(input?: string) {
@@ -125,25 +129,26 @@ function maskPhoneNumber(input?: string) {
   return out
 }
 
-function paymentStatusLabel(value?: string | null) {
+function paymentStatusLabel(value: string | null | undefined, t: (key: string) => string) {
   const status = (value || "").toUpperCase()
   switch (status) {
     case "PENDING":
-      return "Pending payment"
+      return t("payment:pay.status.pending")
     case "INITIATED":
-      return "Payment initiated"
+      return t("payment:pay.status.initiated")
     case "PAID_MARKED":
-      return "Marked paid"
+      return t("payment:pay.status.paidMarked")
     case "DISPUTED":
-      return "Payment disputed"
+      return t("payment:pay.status.disputed")
     case "EXPIRED":
-      return "Payment expired"
+      return t("payment:pay.status.expired")
     default:
-      return status || "Payment"
+      return status || t("payment:pay.status.default")
   }
 }
 
 export default function TaskDetailScreen({ navigation }: any) {
+  const { t } = useTranslation()
   const { params } = useRoute<any>() as { params: RouteParams }
   const taskId = params?.id
 
@@ -208,11 +213,11 @@ export default function TaskDetailScreen({ navigation }: any) {
   const neutral700 = colors.palette.neutral700
 
   const statusMap = {
-    PENDING: { label: "Pending", bg: primarySoft, fg: primary },
-    PENDING_AUTH: { label: "Awaiting approval", bg: colors.palette.primary100, fg: primary },
-    ASSIGNED: { label: "Assigned", bg: warningSoft, fg: warning },
-    COMPLETED: { label: "Completed", bg: successSoft, fg: success },
-    CANCELLED: { label: "Cancelled", bg: colors.palette.neutral200, fg: neutral700 },
+    PENDING: { label: t("oolshik:status.pending"), bg: primarySoft, fg: primary },
+    PENDING_AUTH: { label: t("oolshik:status.pendingAuth"), bg: colors.palette.primary100, fg: primary },
+    ASSIGNED: { label: t("oolshik:status.assigned"), bg: warningSoft, fg: warning },
+    COMPLETED: { label: t("oolshik:status.completed"), bg: successSoft, fg: success },
+    CANCELLED: { label: t("oolshik:status.cancelled"), bg: colors.palette.neutral200, fg: neutral700 },
   } as const
 
   const [rating, setRating] = useState<number>(2.5) // center default (neutral)
@@ -297,8 +302,8 @@ export default function TaskDetailScreen({ navigation }: any) {
         upsertTask(res.data as Task)
         return
       }
-      const msg = (res as any)?.data?.message || "Unable to refresh task details."
-      Alert.alert("Refresh failed", msg)
+      const msg = (res as any)?.data?.message || t("errors:fallback")
+      Alert.alert(t("task:create.alerts.createFailedTitle"), msg)
     } finally {
       setRefreshing(false)
     }
@@ -335,7 +340,9 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const isPendingHelper =
     !!current?.pendingHelperId && !!userId && current.pendingHelperId === userId
-  const contactLabel = isRequester ? "Helper phone" : "Requester phone"
+  const contactLabel = isRequester
+    ? t("oolshik:taskDetailScreen.contactHelperPhone")
+    : t("oolshik:taskDetailScreen.contactRequesterPhone")
   const hasHelper = !!current?.helperId || !!current?.pendingHelperId
   const canViewContact = isRequester
     ? !!rawStatus && rawStatus !== "OPEN" && hasHelper
@@ -372,7 +379,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const currentOfferAmount = typeof current?.offerAmount === "number" ? current.offerAmount : null
   const currentOfferText =
     currentOfferAmount == null
-      ? "No offer"
+      ? t("oolshik:taskDetailScreen.noOffer")
       : `₹${currentOfferAmount.toFixed(2)} ${current?.offerCurrency || "INR"}`
 
   const helperAcceptedAtMs = current?.helperAcceptedAt
@@ -414,7 +421,7 @@ export default function TaskDetailScreen({ navigation }: any) {
     }
     if (authExpiredRef.current) return
     authExpiredRef.current = true
-    setRecoveryNotice("Authorization expired; searching again.")
+    setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationExpiredSearching"))
 
     const refreshTask = async () => {
       try {
@@ -496,8 +503,8 @@ export default function TaskDetailScreen({ navigation }: any) {
   const paymentAwaitingUser =
     activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"
   const paymentCanAct = !!activePayment?.canPay && paymentAwaitingUser
-  const paymentStatusText = paymentStatusLabel(activePaymentStatus)
-  const paymentExpiresText = paymentExpiryText(activePayment?.snapshot?.expiresAt)
+  const paymentStatusText = paymentStatusLabel(activePaymentStatus, t)
+  const paymentExpiresText = paymentExpiryText(activePayment?.snapshot?.expiresAt, t)
   const canOpenPaymentsScanner = isHelper && !!current?.id && rawStatus === "ASSIGNED"
 
   const sanitizePaymentAmountInput = useCallback((value: string) => {
@@ -525,7 +532,10 @@ export default function TaskDetailScreen({ navigation }: any) {
     if (!current || !canEditOffer || offerSaving) return
     const parsedOffer = parseOfferInput(offerInput)
     if (!parsedOffer.ok) {
-      Alert.alert("Invalid offer", parsedOffer.error || "Please enter a valid offer amount.")
+      Alert.alert(
+        t("task:create.alerts.invalidOfferTitle"),
+        parsedOffer.error || t("task:create.alerts.invalidOfferBody"),
+      )
       return
     }
     const nextAmount = parsedOffer.amount
@@ -537,8 +547,8 @@ export default function TaskDetailScreen({ navigation }: any) {
         offerCurrency: "INR",
       })
       if (!res?.ok || !res.data) {
-        const message = (res?.data as any)?.message || "Unable to update offer."
-        Alert.alert("Offer update failed", message)
+        const message = (res?.data as any)?.message || t("errors:fallback")
+        Alert.alert(t("task:create.alerts.createFailedTitle"), message)
         return
       }
       const data = res.data as any
@@ -554,8 +564,8 @@ export default function TaskDetailScreen({ navigation }: any) {
       )
       setOfferNotice(
         data.notificationSuppressed
-          ? "Offer unchanged; helpers not re-notified"
-          : "Offer updated and helpers notified",
+          ? t("oolshik:taskDetailScreen.offerUnchanged")
+          : t("oolshik:taskDetailScreen.offerUpdated"),
       )
     } finally {
       setOfferSaving(false)
@@ -581,8 +591,8 @@ export default function TaskDetailScreen({ navigation }: any) {
       scanLocation: null,
       scannedAt: activePayment?.snapshot?.createdAt ?? new Date().toISOString(),
       guidelines: [
-        "Verify recipient and amount before transfer.",
-        "Mark paid only after successful UPI confirmation.",
+        t("oolshik:taskDetailScreen.verifyRecipientGuideline"),
+        t("oolshik:taskDetailScreen.markPaidGuideline"),
       ],
     }
     const taskContext: PaymentTaskContext = {
@@ -607,16 +617,16 @@ export default function TaskDetailScreen({ navigation }: any) {
     if (!current?.id) return
     const trimmed = helperPaymentAmountInput.trim()
     if (!trimmed) {
-      setHelperPaymentAmountError("Enter amount")
+      setHelperPaymentAmountError(t("payment:qr.enterAmount"))
       return
     }
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setHelperPaymentAmountError("Enter a valid amount")
+      setHelperPaymentAmountError(t("payment:qr.invalidAmount"))
       return
     }
     if (parsed > 1000000) {
-      setHelperPaymentAmountError("Amount too high")
+      setHelperPaymentAmountError(t("payment:qr.amountTooHigh"))
       return
     }
     setHelperPaymentAmountError(null)
@@ -637,7 +647,7 @@ export default function TaskDetailScreen({ navigation }: any) {
         if (num) setFullPhone(String(num))
         setIsRevealed(true)
       } else {
-        const msg = res?.data?.message || "Unable to show number"
+        const msg = res?.data?.message || t("oolshik:taskDetailScreen.unableShowNumber")
         alert(msg)
       }
     } finally {
@@ -657,19 +667,22 @@ export default function TaskDetailScreen({ navigation }: any) {
   const onAccept = async () => {
     if (status !== "ready" || !coords) {
       refresh()
-      Alert.alert("Location not available", "Please enable location and try again.")
+      Alert.alert(
+        t("task:create.alerts.locationNotReadyTitle"),
+        t("task:create.alerts.locationNotReadyBody"),
+      )
       return
     }
     if (!current) return
     if (isRequester) {
-      Alert.alert("You created this request", "Only nearby helpers can accept it.")
+      Alert.alert(t("oolshik:taskDetailScreen.infoTitle"), t("oolshik:taskDetailScreen.onlyHelpersCanAccept"))
       return
     }
     const result = await accept(current.id, coords.latitude, coords.longitude)
     if (result === "ALREADY") {
-      alert("Already assigned")
+      alert(t("oolshik:alreadyAssigned"))
     } else if (result === "OK") {
-      alert("Authorization requested")
+      alert(t("oolshik:taskDetailScreen.authorizationRequested"))
       setTask((t: any) =>
         t
           ? {
@@ -688,7 +701,7 @@ export default function TaskDetailScreen({ navigation }: any) {
         // best-effort refresh
       }
     } else {
-      alert("Error accepting task / Requester can't accept this task")
+      alert(t("oolshik:taskDetailScreen.acceptError"))
     }
     // reflect status locally
   }
@@ -696,7 +709,7 @@ export default function TaskDetailScreen({ navigation }: any) {
   const onAuthorize = async () => {
     if (!current || actionLoading) return
     setActionLoading(true)
-    setRecoveryNotice("Authorizing...")
+    setRecoveryNotice(t("oolshik:taskDetailScreen.authorizing"))
     try {
       const res = await OolshikApi.authorizeRequest(current.id as any)
       if (res?.ok) {
@@ -715,7 +728,7 @@ export default function TaskDetailScreen({ navigation }: any) {
         } else {
           setTask((t: any) => (t ? { ...t, status: "ASSIGNED", pendingAuthExpiresAt: null } : t))
         }
-        setRecoveryNotice("Authorization approved.")
+        setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationApproved"))
         if (coords && status === "ready") {
           await fetchNearby(coords.latitude, coords.longitude)
         }
@@ -727,21 +740,21 @@ export default function TaskDetailScreen({ navigation }: any) {
           setTask(refreshed.data as Task)
           const refreshedStatus = (refreshed.data as any)?.status
           if (refreshedStatus === "ASSIGNED") {
-            setRecoveryNotice("Authorization already approved.")
+            setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationAlreadyApproved"))
             return
           }
           if (refreshedStatus === "OPEN") {
-            setRecoveryNotice("Authorization expired; searching again.")
+            setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationExpiredSearching"))
             return
           }
         }
-        setRecoveryNotice("Authorization not allowed.")
+        setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationNotAllowed"))
         return
       }
-      throw new Error("Authorize failed")
+      throw new Error(t("errors:fallback"))
     } catch {
       setAuthDecision(null)
-      Alert.alert("Approve failed", "Please try again.")
+      Alert.alert(t("task:create.alerts.createFailedTitle"), t("errors:fallback"))
     } finally {
       setActionLoading(false)
     }
@@ -749,7 +762,10 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   async function openInMaps(lat: number, lon: number, label = "Task") {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      Alert.alert("Location unavailable", "Coordinates are missing.")
+      Alert.alert(
+        t("oolshik:taskDetailScreen.locationUnavailableTitle"),
+        t("oolshik:taskDetailScreen.locationUnavailableBody"),
+      )
       return
     }
 
@@ -780,7 +796,10 @@ export default function TaskDetailScreen({ navigation }: any) {
       // fall through to alert
     }
 
-    Alert.alert("No Maps App Found", `Can't open maps on this device.\n\n${lat}, ${lon}`)
+    Alert.alert(
+      t("oolshik:taskDetailScreen.noMapsTitle"),
+      t("oolshik:taskDetailScreen.noMapsBody", { lat, lon }),
+    )
   }
 
   const onComplete = async () => {
@@ -794,9 +813,9 @@ export default function TaskDetailScreen({ navigation }: any) {
       res?.status === 409 ||
       String(res?.data || "").includes("Only requester can complete")
     ) {
-      alert("Only the requester can complete this task")
+      alert(t("oolshik:taskDetailScreen.onlyRequesterCanComplete"))
     } else {
-      alert("Error completing task")
+      alert(t("oolshik:taskDetailScreen.errorCompletingTask"))
     }
   }
 
@@ -822,9 +841,9 @@ export default function TaskDetailScreen({ navigation }: any) {
             }
           : t,
       )
-      setRecoveryNotice("Rating submitted. Thank you!")
+      setRecoveryNotice(t("oolshik:taskDetailScreen.ratingSubmitted"))
     } catch (e) {
-      Alert.alert("Rating failed", "Please try again.")
+      Alert.alert(t("oolshik:taskDetailScreen.ratingFailedTitle"), t("oolshik:taskDetailScreen.ratingFailedBody"))
     } finally {
       setRatingSubmitting(false)
     }
@@ -854,11 +873,11 @@ export default function TaskDetailScreen({ navigation }: any) {
       saveSubmittedFeedbackSnapshot(key, snapshot)
       setSubmittedCsat(snapshot)
       setCsatSubmitted(true)
-      setRecoveryNotice("Thanks for the feedback.")
+      setRecoveryNotice(t("oolshik:taskDetailScreen.thanksForFeedback"))
       return
     }
 
-    Alert.alert("Feedback failed", "Please try again.")
+    Alert.alert(t("oolshik:taskDetailScreen.feedbackFailedTitle"), t("oolshik:taskDetailScreen.feedbackFailedBody"))
   }
 
   const ratingBadgeValue = normalizedStatus === "COMPLETED" ? otherPartyRating : oppositeAvgRating
@@ -874,25 +893,25 @@ export default function TaskDetailScreen({ navigation }: any) {
       return (
         <View style={{ paddingVertical: 16, alignItems: "center", gap: 8 }}>
           <ActivityIndicator />
-          <Text text="Getting your location…" />
+          <Text text={t("task:create.gettingLocation")} />
         </View>
       )
     }
     if (status === "denied") {
       return (
         <View style={{ paddingVertical: 16, gap: 10 }}>
-          <Text preset="heading" text="Location permission denied" />
-          <Text text="Enable location to accept tasks." />
-          <Button text="Open Settings" onPress={() => Linking.openSettings()} />
+          <Text preset="heading" text={t("task:create.locationDeniedTitle")} />
+          <Text text={t("task:create.locationDeniedBody")} />
+          <Button text={t("task:create.openSettings")} onPress={() => Linking.openSettings()} />
         </View>
       )
     }
     if (status === "error") {
       return (
         <View style={{ paddingVertical: 16, gap: 10 }}>
-          <Text preset="heading" text="Could not access location" />
-          <Text text={locationError ?? "Please try again."} />
-          <Button text="Retry" onPress={refresh} />
+          <Text preset="heading" text={t("task:create.locationErrorTitle")} />
+          <Text text={locationError ?? t("errors:fallback")} />
+          <Button text={t("task:create.retry")} onPress={refresh} />
         </View>
       )
     }
@@ -915,7 +934,10 @@ export default function TaskDetailScreen({ navigation }: any) {
   const onConfirmReason = async () => {
     if (!current || !reasonModal.action || !reasonModal.reasonCode) return
     if (reasonModal.reasonCode === "OTHER" && !reasonModal.reasonText?.trim()) {
-      Alert.alert("Add a short reason", "Please add a short note for 'Other'.")
+      Alert.alert(
+        t("oolshik:taskDetailScreen.addShortReasonTitle"),
+        t("oolshik:taskDetailScreen.addShortReasonBody"),
+      )
       return
     }
     setActionLoading(true)
@@ -929,7 +951,7 @@ export default function TaskDetailScreen({ navigation }: any) {
           throw new Error("Cancel failed")
         }
         setTask((t: any) => (t ? { ...t, status: "CANCELLED" } : t))
-        setRecoveryNotice("Request cancelled. We’ve closed it and notified the helper if assigned.")
+        setRecoveryNotice(t("oolshik:taskDetailScreen.requestCancelledNotice"))
       } else if (reasonModal.action === "release") {
         const res = await OolshikApi.releaseTask(current.id, {
           reasonCode: reasonModal.reasonCode,
@@ -939,7 +961,7 @@ export default function TaskDetailScreen({ navigation }: any) {
           throw new Error("Release failed")
         }
         setTask((t: any) => (t ? { ...t, status: "OPEN", helperId: null } : t))
-        setRecoveryNotice("Task released. It’s now open for other helpers to accept.")
+        setRecoveryNotice(t("oolshik:taskDetailScreen.taskReleasedNotice"))
       } else if (reasonModal.action === "reject") {
         const res = await OolshikApi.rejectRequest(current.id, {
           reasonCode: reasonModal.reasonCode,
@@ -953,7 +975,7 @@ export default function TaskDetailScreen({ navigation }: any) {
         } else {
           setTask((t: any) => (t ? { ...t, status: "OPEN", pendingHelperId: null } : t))
         }
-        setRecoveryNotice("Authorization rejected. Searching again.")
+        setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationRejectedNotice"))
       }
 
       if (coords && status === "ready") {
@@ -961,7 +983,7 @@ export default function TaskDetailScreen({ navigation }: any) {
       }
       closeReasonSheet()
     } catch (e) {
-      Alert.alert("Action failed", "Please try again.")
+      Alert.alert(t("oolshik:taskDetailScreen.actionFailedTitle"), t("oolshik:taskDetailScreen.actionFailedBody"))
     } finally {
       setActionLoading(false)
     }
@@ -976,12 +998,12 @@ export default function TaskDetailScreen({ navigation }: any) {
         throw new Error("Reassign failed")
       }
       setTask((t: any) => (t ? { ...t, status: "OPEN", helperId: null } : t))
-      setRecoveryNotice("Request reopened. We'll look for another helper now.")
+      setRecoveryNotice(t("oolshik:taskDetailScreen.requestReopenedNotice"))
       if (coords && status === "ready") {
         await fetchNearby(coords.latitude, coords.longitude)
       }
     } catch (e) {
-      Alert.alert("Reassign failed", "Please try again.")
+      Alert.alert(t("oolshik:taskDetailScreen.reassignFailedTitle"), t("oolshik:taskDetailScreen.reassignFailedBody"))
     } finally {
       setActionLoading(false)
     }
@@ -989,31 +1011,31 @@ export default function TaskDetailScreen({ navigation }: any) {
 
   const cancelReasons = useMemo(
     () => [
-      { code: "NOT_NEEDED", label: "No longer needed" },
-      { code: "FOUND_ALTERNATIVE", label: "Found another helper" },
-      { code: "WRONG_TASK", label: "Created by mistake" },
-      { code: "OTHER", label: "Other" },
+      { code: "NOT_NEEDED", label: t("oolshik:taskDetailScreen.cancelReasonNotNeeded") },
+      { code: "FOUND_ALTERNATIVE", label: t("oolshik:taskDetailScreen.cancelReasonFoundAlternative") },
+      { code: "WRONG_TASK", label: t("oolshik:taskDetailScreen.cancelReasonWrongTask") },
+      { code: "OTHER", label: t("oolshik:taskDetailScreen.reasonOther") },
     ],
-    [],
+    [t],
   )
 
   const releaseReasons = useMemo(
     () => [
-      { code: "CANT_COMPLETE", label: "Cannot complete" },
-      { code: "EMERGENCY", label: "Emergency" },
-      { code: "OTHER", label: "Other" },
+      { code: "CANT_COMPLETE", label: t("oolshik:taskDetailScreen.releaseReasonCantComplete") },
+      { code: "EMERGENCY", label: t("oolshik:taskDetailScreen.releaseReasonEmergency") },
+      { code: "OTHER", label: t("oolshik:taskDetailScreen.reasonOther") },
     ],
-    [],
+    [t],
   )
 
   const rejectReasons = useMemo(
     () => [
-      { code: "NOT_COMFORTABLE", label: "Not comfortable" },
-      { code: "FOUND_OTHER_HELP", label: "Found other help" },
-      { code: "WAIT_TOO_LONG", label: "Waited too long" },
-      { code: "OTHER", label: "Other" },
+      { code: "NOT_COMFORTABLE", label: t("oolshik:taskDetailScreen.rejectReasonNotComfortable") },
+      { code: "FOUND_OTHER_HELP", label: t("oolshik:taskDetailScreen.rejectReasonFoundOtherHelp") },
+      { code: "WAIT_TOO_LONG", label: t("oolshik:taskDetailScreen.rejectReasonWaitTooLong") },
+      { code: "OTHER", label: t("oolshik:taskDetailScreen.reasonOther") },
     ],
-    [],
+    [t],
   )
 
   const currentReasons =
@@ -1027,7 +1049,7 @@ export default function TaskDetailScreen({ navigation }: any) {
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       {/* Header (fixed) */}
       <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
-        <Text preset="heading" text="Task Detail" />
+        <Text preset="heading" text={t("oolshik:taskDetail")} />
         {/* REPORT *** lightweight header action */}
         <View
           style={{
@@ -1041,7 +1063,7 @@ export default function TaskDetailScreen({ navigation }: any) {
             onPress={refreshTask}
             disabled={refreshing}
             accessibilityRole="button"
-            accessibilityLabel="Refresh task details"
+            accessibilityLabel={t("oolshik:taskDetailScreen.refreshTaskDetailsA11y")}
             style={({ pressed }) => ({
               minHeight: 32,
               paddingHorizontal: spacing.sm,
@@ -1059,11 +1081,16 @@ export default function TaskDetailScreen({ navigation }: any) {
             {refreshing ? (
               <ActivityIndicator size="small" color={colors.palette.primary500} />
             ) : (
-              <Text text="Refresh" size="xs" weight="medium" style={{ color: colors.textDim }} />
+              <Text
+                text={t("oolshik:taskDetailScreen.refresh")}
+                size="xs"
+                weight="medium"
+                style={{ color: colors.textDim }}
+              />
             )}
           </Pressable>
           <Button
-            text="Report"
+            text={t("oolshik:taskDetailScreen.report")}
             onPress={() => {
               navigation.navigate("OolshikReport", { taskId: current?.id })
             }}
@@ -1082,7 +1109,7 @@ export default function TaskDetailScreen({ navigation }: any) {
       <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 32 }}>
         {loading || !current ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            {loading ? <ActivityIndicator /> : <Text text="Task not found" />}
+            {loading ? <ActivityIndicator /> : <Text text={t("oolshik:taskDetailScreen.taskNotFound")} />}
           </View>
         ) : status !== "ready" ? (
           renderLocationState()
@@ -1103,8 +1130,8 @@ export default function TaskDetailScreen({ navigation }: any) {
                 <Text text={getInitials(current.createdByName)} weight="bold" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text text={current.createdByName || "Someone nearby"} weight="medium" />
-                <Text text={minsAgo(current.createdAt)} size="xs" style={{ color: neutral600 }} />
+                <Text text={current.createdByName || t("oolshik:taskCard.someoneNearby")} weight="medium" />
+                <Text text={minsAgo(current.createdAt, t)} size="xs" style={{ color: neutral600 }} />
               </View>
 
               {/* Small play control on the right */}
@@ -1113,7 +1140,11 @@ export default function TaskDetailScreen({ navigation }: any) {
                   onPress={togglePlay}
                   accessibilityRole="button"
                   accessibilityLabel={
-                    audioLoading ? "Loading voice" : playing ? "Stop voice" : "Play voice"
+                    audioLoading
+                      ? t("oolshik:taskDetailScreen.loadingVoice")
+                      : playing
+                        ? t("oolshik:taskDetailScreen.stopVoice")
+                        : t("oolshik:taskDetailScreen.playVoice")
                   }
                   accessibilityState={{ disabled: audioLoading }}
                   style={{
@@ -1137,7 +1168,7 @@ export default function TaskDetailScreen({ navigation }: any) {
             {/* Title / description */}
             <View style={{ gap: spacing.xs }}>
               <Text
-                text={current.description || "Voice task"}
+                text={current.description || t("oolshik:taskDetailScreen.voiceTask")}
                 weight="bold"
                 style={{ color: neutral700 }}
               />
@@ -1153,7 +1184,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                 backgroundColor: colors.palette.neutral100,
               }}
             >
-              <Text text="Offer" weight="medium" style={{ color: neutral700 }} />
+              <Text text={t("oolshik:taskDetailScreen.offer")} weight="medium" style={{ color: neutral700 }} />
               <Text text={currentOfferText} size="sm" style={{ color: neutral700 }} />
               {canEditOffer ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
@@ -1161,12 +1192,12 @@ export default function TaskDetailScreen({ navigation }: any) {
                     <TextField
                       value={offerInput}
                       onChangeText={setOfferInput}
-                      placeholder="Set offer amount"
+                      placeholder={t("oolshik:taskDetailScreen.setOfferAmount")}
                       keyboardType="decimal-pad"
                     />
                   </View>
                   <Button
-                    text={offerSaving ? "Saving..." : "Save"}
+                    text={offerSaving ? t("oolshik:taskDetailScreen.saving") : t("oolshik:taskDetailScreen.save")}
                     onPress={onSaveOffer}
                     disabled={offerSaving}
                     style={{ minWidth: 92 }}
@@ -1203,14 +1234,14 @@ export default function TaskDetailScreen({ navigation }: any) {
                   />
                   {isRevealed ? (
                     <Button
-                      text="Call"
+                      text={t("oolshik:taskDetailScreen.call")}
                       onPress={onCall}
                       disabled={!fullPhone}
                       style={{ paddingVertical: spacing.xs }}
                     />
                   ) : (
                     <Button
-                      text={revealLoading ? "…" : "Show"}
+                      text={revealLoading ? "…" : t("oolshik:taskDetailScreen.show")}
                       onPress={onRevealPhone}
                       style={{ paddingVertical: spacing.xs }}
                     />
@@ -1249,7 +1280,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                     }}
                   >
                     <Text
-                      text={`${distance} away`}
+                      text={t("oolshik:taskCard.distanceAway", { distance })}
                       size="xs"
                       numberOfLines={1}
                       style={{ color: neutral700 }}
@@ -1275,7 +1306,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                     flexShrink: 1,
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Open maps for directions"
+                  accessibilityLabel={t("oolshik:taskDetailScreen.openMapA11y")}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <View
@@ -1291,7 +1322,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                     <Text text="↗" size="xxs" weight="bold" style={{ color: "white" }} />
                   </View>
                   <Text
-                    text="Map"
+                    text={t("oolshik:taskDetailScreen.map")}
                     size="xs"
                     weight="medium"
                     numberOfLines={1}
@@ -1359,21 +1390,26 @@ export default function TaskDetailScreen({ navigation }: any) {
                     backgroundColor: colors.palette.neutral100,
                   }}
                 >
-                  <Text text="Helper requested authorization." weight="medium" />
-                  <Text text={`Requester: ${current.createdByName || "Requester"}`} size="xs" />
+                  <Text text={t("oolshik:taskDetailScreen.helperRequestedAuthorization")} weight="medium" />
+                  <Text
+                    text={t("oolshik:taskDetailScreen.requesterLabel", {
+                      name: current.createdByName || t("oolshik:taskDetailScreen.requesterFallback"),
+                    })}
+                    size="xs"
+                  />
                   {authCountdown && !authExpired && (
-                    <Text text={`Approve within ${authCountdown}`} size="xs" />
+                    <Text text={t("oolshik:taskDetailScreen.approveWithin", { time: authCountdown })} size="xs" />
                   )}
-                  {authExpired && <Text text="Authorization expired." size="xs" />}
+                  {authExpired && <Text text={t("oolshik:taskDetailScreen.authorizationExpired")} size="xs" />}
                   <View style={{ flexDirection: "row", gap: spacing.sm }}>
                     <Button
-                      text={actionLoading ? "..." : "Approve"}
+                      text={actionLoading ? "..." : t("oolshik:taskDetailScreen.approve")}
                       onPress={onAuthorize}
                       disabled={authExpired || actionLoading}
                       style={{ flex: 1, paddingVertical: spacing.xs }}
                     />
                     <Button
-                      text="Reject"
+                      text={t("oolshik:taskDetailScreen.reject")}
                       onPress={() => openReasonSheet("reject")}
                       disabled={authExpired || actionLoading}
                       style={{ flex: 1, paddingVertical: spacing.xs }}
@@ -1392,12 +1428,17 @@ export default function TaskDetailScreen({ navigation }: any) {
                     backgroundColor: colors.palette.neutral100,
                   }}
                 >
-                  <Text text="Waiting for requester approval." weight="medium" />
-                  <Text text={`Requester: ${current.createdByName || "Requester"}`} size="xs" />
+                  <Text text={t("oolshik:taskDetailScreen.waitingRequesterApproval")} weight="medium" />
+                  <Text
+                    text={t("oolshik:taskDetailScreen.requesterLabel", {
+                      name: current.createdByName || t("oolshik:taskDetailScreen.requesterFallback"),
+                    })}
+                    size="xs"
+                  />
                   {authCountdown && !authExpired && (
-                    <Text text={`Time left: ${authCountdown}`} size="xs" />
+                    <Text text={t("oolshik:taskDetailScreen.timeLeft", { time: authCountdown })} size="xs" />
                   )}
-                  {authExpired && <Text text="Authorization expired." size="xs" />}
+                  {authExpired && <Text text={t("oolshik:taskDetailScreen.authorizationExpired")} size="xs" />}
                 </View>
               ) : (
                 <View
@@ -1411,7 +1452,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                     backgroundColor: colors.palette.neutral100,
                   }}
                 >
-                  <Text text="Awaiting requester approval." weight="medium" />
+                  <Text text={t("oolshik:taskDetailScreen.awaitingRequesterApproval")} weight="medium" />
                 </View>
               )}
             </View>
@@ -1436,12 +1477,12 @@ export default function TaskDetailScreen({ navigation }: any) {
                       backgroundColor: colors.palette.neutral100,
                     }}
                   >
-                    <Text text="You created this request." weight="medium" />
-                    <Text text="Waiting for a helper to accept." size="xs" />
+                    <Text text={t("oolshik:taskDetailScreen.createdThisRequest")} weight="medium" />
+                    <Text text={t("oolshik:taskDetailScreen.waitingForHelperToAccept")} size="xs" />
                   </View>
                 ) : (
                   <Button
-                    text="Accept"
+                    text={t("oolshik:acceptTask")}
                     onPress={onAccept}
                     style={{ flex: 2, paddingVertical: spacing.xs }}
                   />
@@ -1461,15 +1502,15 @@ export default function TaskDetailScreen({ navigation }: any) {
                 >
                   {isRequester ? (
                     <>
-                      <Text text="You can mark this task as completed." weight="medium" />
+                      <Text text={t("oolshik:taskDetailScreen.canMarkCompleted")} weight="medium" />
                       <Button
-                        text="Mark as Complete"
+                        text={t("oolshik:completeTask")}
                         onPress={onComplete}
                         style={{ flex: 2, paddingVertical: spacing.xs }}
                       />
                     </>
                   ) : (
-                    <Text text="Waiting for requester to complete." weight="medium" />
+                    <Text text={t("oolshik:taskDetailScreen.waitingForRequesterToComplete")} weight="medium" />
                   )}
                 </View>
               )}
@@ -1490,13 +1531,13 @@ export default function TaskDetailScreen({ navigation }: any) {
                 paddingTop: 12,
               }}
             >
-              <Text text="Payments" preset="subheading" />
+              <Text text={t("oolshik:taskDetailScreen.payments")} preset="subheading" />
               <Text
-                text="Set amount and continue to scan UPI QR."
+                text={t("oolshik:taskDetailScreen.paymentsHint")}
                 size="xs"
                 style={{ color: neutral700 }}
               />
-              <Text text="Amount (INR)" size="xs" style={{ color: neutral600 }} />
+              <Text text={t("oolshik:taskDetailScreen.amountInr")} size="xs" style={{ color: neutral600 }} />
               <View style={{ flexDirection: "row", alignItems: "stretch", gap: spacing.xs }}>
                 <View style={{ flex: 1 }}>
                   <TextField
@@ -1514,7 +1555,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                   />
                 </View>
                 <Button
-                  text="Payments"
+                  text={t("oolshik:taskDetailScreen.payments")}
                   onPress={openPaymentsScanner}
                   style={{ minWidth: 120, minHeight: 48, justifyContent: "center" }}
                 />
@@ -1539,11 +1580,13 @@ export default function TaskDetailScreen({ navigation }: any) {
                 paddingTop: 12,
               }}
             >
-              <Text text="Payment update" preset="subheading" />
+              <Text text={t("oolshik:taskDetailScreen.paymentUpdate")} preset="subheading" />
               <Text text={paymentStatusText} size="xs" style={{ color: neutral700 }} />
               {typeof activePayment?.snapshot?.amountRequested === "number" && (
                 <Text
-                  text={`Amount: ₹${activePayment.snapshot.amountRequested.toFixed(2)}`}
+                  text={t("oolshik:taskDetailScreen.amountValue", {
+                    amount: activePayment.snapshot.amountRequested.toFixed(2),
+                  })}
                   size="xs"
                   style={{ color: neutral700 }}
                 />
@@ -1552,24 +1595,24 @@ export default function TaskDetailScreen({ navigation }: any) {
                 <Text text={paymentExpiresText} size="xs" style={{ color: neutral600 }} />
               ) : null}
               {paymentLoading ? (
-                <Text text="Refreshing payment status..." size="xs" style={{ color: neutral600 }} />
+                <Text text={t("oolshik:taskDetailScreen.refreshingPaymentStatus")} size="xs" style={{ color: neutral600 }} />
               ) : null}
               {isRequester && paymentCanAct ? (
                 <View style={{ flexDirection: "row", gap: spacing.sm }}>
                   <Button
-                    text="Pay with UPI"
+                    text={t("oolshik:taskDetailScreen.payWithUpi")}
                     onPress={openPaymentFlow}
                     style={{ flex: 1, paddingVertical: spacing.xs }}
                   />
                   <Button
-                    text="Refresh"
+                    text={t("oolshik:taskDetailScreen.refresh")}
                     onPress={loadActivePayment}
                     style={{ flex: 1, paddingVertical: spacing.xs }}
                   />
                 </View>
               ) : isHelper && activePayment?.payerRole === "REQUESTER" ? (
                 <Text
-                  text="Requester has been notified to complete payment."
+                  text={t("oolshik:taskDetailScreen.requesterNotifiedForPayment")}
                   size="xs"
                   style={{ color: neutral600 }}
                 />
@@ -1592,7 +1635,11 @@ export default function TaskDetailScreen({ navigation }: any) {
             >
               {myRating == null && (
                 <Text
-                  text={isRequester ? "Rate your helper" : "Rate the requester"}
+                  text={
+                    isRequester
+                      ? t("oolshik:taskDetailScreen.rateYourHelper")
+                      : t("oolshik:taskDetailScreen.rateRequester")
+                  }
                   preset="subheading"
                 />
               )}
@@ -1603,20 +1650,27 @@ export default function TaskDetailScreen({ navigation }: any) {
                     {rating.toFixed(1)} / 5.0
                   </Text>
                   <Button
-                    text={ratingSubmitting ? "..." : "Submit Rating"}
+                    text={ratingSubmitting ? "..." : t("oolshik:taskDetailScreen.submitRating")}
                     onPress={onSubmitRating}
                     style={{ paddingVertical: spacing.xs }}
                     disabled={ratingSubmitting}
                   />
                 </>
               ) : (
-                <Text text={`You rated: ${myRating.toFixed(1)} / 5.0`} weight="medium" />
+                <Text
+                  text={t("oolshik:taskDetailScreen.youRated", { rating: myRating.toFixed(1) })}
+                  weight="medium"
+                />
               )}
               {otherPartyRating != null && (
                 <Text
-                  text={`${
-                    isRequester ? "Helper" : "Requester"
-                  } rated you: ${otherPartyRating.toFixed(1)} / 5.0`}
+                  text={
+                    isRequester
+                      ? t("oolshik:taskDetailScreen.helperRatedYou", { rating: otherPartyRating.toFixed(1) })
+                      : t("oolshik:taskDetailScreen.requesterRatedYou", {
+                          rating: otherPartyRating.toFixed(1),
+                        })
+                  }
                   size="xs"
                 />
               )}
@@ -1637,22 +1691,33 @@ export default function TaskDetailScreen({ navigation }: any) {
                 paddingTop: 12,
               }}
             >
-              <Text text="How was the overall experience?" preset="subheading" />
+              <Text text={t("oolshik:taskDetailScreen.overallExperience")} preset="subheading" />
               {csatSubmitted ? (
                 <View style={{ gap: spacing.xxs }}>
                   <Text
-                    text="You have submitted. Thanks for the feedback."
+                    text={t("oolshik:taskDetailScreen.alreadySubmittedThanks")}
                     size="xs"
                     style={{ color: neutral600 }}
                   />
                   {submittedCsat?.rating != null ? (
-                    <Text text={`Rating submitted: ${submittedCsat.rating}/5`} size="xs" />
+                    <Text
+                      text={t("oolshik:taskDetailScreen.ratingSubmittedValue", {
+                        rating: submittedCsat.rating,
+                      })}
+                      size="xs"
+                    />
                   ) : null}
                   {submittedCsat?.tags?.length ? (
-                    <Text text={`Tag: ${submittedCsat.tags.join(", ")}`} size="xs" />
+                    <Text
+                      text={t("oolshik:taskDetailScreen.tagLabel", { tag: submittedCsat.tags.join(", ") })}
+                      size="xs"
+                    />
                   ) : null}
                   {submittedCsat?.message ? (
-                    <Text text={`Comment: ${submittedCsat.message}`} size="xs" />
+                    <Text
+                      text={t("oolshik:taskDetailScreen.commentLabel", { comment: submittedCsat.message })}
+                      size="xs"
+                    />
                   ) : null}
                 </View>
               ) : (
@@ -1665,7 +1730,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                           key={`csat-${val}`}
                           onPress={() => setCsatRating(val)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Rate ${val}`}
+                          accessibilityLabel={t("oolshik:taskDetailScreen.rateNumberA11y", { value: val })}
                           style={({ pressed }) => ({
                             width: 36,
                             height: 36,
@@ -1684,9 +1749,14 @@ export default function TaskDetailScreen({ navigation }: any) {
                     })}
                   </View>
                   <View style={{ gap: spacing.xs }}>
-                    <Text text="Quick tag (optional)" size="xs" style={{ color: neutral600 }} />
+                    <Text text={t("oolshik:taskDetailScreen.quickTagOptional")} size="xs" style={{ color: neutral600 }} />
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
-                      {["Smooth", "Helpful", "Clear communication", "Could improve"].map((tag) => {
+                      {[
+                        t("oolshik:taskDetailScreen.tagSmooth"),
+                        t("oolshik:taskDetailScreen.tagHelpful"),
+                        t("oolshik:taskDetailScreen.tagClearCommunication"),
+                        t("oolshik:taskDetailScreen.tagCouldImprove"),
+                      ].map((tag) => {
                         const active = csatTag === tag
                         return (
                           <Pressable
@@ -1702,7 +1772,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                               opacity: pressed ? 0.7 : 1,
                             })}
                             accessibilityRole="button"
-                            accessibilityLabel={`Tag ${tag}`}
+                            accessibilityLabel={t("oolshik:taskDetailScreen.tagA11y", { tag })}
                           >
                             <Text
                               text={tag}
@@ -1715,7 +1785,7 @@ export default function TaskDetailScreen({ navigation }: any) {
                     </View>
                   </View>
                   <Button
-                    text={csatSubmitting ? "..." : "Send feedback"}
+                    text={csatSubmitting ? "..." : t("oolshik:taskDetailScreen.sendFeedback")}
                     onPress={onSubmitCsat}
                     disabled={csatSubmitting}
                     style={{ paddingVertical: spacing.xs }}
@@ -1728,24 +1798,27 @@ export default function TaskDetailScreen({ navigation }: any) {
             <View style={{ marginTop: spacing.md, marginHorizontal: 16, gap: spacing.xs }}>
               {canCancel && (
                 <Button
-                  text={actionLoading ? "..." : "Cancel Request"}
+                  text={actionLoading ? "..." : t("oolshik:taskDetailScreen.cancelRequest")}
                   onPress={() => openReasonSheet("cancel")}
                   style={{ paddingVertical: spacing.xs }}
                 />
               )}
               {canRelease && (
                 <Button
-                  text={actionLoading ? "..." : "Give Away"}
+                  text={actionLoading ? "..." : t("oolshik:taskDetailScreen.giveAway")}
                   onPress={() => openReasonSheet("release")}
                   style={{ paddingVertical: spacing.xs }}
                 />
               )}
               {isRequester && rawStatus === "ASSIGNED" && !canReassign && reassignCountdown && (
-                <Text text={`Reassign available in ${reassignCountdown}`} size="xs" />
+                <Text
+                  text={t("oolshik:taskDetailScreen.reassignAvailableIn", { time: reassignCountdown })}
+                  size="xs"
+                />
               )}
               {canReassign && (
                 <Button
-                  text={actionLoading ? "..." : "Reassign Helper"}
+                  text={actionLoading ? "..." : t("oolshik:taskDetailScreen.reassignHelper")}
                   onPress={onReassign}
                   style={{ paddingVertical: spacing.xs }}
                 />
@@ -1753,7 +1826,7 @@ export default function TaskDetailScreen({ navigation }: any) {
               {isRequester &&
                 rawStatus === "ASSIGNED" &&
                 (current?.reassignedCount ?? 0) >= MAX_REASSIGN && (
-                  <Text text="Reassign limit reached" size="xs" />
+                  <Text text={t("oolshik:taskDetailScreen.reassignLimitReached")} size="xs" />
                 )}
             </View>
           )}
@@ -1770,10 +1843,10 @@ export default function TaskDetailScreen({ navigation }: any) {
                 borderColor: success,
               }}
             >
-              <Text text="Task completed ✓" weight="bold" style={{ color: success }} />
-              <Text style={{ marginBottom: 5 }} text="Thanks for helping!" size="xs" />
+              <Text text={t("oolshik:taskDetailScreen.taskCompleted")} weight="bold" style={{ color: success }} />
+              <Text style={{ marginBottom: 5 }} text={t("oolshik:taskDetailScreen.thanksForHelping")} size="xs" />
               <Button
-                text="Ok"
+                text={t("oolshik:taskDetailScreen.ok")}
                 onPress={() => navigation.goBack()}
                 style={{ flex: 2, paddingVertical: spacing.xs }}
               />
@@ -1802,10 +1875,10 @@ export default function TaskDetailScreen({ navigation }: any) {
             <Text
               text={
                 reasonModal.action === "release"
-                  ? "Reason for giving away"
+                  ? t("oolshik:taskDetailScreen.reasonForGivingAway")
                   : reasonModal.action === "reject"
-                    ? "Reason for reject"
-                    : "Reason for cancel"
+                    ? t("oolshik:taskDetailScreen.reasonForReject")
+                    : t("oolshik:taskDetailScreen.reasonForCancel")
               }
               preset="subheading"
             />
@@ -1845,15 +1918,15 @@ export default function TaskDetailScreen({ navigation }: any) {
                     reasonText: v,
                   }))
                 }
-                placeholder="Add a short note"
+                placeholder={t("oolshik:taskDetailScreen.addShortNote")}
                 containerStyle={{ marginBottom: 0 }}
               />
             )}
 
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <Button text="Go Back" onPress={closeReasonSheet} style={{ flex: 1 }} />
+              <Button text={t("oolshik:taskDetailScreen.goBack")} onPress={closeReasonSheet} style={{ flex: 1 }} />
               <Button
-                text={actionLoading ? "..." : "Confirm"}
+                text={actionLoading ? "..." : t("oolshik:taskDetailScreen.confirm")}
                 onPress={onConfirmReason}
                 style={{ flex: 1 }}
               />

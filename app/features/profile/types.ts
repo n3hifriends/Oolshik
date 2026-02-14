@@ -12,7 +12,8 @@ export type ProfileExtras = {
   fullNameOverride?: string
   nickname?: string
   locality?: string
-  language?: "mr" | "en" | string
+  language?: "mr" | "en" | "mr-IN" | "en-IN" | string
+  preferredLanguage?: "mr-IN" | "en-IN" | string
   notificationsEnabled?: boolean
   helperRadiusKm?: number
   helperAvailable?: boolean

@@ -13,26 +13,27 @@ import hi from "./hi"
 import ja from "./ja"
 import ko from "./ko"
 import mr from "./mr"
+import { FALLBACK_LOCALE, normalizeLocaleTag, pickDeviceLocaleTag } from "./locale"
 
-const fallbackLocale = "en-US"
+const fallbackLocale = FALLBACK_LOCALE
 
-const systemLocales = Localization.getLocales()
-
-const resources = { mr, ar, en, ko, es, fr, ja, hi }
-const supportedTags = Object.keys(resources)
-
-// Checks to see if the device locale matches any of the supported locales
-// Device locale may be more specific and still match (e.g., en-US matches en)
-const systemTagMatchesSupportedTags = (deviceTag: string) => {
-  const primaryTag = deviceTag.split("-")[0]
-  return supportedTags.includes(primaryTag)
+const resources = {
+  "en-IN": en,
+  en,
+  "mr-IN": mr,
+  mr,
+  ar,
+  ko,
+  es,
+  fr,
+  ja,
+  hi,
 }
 
-const pickSupportedLocale: () => Localization.Locale | undefined = () => {
-  return systemLocales.find((locale) => systemTagMatchesSupportedTags(locale.languageTag))
-}
-
-const locale = pickSupportedLocale()
+const deviceLocaleTag = pickDeviceLocaleTag(Localization.getLocales())
+const locale = deviceLocaleTag
+  ? Localization.getLocales().find((item) => normalizeLocaleTag(item.languageTag) === deviceLocaleTag)
+  : undefined
 
 export let isRTL = false
 
@@ -49,7 +50,7 @@ export const initI18n = async () => {
 
   await i18n.init({
     resources,
-    lng: locale?.languageTag ?? fallbackLocale,
+    lng: deviceLocaleTag ?? fallbackLocale,
     fallbackLng: fallbackLocale,
     interpolation: {
       escapeValue: false,

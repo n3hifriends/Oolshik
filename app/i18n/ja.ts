@@ -33,6 +33,7 @@ const ja: Translations = {
   // @demo remove-block-start
   errors: {
     invalidEmail: "有効なメールアドレスを入力してください.",
+    fallback: "問題が発生しました。もう一度お試しください。",
   },
   loginScreen: {
     logIn: "ログイン",

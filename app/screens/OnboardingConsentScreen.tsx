@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { storage } from "@/utils/storage"
 import { useMMKVString } from "react-native-mmkv"
+import { fromLanguageCode, toLanguageCode } from "@/i18n/locale"
 
 const CONSENT_VERSION = "v1"
 
@@ -25,15 +26,15 @@ export default function OnboardingConsentScreen({ navigation }: any) {
 
   const { granted, request } = useForegroundLocation({ autoRequest: false }) as {
     granted?: boolean
-    request?: () => Promise<void>
+    request?: () => void
   }
 
   const [accepted, setAccepted] = useState(false)
-  const [lang, setLang] = useState<"mr" | "en">(i18n.language === "mr" ? "mr" : "en")
+  const [lang, setLang] = useState<"mr" | "en">(toLanguageCode(i18n.language) === "mr" ? "mr" : "en")
   const [showConsent, setShowConsent] = useState(false)
 
   useEffect(() => {
-    i18n.changeLanguage(lang)
+    i18n.changeLanguage(fromLanguageCode(lang))
   }, [lang])
 
   const canContinue = useMemo(() => Boolean(accepted && granted), [accepted, granted])

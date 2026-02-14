@@ -6,7 +6,8 @@ import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import Config from "@/config"
 import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth"
-import { init } from "i18next"
+import i18n from "i18next"
+import { normalizeLocaleTag } from "@/i18n/locale"
 
 // ---------- Toggleable API logs (default: true) ----------
 export let API_LOGS_ENABLED = true
@@ -121,9 +122,10 @@ axiosInstance.interceptors.request.use((config) => {
   ;(config as any as ReqMeta)._tsStart = Date.now()
   logRequest("AXIOS", config)
   const isAuthEndpoint = !!config.url && AUTH_WHITELIST.some((p) => config.url!.includes(p))
+  config.headers = config.headers ?? {}
+  config.headers["Accept-Language"] = normalizeLocaleTag(i18n.language)
   const access = tokens.access
   if (!isAuthEndpoint && access) {
-    config.headers = config.headers ?? {}
     config.headers.Authorization = `Bearer ${access}`
   }
   return config
@@ -138,6 +140,8 @@ const raw = axios.create({
 // ---- logging for raw axios (refresh) ----
 raw.interceptors.request.use((config) => {
   ;(config as any as ReqMeta)._tsStart = Date.now()
+  config.headers = config.headers ?? {}
+  config.headers["Accept-Language"] = normalizeLocaleTag(i18n.language)
   logRequest("RAW", config)
   return config
 })
@@ -295,10 +299,11 @@ export const api: ApisauceInstance = create({
   axiosInstance, // 👈 use our configured axios with interceptors
 })
 api.addAsyncRequestTransform(async (request) => {
+  request.headers = request.headers ?? {}
+  request.headers["Accept-Language"] = normalizeLocaleTag(i18n.language)
   const idToken = await getFirebaseIdToken(false)
   const headerToken = idToken ?? tokens.access
   if (headerToken) {
-    request.headers = request.headers ?? {}
     request.headers.Authorization = `Bearer ${headerToken}`
   }
 })
@@ -391,6 +396,17 @@ export type FeedbackCreateResponse = {
 export type UserStats = {
   avgRating?: number | null
   completedHelps?: number | null
+}
+
+export type AuthMeResponse = {
+  id?: string | number
+  phone?: string
+  email?: string
+  displayName?: string
+  roles?: string
+  languages?: string
+  preferredLanguage?: string
+  locale?: string
 }
 
 export type PaymentPayerRole = "REQUESTER" | "HELPER"
@@ -555,7 +571,13 @@ export const OolshikApi = {
     api.post<{ accessToken: string; refreshToken: string }>("/auth/otp/verify", payload),
   complete: (displayName: string, email: string) =>
     api.post("/auth/complete", { displayName, email }),
-  me: () => api.get("/auth/me"),
+  me: () => api.get<AuthMeResponse>("/auth/me"),
+  updateMe: (patch: Record<string, unknown>) => api.put<AuthMeResponse>("/auth/me", patch),
+  getPreferredLanguage: () => api.get<{ preferredLanguage?: string }>("/auth/me/language"),
+  updatePreferredLanguage: (preferredLanguage: string) =>
+    api.put<{ preferredLanguage?: string; message?: string }>("/auth/me/language", {
+      preferredLanguage,
+    }),
 
   // ---------- NEW: refresh endpoint ----------
   refresh: (refreshToken: string) =>

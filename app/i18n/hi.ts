@@ -32,6 +32,7 @@ const hi: Translations = {
   // @demo remove-block-start
   errors: {
     invalidEmail: "अमान्य ईमेल पता।",
+    fallback: "कुछ गलत हुआ। कृपया फिर से प्रयास करें।",
   },
   loginScreen: {
     logIn: "लॉग इन करें",

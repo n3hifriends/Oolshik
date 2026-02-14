@@ -1,6 +1,7 @@
 // app/screens/ReportScreen.tsx
 import React from "react"
 import { View, Alert, Pressable } from "react-native"
+import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -8,13 +9,13 @@ import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import { OolshikApi } from "@/api"
 import { useRoute, useNavigation } from "@react-navigation/native"
-import { RadioGroup } from "@/components/RadioGroup"
 
 type Params = { taskId?: string; userId?: string; targetUserId?: string }
 
 type Reason = "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
 
 export default function ReportScreen() {
+  const { t } = useTranslation()
   const nav = useNavigation<any>()
   const { params } = useRoute<any>() as { params: Params }
   const { theme } = useAppTheme()
@@ -29,13 +30,13 @@ export default function ReportScreen() {
   const validate = (): { ok: boolean; message?: string } => {
     const targetUserId = params?.targetUserId || params?.userId
     if (!params?.taskId && !targetUserId) {
-      return { ok: false, message: "Missing context. Please report from a task or a profile." }
+      return { ok: false, message: t("oolshik:reportScreen.missingContext") }
     }
     if (reason === "OTHER" && !text.trim()) {
-      return { ok: false, message: "Please add details when selecting Other." }
+      return { ok: false, message: t("oolshik:reportScreen.addDetailsForOther") }
     }
     if (text.length > 1000) {
-      return { ok: false, message: "Details are too long. Please keep under 1000 characters." }
+      return { ok: false, message: t("oolshik:reportScreen.detailsTooLong") }
     }
     return { ok: true }
   }
@@ -43,13 +44,13 @@ export default function ReportScreen() {
   const submit = async () => {
     const v = validate()
     if (!v.ok) {
-      Alert.alert("Report", v.message)
+      Alert.alert(t("oolshik:reportScreen.reportTitle"), v.message)
       return
     }
 
     setLoading(true)
     try {
-      console.log("🚀 ~ submit ~ params:", params)
+      const targetUserId = params?.targetUserId || params?.userId
       const res = await OolshikApi.report({
         taskId: params?.taskId,
         targetUserId: targetUserId,
@@ -58,23 +59,25 @@ export default function ReportScreen() {
       })
 
       if (res?.ok) {
-        Alert.alert("Thanks for reporting", "Our team will review this shortly.")
+        Alert.alert(t("oolshik:reportScreen.thanksTitle"), t("oolshik:reportScreen.thanksBody"))
         nav.goBack()
       } else {
-        Alert.alert("Report failed", res?.error ?? "Please try again.")
+        const message =
+          (res?.data as any)?.message ?? (res as any)?.problem ?? t("oolshik:homeScreen.tryAgain")
+        Alert.alert(t("oolshik:reportScreen.failedTitle"), message)
       }
     } catch (e: any) {
-      Alert.alert("Report failed", e?.message ?? "Please try again.")
+      Alert.alert(t("oolshik:reportScreen.failedTitle"), e?.message ?? t("oolshik:homeScreen.tryAgain"))
     } finally {
       setLoading(false)
     }
   }
 
   const reasons = [
-    { label: "Spam / Advertising", value: "SPAM" },
-    { label: "Inappropriate Content", value: "INAPPROPRIATE" },
-    { label: "Unsafe / Harmful", value: "UNSAFE" },
-    { label: "Other", value: "OTHER" },
+    { label: t("oolshik:reportScreen.spam"), value: "SPAM" },
+    { label: t("oolshik:reportScreen.inappropriate"), value: "INAPPROPRIATE" },
+    { label: t("oolshik:reportScreen.unsafe"), value: "UNSAFE" },
+    { label: t("oolshik:reportScreen.other"), value: "OTHER" },
   ]
   const Pill: React.FC<{
     label: string
@@ -112,10 +115,10 @@ export default function ReportScreen() {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: 16 }}
     >
-      <Text preset="heading" text="Report an issue" />
+      <Text preset="heading" text={t("oolshik:reportScreen.heading")} />
       <View style={{ height: spacing.md }} />
 
-      <Text text="Reason" weight="medium" />
+      <Text text={t("oolshik:reportScreen.reason")} weight="medium" />
       <View style={{ height: spacing.xs }} />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {reasons.map((r) => (
@@ -129,14 +132,14 @@ export default function ReportScreen() {
       </View>
 
       <View style={{ height: spacing.md }} />
-      <Text text="Details (optional)" weight="medium" />
+      <Text text={t("oolshik:reportScreen.detailsOptional")} weight="medium" />
       <View style={{ height: spacing.xs }} />
       <TextField
         multiline
         numberOfLines={6}
         value={text}
         onChangeText={(t) => setText(t.slice(0, MAX_DESC))}
-        placeholder="Describe what happened…"
+        placeholder={t("oolshik:reportScreen.placeholder")}
         style={{ minHeight: 120 }}
         editable={!loading}
       />
@@ -146,7 +149,7 @@ export default function ReportScreen() {
 
       <View style={{ height: spacing.lg }} />
       <Button
-        text={loading ? "Submitting…" : "Submit Report"}
+        text={loading ? t("oolshik:reportScreen.submitting") : t("oolshik:reportScreen.submit")}
         onPress={submit}
         disabled={loading}
         style={{ width: "100%", paddingVertical: spacing.xs }}

@@ -1,6 +1,8 @@
 import React from "react"
 import { Pressable, View } from "react-native"
+import { useTranslation } from "react-i18next"
 import { Text } from "@/components/Text"
+import type { TxKeyPath } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
 
 export type ViewMode = "forYou" | "mine"
@@ -9,11 +11,12 @@ export const Segmented: React.FC<{ value: ViewMode; onChange: (v: ViewMode) => v
   value,
   onChange,
 }) => {
+  const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { colors, spacing, isDark } = theme
-  const tabs: { key: ViewMode; tx: string; a11y: string }[] = [
-    { key: "forYou", tx: "oolshik:tabForYou", a11y: "For you" },
-    { key: "mine", tx: "oolshik:tabMyRequests", a11y: "My requests" },
+  const tabs: { key: ViewMode; tx: TxKeyPath; a11y: string }[] = [
+    { key: "forYou", tx: "oolshik:tabForYou", a11y: t("oolshik:tabForYou") },
+    { key: "mine", tx: "oolshik:tabMyRequests", a11y: t("oolshik:tabMyRequests") },
   ]
   return (
     <View

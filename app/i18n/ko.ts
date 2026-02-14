@@ -32,6 +32,7 @@ const ko: Translations = {
   // @demo remove-block-start
   errors: {
     invalidEmail: "잘못된 이메일 주소 입니다.",
+    fallback: "문제가 발생했습니다. 다시 시도해 주세요.",
   },
   loginScreen: {
     logIn: "로그인",

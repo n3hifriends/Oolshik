@@ -33,6 +33,7 @@ const fr: Translations = {
   // @demo remove-block-start
   errors: {
     invalidEmail: "Adresse e-mail invalide.",
+    fallback: "Une erreur est survenue. Veuillez réessayer.",
   },
   loginScreen: {
     logIn: "Se connecter",
