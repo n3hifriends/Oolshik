@@ -1,5 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react"
 import { TextInput, TextStyle, View, ViewStyle, Pressable } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
@@ -13,8 +14,11 @@ import type { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { getAuth, signInWithPhoneNumber, FirebaseAuthTypes } from "@react-native-firebase/auth"
 import i18n from "i18next"
-import { normalizeLocaleTag } from "@/i18n/locale"
-import { updateProfileExtras } from "@/features/profile/storage/profileExtrasStore"
+import { pickDeviceLocaleTag, resolvePreferredLocale } from "@/i18n/locale"
+import {
+  getProfileExtras,
+  updateProfileExtras,
+} from "@/features/profile/storage/profileExtrasStore"
 
 interface LoginScreenProps extends AppStackScreenProps<"Login"> {}
 
@@ -83,6 +87,7 @@ function OtpBoxes({
 }
 
 export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
+  const { t } = useTranslation()
   // Mandatory phone & OTP
   const [phone, setPhone] = useState("") // 10 digits (India-style)
   const [otp, setOtp] = useState("")
@@ -110,22 +115,55 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     setAuthEmail("")
   }, [setAuthEmail])
 
+  // Resolve locale at login screen boot:
+  // 1) saved preference
+  // 2) device locale (only en/mr supported)
+  // 3) fallback en-IN
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      let localPreference: string | null = null
+      try {
+        const extras = await getProfileExtras()
+        localPreference = extras.preferredLanguage ?? extras.language ?? null
+      } catch {
+        // best-effort
+      }
+      const resolved = resolvePreferredLocale({
+        localPreference,
+        deviceLocaleTag: pickDeviceLocaleTag() ?? null,
+      })
+      if (!active) return
+      await i18n.changeLanguage(resolved)
+      try {
+        await updateProfileExtras({ preferredLanguage: resolved, language: resolved })
+      } catch {
+        // best-effort
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
+
   // Validation
   const phoneError = useMemo(() => {
-    const t = phone.replace(/\D/g, "")
-    if (t.length === 0) return "Can't be blank"
-    if (t.length < 10) return "must be 10 digits"
+    const digits = phone.replace(/\D/g, "")
+    if (digits.length === 0) return "phone_required"
+    if (digits.length < 10) return "phone_digits"
     return ""
   }, [phone])
 
   const nameError = useMemo(() => {
-    return displayName.trim().length === 0 ? "Can't be blank" : ""
+    return displayName.trim().length === 0 ? "name_required" : ""
   }, [displayName])
 
   const withTimeout = <T,>(p: Promise<T>, ms = 30000) =>
     Promise.race([
       p,
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("OTP request timed out")), ms)),
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error(t("oolshik:login.otpTimedOut"))), ms),
+      ),
     ])
 
   // Real services
@@ -145,7 +183,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       if (msg.includes("blocked") || msg.includes("17010")) {
         // Show a precise message so you know it's anti-abuse
         throw new Error(
-          "Firebase has temporarily blocked OTP from this device. Use a test number or try a fresh emulator/real device.",
+          t("oolshik:login.firebaseOtpBlocked"),
         )
       }
       throw err
@@ -191,7 +229,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       setOtpVerified(false)
       setResendIn(30)
     } else {
-      alert("Failed to send OTP")
+      alert(t("oolshik:login.otpSendFailed"))
     }
   }
 
@@ -210,7 +248,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       })
       setOtpVerified(true)
     } else {
-      alert("Invalid OTP")
+      alert(t("oolshik:login.invalidOtp"))
     }
   }
 
@@ -223,14 +261,14 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
     // If OTP hasn't been verified yet, attempt verification now (no auto-verify on 6th digit)
     if (!otpVerified) {
       if (!otpSent || !/^\d{6}$/.test(otp)) {
-        alert("Please enter the 6-digit code to continue.")
+        alert(t("oolshik:login.otpRequired"))
         return
       }
       setLoading("verify")
       const res = await verifyOtp(phone, otp)
       setLoading(null)
       if (!(res.ok && res.data?.accessToken)) {
-        alert("Invalid OTP")
+        alert(t("oolshik:login.invalidOtp"))
         return
       }
       tokens = { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken as any }
@@ -261,9 +299,18 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           }
           setUserName(profile.displayName ?? (displayName || "You"))
           if (profile.id != null) setUserId(String(profile.id))
-          const preferredLanguage = normalizeLocaleTag(
-            profile.preferredLanguage ?? profile.locale ?? profile.languages,
-          )
+          let localPreference: string | null = null
+          try {
+            const extras = await getProfileExtras()
+            localPreference = extras.preferredLanguage ?? extras.language ?? null
+          } catch {
+            // best-effort
+          }
+          const preferredLanguage = resolvePreferredLocale({
+            serverPreference: profile.preferredLanguage ?? profile.locale ?? profile.languages ?? null,
+            localPreference,
+            deviceLocaleTag: pickDeviceLocaleTag() ?? null,
+          })
           await i18n.changeLanguage(preferredLanguage)
           await updateProfileExtras({
             preferredLanguage,
@@ -275,6 +322,20 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       }
     } catch {
       setUserName(displayName || "You")
+      try {
+        const extras = await getProfileExtras()
+        const preferredLanguage = resolvePreferredLocale({
+          localPreference: extras.preferredLanguage ?? extras.language ?? null,
+          deviceLocaleTag: pickDeviceLocaleTag() ?? null,
+        })
+        await i18n.changeLanguage(preferredLanguage)
+        await updateProfileExtras({
+          preferredLanguage,
+          language: preferredLanguage,
+        })
+      } catch {
+        // best-effort
+      }
     }
 
     // // Navigate to HomeFeed only from here
@@ -290,7 +351,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
       contentContainerStyle={themed($container)}
     >
       {/* Title */}
-      <Text preset="heading" text="Log in" style={themed($title)} />
+      <Text preset="heading" text={t("oolshik:login.heading")} style={themed($title)} />
 
       {/* STEP 1: Phone */}
       <View style={themed($card)}>
@@ -298,7 +359,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           <View style={themed($stepBadge)}>
             <Text text="1" weight="bold" style={{ color: "white" }} />
           </View>
-          <Text text="Verify your mobile" weight="bold" />
+          <Text text={t("oolshik:login.stepVerifyMobile")} weight="bold" />
           {otpVerified ? <Text text="✓" style={{ marginLeft: "auto", color: "#16A34A" }} /> : null}
         </View>
 
@@ -312,7 +373,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
               onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, 10))}
               containerStyle={{ marginBottom: 0 }}
               keyboardType="phone-pad"
-              placeholder="10-digit mobile"
+              placeholder={t("oolshik:login.phonePlaceholder")}
               status={phoneError ? "error" : undefined}
               maxLength={10}
               editable={!otpVerified}
@@ -322,7 +383,17 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           </View>
         </View>
         {!!phoneError && (
-          <Text text={phoneError} size="xs" style={{ color: "#DC2626", marginTop: spacing.xs }} />
+          <Text
+            text={
+              phoneError === "phone_required"
+                ? t("oolshik:login.phoneRequired")
+                : phoneError === "phone_digits"
+                  ? t("oolshik:login.phoneDigits")
+                  : ""
+            }
+            size="xs"
+            style={{ color: "#DC2626", marginTop: spacing.xs }}
+          />
         )}
 
         <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
@@ -330,13 +401,13 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
             text={
               otpSent
                 ? resendIn > 0
-                  ? `Resend in ${resendIn}s`
+                  ? t("oolshik:login.resendIn", { seconds: resendIn })
                   : loading === "send"
-                    ? "Sending…"
-                    : "Resend OTP"
+                    ? t("oolshik:login.sending")
+                    : t("oolshik:login.resendOtp")
                 : loading === "send"
-                  ? "Sending…"
-                  : "Send OTP"
+                  ? t("oolshik:login.sending")
+                  : t("oolshik:login.sendOtp")
             }
             onPress={onSendOtp}
             disabled={!!phoneError || loading === "send" || (otpSent && resendIn > 0)}
@@ -351,9 +422,12 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           <View style={themed($stepBadge)}>
             <Text text="2" weight="bold" style={{ color: "white" }} />
           </View>
-          <Text text="Enter 6-digit code" weight="bold" />
+          <Text text={t("oolshik:login.stepEnterOtp")} weight="bold" />
           {otpVerified ? (
-            <Text text="✓ Verified" style={{ marginLeft: "auto", color: "#16A34A" }} />
+            <Text
+              text={`✓ ${t("oolshik:login.verified")}`}
+              style={{ marginLeft: "auto", color: "#16A34A" }}
+            />
           ) : null}
         </View>
 
@@ -371,7 +445,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         {!otpVerified && (
           <View style={{ marginTop: spacing.sm }}>
             <Button
-              text={loading === "verify" ? "Verifying…" : "Verify"}
+              text={loading === "verify" ? t("oolshik:login.verifying") : t("oolshik:login.verify")}
               onPress={() => onVerifyOtp()}
               disabled={!otpSent || otp.length !== 6 || loading === "verify"}
               style={{ marginTop: spacing.md, paddingVertical: spacing.xs }}
@@ -386,7 +460,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
           <View style={themed($stepBadge)}>
             <Text text="3" weight="bold" style={{ color: "white" }} />
           </View>
-          <Text text="Your name" weight="bold" />
+          <Text text={t("oolshik:login.stepYourName")} weight="bold" />
           {displayName.trim().length > 0 ? (
             <Text text="✓" style={{ marginLeft: "auto", color: "#16A34A" }} />
           ) : null}
@@ -394,16 +468,16 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         <TextField
           value={displayName}
           onChangeText={setDisplayName}
-          placeholder="Your name"
+          placeholder={t("oolshik:login.stepYourName")}
           autoCapitalize="words"
           status={triedContinue && nameError ? "error" : undefined}
-          helper={triedContinue && nameError ? nameError : undefined}
+          helper={triedContinue && nameError ? t("oolshik:login.nameRequired") : undefined}
         />
       </View>
 
       <View style={themed($card)}>
         <Pressable onPress={() => setShowEmail((v) => !v)} style={themed($cardHeader)}>
-          <Text text="Email" weight="bold" />
+          <Text text={t("oolshik:login.email")} weight="bold" />
           <Text text={showEmail ? "-" : "+"} style={{ marginLeft: "auto", fontWeight: "bold" }} />
         </Pressable>
         {showEmail && (
@@ -413,7 +487,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
-            placeholder="name@example.com"
+            placeholder={t("oolshik:login.emailPlaceholder")}
             helper={validationError}
             status={validationError ? "error" : undefined}
           />
@@ -426,7 +500,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
         style={{ position: "absolute", left: spacing.md, right: spacing.md, bottom: spacing.md }}
       >
         <Button
-          text="Continue"
+          text={t("oolshik:login.continue")}
           onPress={onContinue}
           disabled={!!phoneError || displayName.trim().length === 0}
           style={{ paddingVertical: spacing.sm }}

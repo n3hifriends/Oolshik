@@ -144,7 +144,8 @@ export function AlertDialog(props: AlertDialogProps) {
           <Text
             preset="subheading"
             text={message}
-            style={{ marginBottom: 18, color: theme.colors.textDim, lineHeight: 20 }}
+            // Keep message line height from preset to avoid clipping complex scripts (e.g. Marathi).
+            style={{ marginBottom: 18, color: theme.colors.textDim }}
           />
         )}
         {renderButtons()}
