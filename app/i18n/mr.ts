@@ -341,6 +341,8 @@ const mr = {
       rejectReasonWaitTooLong: "खूप वेळ वाट पाहिली",
       refreshTaskDetailsA11y: "कामाचे तपशील रिफ्रेश करा",
       refresh: "रिफ्रेश",
+      refreshFailedTitle: "रिफ्रेश अयशस्वी",
+      refreshFailedBody: "कामाचे तपशील रिफ्रेश करता आले नाहीत. कृपया पुन्हा प्रयत्न करा.",
       report: "तक्रार",
       taskNotFound: "काम सापडले नाही",
       loadingVoice: "आवाज लोड होत आहे",

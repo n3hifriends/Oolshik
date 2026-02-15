@@ -333,6 +333,8 @@ const en = {
       rejectReasonWaitTooLong: "Waited too long",
       refreshTaskDetailsA11y: "Refresh task details",
       refresh: "Refresh",
+      refreshFailedTitle: "Refresh failed",
+      refreshFailedBody: "Unable to refresh task details. Please try again.",
       report: "Report",
       taskNotFound: "Task not found",
       loadingVoice: "Loading voice",
