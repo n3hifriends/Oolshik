@@ -1,11 +1,41 @@
 import { useEffect, useMemo, useState } from "react"
-import { normalize } from "@/utils/text"
+
 import { getDistanceMeters, distanceLabel } from "@/utils/distance"
+import { normalize } from "@/utils/text"
 
 export type Status = "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
 export type ViewMode = "forYou" | "mine"
 
-const normalizeStatus = (status?: string): Status | null => {
+type TaskLike = {
+  id?: string | number
+  status?: string | null
+  requesterId?: string | number | null
+  pendingHelperId?: string | number | null
+  title?: string | null
+  description?: string | null
+  createdByName?: string | null
+  requesterName?: string | null
+  createdByPhoneNumber?: string | null
+  phoneNumber?: string | null
+  createdAt?: string | null
+  distanceMtr?: number
+  distance_m?: number
+  distanceMeters?: number
+  distance?: number
+  distanceKm?: number
+}
+
+type IndexedTask = {
+  task: TaskLike
+  normalizedStatus: Status | null
+  isMine: boolean
+  pendingAuthVisibleForForYou: boolean
+  searchHaystack: string
+  sortDistance: number
+  sortCreatedAt: number
+}
+
+const normalizeStatus = (status?: string | null): Status | null => {
   const raw = String(status ?? "")
     .trim()
     .toUpperCase()
@@ -25,7 +55,7 @@ const normalizeStatus = (status?: string): Status | null => {
 }
 
 export function useTaskFiltering(
-  tasks: any[],
+  tasks: TaskLike[],
   options: {
     selectedStatuses: Set<Status>
     viewMode: ViewMode
@@ -35,71 +65,90 @@ export function useTaskFiltering(
 ) {
   const [query, setQuery] = useState(options.rawQuery)
   useEffect(() => {
+    if (options.rawQuery === "") {
+      setQuery("")
+      return
+    }
     const t = setTimeout(() => setQuery(options.rawQuery), 220)
     return () => clearTimeout(t)
   }, [options.rawQuery])
 
-  const filtered = useMemo(() => {
+  const uniqueTasks = useMemo(() => {
     const list = Array.isArray(tasks) ? tasks : []
-    // de-dupe by id
-    const unique = Array.from(new Map(list.map((t: any) => [t.id, t])).values())
+    const deduped = new Map<unknown, TaskLike>()
+    for (const task of list) {
+      deduped.set(task?.id, task)
+    }
+    return Array.from(deduped.values())
+  }, [tasks])
 
-    const statusesToUse: Status[] =
-      options.selectedStatuses.size === 0
-        ? (Array.from(
-            new Set(
-              unique
-                .map((t: any) => normalizeStatus(t.status))
-                .filter((s): s is Status => Boolean(s)),
-            ),
-          ) as Status[])
-        : (Array.from(options.selectedStatuses) as Status[])
+  const indexedTasks = useMemo(() => {
+    const indexed: IndexedTask[] = uniqueTasks.map((task) => {
+      const normalizedStatus = normalizeStatus(task.status)
+      const distanceM = getDistanceMeters(task)
 
-    const mine = (t: any) =>
-      options.myId ? String(t?.requesterId) === String(options.myId) : false
-
-    let res = unique.filter((t: any) => {
-      const normalized = normalizeStatus(t.status)
-      return normalized ? statusesToUse.includes(normalized) : false
-    })
-    res = res.filter((t: any) => (options.viewMode === "mine" ? mine(t) : !mine(t)))
-    res = res.filter((t: any) => {
-      if (t?.status !== "PENDING_AUTH") return true
-      if (options.viewMode === "mine") return true
-      return options.myId ? String(t?.pendingHelperId) === String(options.myId) : false
-    })
-
-    const q = normalize(query)
-    if (q) {
-      res = res.filter((t: any) => {
-        const distM = getDistanceMeters(t)
-        const hay = normalize(
+      return {
+        task,
+        normalizedStatus,
+        isMine: options.myId ? String(task.requesterId) === String(options.myId) : false,
+        pendingAuthVisibleForForYou:
+          task.status !== "PENDING_AUTH" ||
+          (options.myId ? String(task.pendingHelperId) === String(options.myId) : false),
+        searchHaystack: normalize(
           [
-            t?.title,
-            t?.description,
-            t?.createdByName ?? t?.requesterName,
-            t?.createdByPhoneNumber ?? t?.phoneNumber,
-            t?.status,
-            distM != null ? distanceLabel(distM) : "",
-            distM != null ? Math.round(distM) : "",
-            distM != null ? (distM / 1000).toFixed(1) + " km" : "",
+            task.title,
+            task.description,
+            task.createdByName ?? task.requesterName,
+            task.createdByPhoneNumber ?? task.phoneNumber,
+            task.status,
+            distanceM != null ? distanceLabel(distanceM) : "",
+            distanceM != null ? Math.round(distanceM) : "",
+            distanceM != null ? `${(distanceM / 1000).toFixed(1)} km` : "",
           ]
             .filter(Boolean)
             .join(" | "),
-        )
-        return hay.includes(q)
-      })
+        ),
+        sortDistance: distanceM ?? Number.POSITIVE_INFINITY,
+        sortCreatedAt: new Date(task.createdAt ?? 0).getTime(),
+      }
+    })
+
+    indexed.sort((a, b) => {
+      if (a.sortDistance !== b.sortDistance) {
+        return a.sortDistance - b.sortDistance
+      }
+      return b.sortCreatedAt - a.sortCreatedAt
+    })
+
+    return indexed
+  }, [uniqueTasks, options.myId])
+
+  const statusesToUse = useMemo(() => {
+    if (options.selectedStatuses.size > 0) return options.selectedStatuses
+
+    const discovered = new Set<Status>()
+    for (const entry of indexedTasks) {
+      if (entry.normalizedStatus) discovered.add(entry.normalizedStatus)
+    }
+    return discovered
+  }, [indexedTasks, options.selectedStatuses])
+
+  const normalizedQuery = useMemo(() => normalize(query), [query])
+
+  const filtered = useMemo(() => {
+    const showMine = options.viewMode === "mine"
+    const results: TaskLike[] = []
+
+    for (const entry of indexedTasks) {
+      if (!entry.normalizedStatus || !statusesToUse.has(entry.normalizedStatus)) continue
+      if (showMine ? !entry.isMine : entry.isMine) continue
+      if (!showMine && !entry.pendingAuthVisibleForForYou) continue
+      if (normalizedQuery && !entry.searchHaystack.includes(normalizedQuery)) continue
+      results.push(entry.task)
     }
 
-    return res.sort((a: any, b: any) => {
-      const ad = getDistanceMeters(a) ?? Number.POSITIVE_INFINITY
-      const bd = getDistanceMeters(b) ?? Number.POSITIVE_INFINITY
-      if (ad !== bd) return ad - bd
-      const at = new Date(a.createdAt ?? 0).getTime()
-      const bt = new Date(b.createdAt ?? 0).getTime()
-      return bt - at
-    })
-  }, [tasks, options.selectedStatuses, options.viewMode, options.myId, query])
+    return results
+  }, [indexedTasks, normalizedQuery, options.viewMode, statusesToUse])
 
-  return { filtered, query, setQuery }
+  return { filtered }
 }

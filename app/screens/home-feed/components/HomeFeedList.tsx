@@ -1,21 +1,21 @@
-import React from "react"
+import type { ReactElement } from "react"
 import { FlatList } from "react-native"
+
 import { Text } from "@/components/Text"
 import type { HomeFeedTask, HomeFeedViewMode } from "@/screens/home-feed/types"
 
 type HomeFeedListProps = {
   data: HomeFeedTask[]
   loading: boolean
-  renderItem: ({ item }: { item: HomeFeedTask }) => React.ReactElement | null
+  renderItem: ({ item }: { item: HomeFeedTask }) => ReactElement | null
   onRefresh: () => void
   emptyMineText: string
   emptyForYouText: string
   viewMode: HomeFeedViewMode
   extraData: {
-    radiusMeters: number
-    selected: string
     viewMode: HomeFeedViewMode
-    rawSearch: string
+    loading: boolean
+    titleRefreshCooldowns: Record<string, number>
   }
 }
 

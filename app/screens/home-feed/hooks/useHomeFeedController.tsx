@@ -83,7 +83,7 @@ export function useHomeFeedController({
     selectedStatusesRef.current = selectedStatuses
   }, [selectedStatuses])
 
-  const { filtered, setQuery } = useTaskFiltering(taskItems, {
+  const { filtered } = useTaskFiltering(taskItems, {
     selectedStatuses,
     viewMode,
     myId: userId,
@@ -491,33 +491,33 @@ export function useHomeFeedController({
       setSearchOpen(open)
       if (!open) {
         setRawSearch("")
-        setQuery("")
       }
     },
-    [setQuery],
+    [],
   )
 
-  const handleSearchChange = useCallback(
-    (nextValue: string) => {
-      setRawSearch(nextValue)
-      setQuery(nextValue)
-    },
-    [setQuery],
-  )
+  const handleSearchChange = useCallback((nextValue: string) => {
+    setRawSearch(nextValue)
+  }, [])
 
   const handleSearchClear = useCallback(() => {
     setRawSearch("")
-    setQuery("")
-  }, [setQuery])
+  }, [])
 
   const extraData = useMemo(
     () => ({
-      radiusMeters,
-      selected: Array.from(selectedStatuses).sort().join(","),
       viewMode,
-      rawSearch,
+      loading,
+      titleRefreshCooldowns,
     }),
-    [radiusMeters, selectedStatuses, viewMode, rawSearch],
+    [loading, titleRefreshCooldowns, viewMode],
+  )
+
+  const setFeedRadius = useCallback(
+    (radius: Radius) => {
+      setRadius(radius)
+    },
+    [setRadius],
   )
 
   return {
@@ -554,7 +554,7 @@ export function useHomeFeedController({
     handlers: {
       setViewMode: setNextViewMode,
       toggleStatus,
-      setRadius: (radius: Radius) => setRadius(radius),
+      setRadius: setFeedRadius,
       onAcceptPress,
       renderItem,
       onSubmitTask: handleSubmitTask,

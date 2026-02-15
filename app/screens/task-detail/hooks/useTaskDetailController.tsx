@@ -207,7 +207,10 @@ export function useTaskDetailController({
         if (nextTask) upsertTask(nextTask)
         return
       }
-      Alert.alert(t("task:create.alerts.createFailedTitle"), res.message || t("errors:fallback"))
+      Alert.alert(
+        t("oolshik:taskDetailScreen.refreshFailedTitle"),
+        res.message || t("oolshik:taskDetailScreen.refreshFailedBody"),
+      )
     } finally {
       setRefreshing(false)
     }
