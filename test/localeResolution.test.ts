@@ -29,6 +29,20 @@ describe("locale resolution", () => {
       }),
     ).toBe("mr-IN")
     expect(resolvePreferredLocale({ deviceLocaleTag: "mr-IN" })).toBe("mr-IN")
+    expect(
+      resolvePreferredLocale({
+        serverPreference: "hi-IN",
+        localPreference: "kn-IN",
+        deviceLocaleTag: "mr-IN",
+      }),
+    ).toBe("mr-IN")
+    expect(
+      resolvePreferredLocale({
+        serverPreference: "hi-IN",
+        localPreference: "kn-IN",
+        deviceLocaleTag: "fr-FR",
+      }),
+    ).toBe("en-IN")
     expect(resolvePreferredLocale({})).toBe("en-IN")
   })
 
@@ -51,4 +65,3 @@ describe("locale resolution", () => {
     expect(toLanguageCode("en-IN")).toBe("en")
   })
 })
-

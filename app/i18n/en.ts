@@ -412,6 +412,76 @@ const en = {
     chatScreen: {
       heading: "Chat (MVP text-only)",
     },
+    login: {
+      heading: "Log in",
+      stepVerifyMobile: "Verify your mobile",
+      stepEnterOtp: "Enter 6-digit code",
+      stepYourName: "Your name",
+      phonePlaceholder: "10-digit mobile",
+      sendOtp: "Send OTP",
+      resendOtp: "Resend OTP",
+      resendIn: "Resend in {{seconds}}s",
+      sending: "Sending...",
+      verify: "Verify",
+      verifying: "Verifying...",
+      verified: "Verified",
+      email: "Email",
+      emailPlaceholder: "name@example.com",
+      continue: "Continue",
+      invalidOtp: "Invalid OTP",
+      otpSendFailed: "Failed to send OTP",
+      otpTimedOut: "OTP request timed out",
+      otpRequired: "Please enter the 6-digit code to continue.",
+      phoneRequired: "Can't be blank",
+      phoneDigits: "must be 10 digits",
+      nameRequired: "Can't be blank",
+      firebaseOtpBlocked:
+        "Firebase has temporarily blocked OTP from this device. Use a test number or try a fresh emulator/real device.",
+    },
+    consent: {
+      title: "User Consent",
+      agree: "I have read and agree to the consent terms",
+      allowLocation: "Allow location access",
+      locationGranted: "Location access granted",
+      continue: "Continue",
+      ok: "Ok",
+      close: "Close",
+      languageLabel: "Language",
+      preface: "By continuing, you acknowledge and consent to the following:",
+      declarationTitle: "User Declaration",
+      declarationBody:
+        "I have read and understood this consent. By tapping “Ok”, I voluntarily provide my consent as described above.",
+      section1Title: "1. Purpose of Use",
+      section1Item1:
+        "I voluntarily provide my location, voice recordings, and phone number for use within the Oolshik app to:",
+      section1Item2: "Enable location-based help/task matching between users.",
+      section1Item3: "Facilitate voice-first task creation and communication.",
+      section1Item4: "Allow contact masking, reporting, and task coordination.",
+      section1Item5:
+        "Allow the same application to dynamically operate in requester (Neta) or helper (Karyakarta) roles based on my actions.",
+      section2Title: "2. Data Collection and Retention",
+      section2Item1: "My location is collected only in the foreground when the app is active.",
+      section2Item2:
+        "Voice clips (<=30 seconds) may be securely uploaded for playback and moderation.",
+      section2Item3:
+        "Device-level indicators (such as connectivity status) and historical interaction indicators may be processed to improve task delivery reliability.",
+      section2Item4:
+        "Data is retained only as required for lawful and service-related purposes.",
+      section3Title: "3. Consent and Withdrawal",
+      section3Item1: "Granting these permissions is essential for app functionality.",
+      section3Item2:
+        "I may withdraw consent anytime by uninstalling the app or contacting support@oolshik.in.",
+      section3Item3:
+        "Upon withdrawal, personal data will be deleted or anonymized unless retention is required by law.",
+      section4Title: "4. Data Security and Privacy",
+      section4Item1: "Data is protected using AES-256 encryption at rest and HTTPS in transit.",
+      section4Item2:
+        "Oolshik acts as a Data Fiduciary under the Digital Personal Data Protection Act, 2023.",
+      section4Item3: "Access is restricted to authorized systems and personnel only.",
+      section5Title: "5. Legal Compliance",
+      section5Item1: "Oolshik complies with applicable Indian IT laws.",
+      section5Item2: "Jurisdiction: Pune, Maharashtra, India.",
+    },
   },
   common: {
     ok: "OK!",

@@ -100,7 +100,7 @@ function handleNotificationResponse(resp: Notifications.NotificationResponse) {
   const type = typeof data?.type === "string" ? (data.type as string) : ""
   const taskId = typeof data?.taskId === "string" ? (data.taskId as string) : ""
   if (type.startsWith("TASK_") && taskId) {
-    navigate("OolshikDetail", { id: taskId })
+    navigate("Oolshik", { screen: "OolshikDetail", params: { id: taskId } })
   }
 }
 

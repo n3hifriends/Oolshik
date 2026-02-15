@@ -9,14 +9,23 @@ import { useTranslation } from "react-i18next"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { storage } from "@/utils/storage"
 import { useMMKVString } from "react-native-mmkv"
-import { fromLanguageCode, toLanguageCode } from "@/i18n/locale"
+import {
+  fromLanguageCode,
+  pickDeviceLocaleTag,
+  resolvePreferredLocale,
+  toLanguageCode,
+} from "@/i18n/locale"
+import {
+  getProfileExtras,
+  updateProfileExtras,
+} from "@/features/profile/storage/profileExtrasStore"
 
 const CONSENT_VERSION = "v1"
 
 export default function OnboardingConsentScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [onboardingComplete, setOnboardingComplete] = useMMKVString(
     "onboarding.v1.completed",
@@ -30,131 +39,102 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   }
 
   const [accepted, setAccepted] = useState(false)
-  const [lang, setLang] = useState<"mr" | "en">(toLanguageCode(i18n.language) === "mr" ? "mr" : "en")
+  const [lang, setLang] = useState<"mr" | "en">(toLanguageCode(i18n.language))
   const [showConsent, setShowConsent] = useState(false)
 
   useEffect(() => {
-    i18n.changeLanguage(fromLanguageCode(lang))
-  }, [lang])
+    let active = true
+    ;(async () => {
+      let localPreference: string | null = null
+      try {
+        const extras = await getProfileExtras()
+        localPreference = extras.preferredLanguage ?? extras.language ?? null
+      } catch {
+        // best-effort
+      }
+
+      const resolved = resolvePreferredLocale({
+        localPreference,
+        deviceLocaleTag: pickDeviceLocaleTag() ?? null,
+      })
+      const resolvedCode = toLanguageCode(resolved)
+      if (!active) return
+      setLang(resolvedCode)
+      await i18n.changeLanguage(resolved)
+      try {
+        await updateProfileExtras({
+          preferredLanguage: resolved,
+          language: resolved,
+        })
+      } catch {
+        // best-effort
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [i18n])
+
+  const onLanguageChange = async (next: "mr" | "en") => {
+    setLang(next)
+    const resolved = fromLanguageCode(next)
+    await i18n.changeLanguage(resolved)
+    try {
+      await updateProfileExtras({
+        preferredLanguage: resolved,
+        language: resolved,
+      })
+    } catch {
+      // best-effort
+    }
+  }
 
   const canContinue = useMemo(() => Boolean(accepted && granted), [accepted, granted])
 
-  const uiText = {
-    en: {
-      title: "User Consent",
-      agree: "I have read and agree to the consent terms",
-      allowLocation: "Allow location access",
-      locationGranted: "Location access granted",
-      continue: "Continue",
-      ok: "Ok",
-      close: "Close",
-    },
-    mr: {
-      title: "वापरकर्ता संमती",
-      agree: "मी संमती अटी वाचल्या आहेत व मान्य करतो/करते",
-      allowLocation: "स्थान परवानगी द्या",
-      locationGranted: "स्थान परवानगी मिळाली",
-      continue: "पुढे जा",
-      ok: "ठीक आहे",
-      close: "बंद करा",
-    },
-  } as const
-
-  const copy = uiText[lang]
-
-  /* =======================
-     CONSENT CONTENT (PATENT-ALIGNED)
-     ======================= */
-
-  const consentSections = {
-    en: {
-      preface: "By continuing, you acknowledge and consent to the following:",
-      sections: [
-        {
-          title: "1. Purpose of Use",
-          items: [
-            "I voluntarily provide my location, voice recordings, and phone number for use within the Oolshik app to:",
-            "• Enable location-based help/task matching between users.",
-            "• Facilitate voice-first task creation and communication.",
-            "• Allow contact masking, reporting, and task coordination.",
-            "• Allow the same application to dynamically operate in requester (Neta) or helper (Karyakarta) roles based on my actions.",
-          ],
-        },
-        {
-          title: "2. Data Collection and Retention",
-          items: [
-            "• My location is collected only in the foreground when the app is active.",
-            "• Voice clips (≤30 seconds) may be securely uploaded for playback and moderation.",
-            "• Device-level indicators (such as connectivity status) and historical interaction indicators may be processed to improve task delivery reliability.",
-            "• Data is retained only as required for lawful and service-related purposes.",
-          ],
-        },
-        {
-          title: "3. Consent and Withdrawal",
-          items: [
-            "• Granting these permissions is essential for app functionality.",
-            "• I may withdraw consent anytime by uninstalling the app or contacting support@oolshik.in.",
-            "• Upon withdrawal, personal data will be deleted or anonymized unless retention is required by law.",
-          ],
-        },
-        {
-          title: "4. Data Security and Privacy",
-          items: [
-            "• Data is protected using AES-256 encryption at rest and HTTPS in transit.",
-            "• Oolshik acts as a Data Fiduciary under the Digital Personal Data Protection Act, 2023.",
-            "• Access is restricted to authorized systems and personnel only.",
-          ],
-        },
-        {
-          title: "5. Legal Compliance",
-          items: [
-            "• Oolshik complies with applicable Indian IT laws.",
-            "• Jurisdiction: Pune, Maharashtra, India.",
-          ],
-        },
+  const consentSections = [
+    {
+      title: t("oolshik:consent.section1Title"),
+      items: [
+        t("oolshik:consent.section1Item1"),
+        `• ${t("oolshik:consent.section1Item2")}`,
+        `• ${t("oolshik:consent.section1Item3")}`,
+        `• ${t("oolshik:consent.section1Item4")}`,
+        `• ${t("oolshik:consent.section1Item5")}`,
       ],
-      declarationTitle: "✅ User Declaration",
-      declarationBody:
-        "I have read and understood this consent. By tapping “Ok”, I voluntarily provide my consent as described above.",
     },
-
-    mr: {
-      preface: "पुढे चालू ठेवल्यास, आपण खालील बाबींना संमती देत आहात:",
-      sections: [
-        {
-          title: "1. वापराचा उद्देश",
-          items: [
-            "मी Oolshik अ‍ॅपमध्ये माझे स्थान, व्हॉईस रेकॉर्डिंग आणि फोन नंबर स्वेच्छेने देत आहे:",
-            "• स्थानाधारित मदत/टास्क मॅचिंगसाठी.",
-            "• व्हॉईस-फर्स्ट संवादासाठी.",
-            "• एकाच अ‍ॅपमध्ये ‘नेता’ किंवा ‘कार्यकर्ता’ म्हणून भूमिका बदलण्यासाठी.",
-          ],
-        },
-        {
-          title: "2. डेटा संकलन",
-          items: [
-            "• स्थान फक्त अ‍ॅप सक्रिय असताना घेतले जाते.",
-            "• नेटवर्क स्थिती व पूर्वीचे परस्परसंवाद विश्वसनीयतेसाठी वापरले जाऊ शकतात.",
-          ],
-        },
-        {
-          title: "3. संमती",
-          items: [
-            "• संमती मागे घेण्यासाठी अ‍ॅप काढून टाका किंवा support@oolshik.in वर संपर्क करा.",
-          ],
-        },
-        {
-          title: "4. कायदेशीर पालन",
-          items: [
-            "• Oolshik, Digital Personal Data Protection Act, 2023 नुसार कार्य करते.",
-            "• अधिकारक्षेत्र: पुणे, महाराष्ट्र.",
-          ],
-        },
+    {
+      title: t("oolshik:consent.section2Title"),
+      items: [
+        `• ${t("oolshik:consent.section2Item1")}`,
+        `• ${t("oolshik:consent.section2Item2")}`,
+        `• ${t("oolshik:consent.section2Item3")}`,
+        `• ${t("oolshik:consent.section2Item4")}`,
       ],
-      declarationTitle: "✅ वापरकर्ता जाहीरनामा",
-      declarationBody: "“Ok” टॅप करून मी वरील सर्व अटी समजून संमती देतो/देते.",
     },
-  } as const
+    {
+      title: t("oolshik:consent.section3Title"),
+      items: [
+        `• ${t("oolshik:consent.section3Item1")}`,
+        `• ${t("oolshik:consent.section3Item2")}`,
+        `• ${t("oolshik:consent.section3Item3")}`,
+      ],
+    },
+    {
+      title: t("oolshik:consent.section4Title"),
+      items: [
+        `• ${t("oolshik:consent.section4Item1")}`,
+        `• ${t("oolshik:consent.section4Item2")}`,
+        `• ${t("oolshik:consent.section4Item3")}`,
+      ],
+    },
+    {
+      title: t("oolshik:consent.section5Title"),
+      items: [
+        `• ${t("oolshik:consent.section5Item1")}`,
+        `• ${t("oolshik:consent.section5Item2")}`,
+      ],
+    },
+  ]
 
   /* =======================
      UI HELPERS
@@ -187,16 +167,18 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
       <View style={{ padding: spacing.md }}>
-        <Text preset="heading" text={copy.title} />
+        <Text preset="heading" text={t("oolshik:consent.title")} />
       </View>
 
       <View style={{ flex: 1, paddingHorizontal: spacing.md, gap: spacing.lg }}>
         <RadioGroup
           value={lang}
-          onChange={(v) => setLang(v as "mr" | "en")}
+          onChange={(v) => {
+            onLanguageChange(v as "mr" | "en")
+          }}
           options={[
-            { label: "मराठी", value: "mr" },
-            { label: "English", value: "en" },
+            { label: t("oolshik:marathi"), value: "mr" },
+            { label: t("oolshik:english"), value: "en" },
           ]}
         />
 
@@ -216,14 +198,14 @@ export default function OnboardingConsentScreen({ navigation }: any) {
             style={{ flex: 1 }}
             accessibilityRole="button"
           >
-            <Text text={copy.agree} />
+            <Text text={t("oolshik:consent.agree")} />
           </Pressable>
         </View>
 
         {accepted ? (
           !granted ? (
             <Button
-              text={copy.allowLocation}
+              text={t("oolshik:consent.allowLocation")}
               onPress={async () => {
                 try {
                   await request?.()
@@ -232,7 +214,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
             />
           ) : (
             <Text
-              text={copy.locationGranted}
+              text={t("oolshik:consent.locationGranted")}
               size="xs"
               style={{ color: colors.palette.neutral600 }}
             />
@@ -252,8 +234,8 @@ export default function OnboardingConsentScreen({ navigation }: any) {
         >
           <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: spacing.md }}>
             <ScrollView>
-              <Text text={consentSections[lang].preface} />
-              {consentSections[lang].sections.map((s, i) => (
+              <Text text={t("oolshik:consent.preface")} />
+              {consentSections.map((s, i) => (
                 <View key={i} style={{ marginVertical: 8 }}>
                   <Text text={s.title} weight="bold" />
                   {s.items.map((it, j) => (
@@ -261,14 +243,18 @@ export default function OnboardingConsentScreen({ navigation }: any) {
                   ))}
                 </View>
               ))}
-              <Text weight="bold" text={consentSections[lang].declarationTitle} />
-              <Text text={consentSections[lang].declarationBody} />
+              <Text weight="bold" text={t("oolshik:consent.declarationTitle")} />
+              <Text text={t("oolshik:consent.declarationBody")} />
             </ScrollView>
 
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <Button text={copy.close} onPress={() => setShowConsent(false)} style={{ flex: 1 }} />
               <Button
-                text={copy.ok}
+                text={t("oolshik:consent.close")}
+                onPress={() => setShowConsent(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                text={t("oolshik:consent.ok")}
                 onPress={async () => {
                   setAccepted(true)
                   setConsentMeta(
@@ -292,7 +278,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
 
       <View style={{ padding: spacing.md }}>
         <Button
-          text={copy.continue}
+          text={t("oolshik:consent.continue")}
           disabled={!canContinue}
           onPress={() => {
             if (!canContinue) return
