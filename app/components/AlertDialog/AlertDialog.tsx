@@ -8,6 +8,7 @@ import {
   Platform,
   AccessibilityInfo,
 } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
@@ -59,6 +60,7 @@ export function AlertDialog(props: AlertDialogProps) {
     testID,
   } = props
   const { theme } = useAppTheme()
+  const { t } = useTranslation()
 
   const palette = {
     cardBg: theme.isDark ? "rgba(21,21,25,0.96)" : "rgba(255,255,255,0.98)",
@@ -68,7 +70,9 @@ export function AlertDialog(props: AlertDialogProps) {
   }
 
   const renderButtons = () => {
-    const items = actions.length ? actions : [{ text: "OK", tone: "primary" as AlertActionTone }]
+    const items = actions.length
+      ? actions
+      : [{ text: t("common:ok", { defaultValue: "OK" }), tone: "primary" as AlertActionTone }]
     const inline = items.length <= 2
     return (
       <View style={[styles.buttonRow, !inline && styles.buttonColumn]}>
@@ -116,7 +120,7 @@ export function AlertDialog(props: AlertDialogProps) {
         onPress={() => {
           if (dismissOnBackdropPress) onDismiss?.()
         }}
-        accessibilityLabel="Close dialog"
+        accessibilityLabel={t("common:cancel", { defaultValue: "Close dialog" })}
         accessibilityRole="button"
       />
       <View
@@ -157,7 +161,10 @@ export function AlertDialog(props: AlertDialogProps) {
 
   // announce dialog for accessibility
   if (Platform.OS === "android") {
-    AccessibilityInfo.announceForAccessibility?.(title ?? "Alert")
+    const announcementText = title ?? message ?? ""
+    if (announcementText) {
+      AccessibilityInfo.announceForAccessibility?.(announcementText)
+    }
   }
 
   return ResolvedPortal ? (

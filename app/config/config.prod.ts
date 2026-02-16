@@ -7,4 +7,6 @@
  */
 export default {
   API_URL: "",
+  LOCAL_AUDIO_PUBLIC_STREAM:
+    (process.env.EXPO_PUBLIC_LOCAL_AUDIO_PUBLIC_STREAM || "false").toLowerCase() === "true",
 }

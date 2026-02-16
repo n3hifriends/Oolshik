@@ -44,6 +44,12 @@ export const streamUrl = (id: string, a?: ApisauceInstance) => {
   return `${trimmed}/media/audio/${id}/stream`
 }
 
+export const publicStreamUrl = (id: string, a?: ApisauceInstance) => {
+  const base = getApi(a)?.getBaseURL?.() || ""
+  const trimmed = base.replace(/\/+$/, "")
+  return `${trimmed}/public/media/audio/${id}/stream`
+}
+
 // ---------- Phase 2: direct-to-S3 multipart (optional) ----------
 export type MpuCreateResp = { uploadId: string; objectKey: string }
 export type MpuPart = { partNumber: number; url: string }

@@ -1,7 +1,9 @@
 // app/audio/uploadAudio.ts
 import RNFS from "react-native-fs"
+
+import { initUpload, uploadChunk, completeUpload, ensureOk, publicStreamUrl, streamUrl } from "@/api/audio"
 import { api as Api } from "@/api/client"
-import { initUpload, uploadChunk, completeUpload, ensureOk, streamUrl } from "@/api/audio"
+import Config from "@/config"
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
 const PRESIGN_RETRY_COOLDOWN_MS = 10 * 60 * 1000
@@ -26,10 +28,10 @@ type Opts = {
 export async function uploadAudioSmart(opts: Opts): Promise<{ ok: true; url: string }> {
   const mimeType = opts.mimeType ?? "audio/m4a"
   const filename = opts.filename ?? `recording_${Date.now()}.m4a`
+  const requestId = buildUploadRequestId(opts.requestId)
 
   const shouldTryPresign =
-    presignState !== "unsupported" ||
-    Date.now() - lastPresignAttemptAt > PRESIGN_RETRY_COOLDOWN_MS
+    presignState !== "unsupported" || Date.now() - lastPresignAttemptAt > PRESIGN_RETRY_COOLDOWN_MS
 
   // Try presigned S3 first (fallback to chunked on failure)
   if (shouldTryPresign) {
@@ -69,7 +71,7 @@ export async function uploadAudioSmart(opts: Opts): Promise<{ ok: true; url: str
   if (!Number.isFinite(size) || size <= 0) throw new Error("File not found or empty")
 
   // 2) init
-  const initRes = await initUpload({ filename, mimeType, size })
+  const initRes = await initUpload({ filename, mimeType, size, requestId })
   const initData = ensureOk<{ uploadId: string }>(initRes)
   const uploadId = initData.uploadId
 
@@ -98,15 +100,27 @@ export async function uploadAudioSmart(opts: Opts): Promise<{ ok: true; url: str
   const saved: any = comp.data
 
   // 5) build play URL via the same base used by client/api
-  const url = streamUrl(saved.id) // e.g. http://.../api/media/audio/{id}/stream
+  const url = Config.LOCAL_AUDIO_PUBLIC_STREAM
+    ? publicStreamUrl(saved.id) // e.g. http://.../api/public/media/audio/{id}/stream
+    : streamUrl(saved.id) // e.g. http://.../api/media/audio/{id}/stream
   return { ok: true, url }
+}
+
+function buildUploadRequestId(existing?: string): string {
+  const value = existing?.trim()
+  if (value) return value
+
+  const generatedByCrypto = globalThis.crypto?.randomUUID?.()
+  if (generatedByCrypto) return generatedByCrypto
+
+  return `audio-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 function base64ToBytes(b64: string): Uint8Array {
   // fast base64 decoder (no atob dependency)
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-  let i = 0,
-    out: number[] = []
+  let i = 0
+  const out: number[] = []
   b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "")
   while (i < b64.length) {
     const e1 = chars.indexOf(b64[i++])

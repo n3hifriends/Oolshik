@@ -7,4 +7,6 @@
  */
 export default {
   API_URL: process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:8080/api",
+  LOCAL_AUDIO_PUBLIC_STREAM:
+    (process.env.EXPO_PUBLIC_LOCAL_AUDIO_PUBLIC_STREAM || "true").toLowerCase() === "true",
 }
