@@ -28,6 +28,10 @@ const en = {
     language: "Language",
     marathi: "Marathi",
     english: "English",
+    units: {
+      mShort: "m",
+      kmShort: "km",
+    },
     consentTitle: "Terms & Location Usage",
     consentAgree: "I Agree",
     rating: "Rating",

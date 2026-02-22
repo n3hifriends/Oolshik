@@ -937,7 +937,7 @@ export function useTaskDetailController({
   const ratingBadgeValue = normalizedStatus === "COMPLETED" ? otherPartyRating : oppositeAvgRating
   const showRatingBadge = ratingBadgeValue != null
   const canRate = normalizedStatus === "COMPLETED" && (isRequester || isHelper)
-  const distanceLabel = formatDistance(current?.distanceMtr)
+  const distanceLabel = formatDistance(current?.distanceMtr, t)
 
   const paymentAmountText =
     typeof activePayment?.snapshot?.amountRequested === "number"
