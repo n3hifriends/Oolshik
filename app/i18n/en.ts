@@ -150,6 +150,12 @@ const en = {
       voiceReady: "Voice note ready",
       voiceReadyWithDuration: "Voice note ready ({{seconds}}s)",
       closeA11y: "Close composer",
+      submittingStatus: "Submitting task...",
+      pleaseWait: "Please wait",
+      suggestionHeader: "1 | 1 km",
+      sampleTaskGroceries: "• Bring groceries",
+      sampleTaskMotor: "• Need help with motor",
+      sampleTaskWaterPump: "• Switch on water pump",
     },
     homeScreen: {
       locationNotAvailableTitle: "Location not available",

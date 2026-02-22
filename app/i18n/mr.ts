@@ -158,6 +158,12 @@ const mr = {
       voiceReady: "व्हॉइस नोट तयार",
       voiceReadyWithDuration: "व्हॉइस नोट तयार ({{seconds}} सेकंद)",
       closeA11y: "कंपोजर बंद करा",
+      submittingStatus: "काम सबमिट करत आहोत...",
+      pleaseWait: "कृपया थांबा",
+      suggestionHeader: "१ | १ कि.मी.",
+      sampleTaskGroceries: "• किराणा आणून द्या",
+      sampleTaskMotor: "• मोटारसाठी मदत हवी आहे",
+      sampleTaskWaterPump: "• पाण्याचा पंप सुरू करून द्या",
     },
     homeScreen: {
       locationNotAvailableTitle: "स्थान उपलब्ध नाही",

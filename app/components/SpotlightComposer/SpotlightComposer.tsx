@@ -84,6 +84,7 @@ const FAB_OFFSET_Y = 10
 const PILL_HEIGHT = 66
 const PILL_RADIUS = 26
 const TOP_SPACING = 32
+const SUBMIT_LOADER_MIN_MS = 500
 
 let BlurComponent: React.ComponentType<any> | null = null
 try {
@@ -108,6 +109,9 @@ const lerp = (a: number, b: number, t: number): number => {
   "worklet"
   return a + (b - a) * t
 }
+
+const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const { t } = useTranslation()
@@ -354,16 +358,24 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   )
 
   const handleSubmit = useCallback(async () => {
+    if (state === "submitting") return
     const trimmed = text.trim()
     const safeText = trimmed || (mode === "voice" && voiceNote ? t("oolshik:taskCard.voiceTask") : "")
     if (!safeText) return
     setState("submitting")
+    const submitStartedAt = Date.now()
     try {
+      // Let React paint the submitting UI before network / JS work starts.
+      await waitForNextFrame()
       await onSubmitTask?.({
         text: safeText,
         mode: mode ?? "type",
         voiceNote: voiceNote ?? undefined,
       })
+      const elapsed = Date.now() - submitStartedAt
+      if (elapsed < SUBMIT_LOADER_MIN_MS) {
+        await sleep(SUBMIT_LOADER_MIN_MS - elapsed)
+      }
       if (Platform.OS === "android") {
         const ToastAndroid = require("react-native").ToastAndroid
         ToastAndroid.show(t("oolshik:composer.submittedBody"), ToastAndroid.SHORT)
@@ -376,9 +388,12 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       return
     }
     closeComposer()
-  }, [closeComposer, mode, onSubmitTask, t, text, voiceNote])
+  }, [closeComposer, mode, onSubmitTask, state, t, text, voiceNote])
 
   const onScrimPress = useCallback(() => {
+    if (state === "submitting") {
+      return
+    }
     if (state === "voice_recording") {
       Alert.alert(t("oolshik:composer.stopRecordingTitle"), t("oolshik:composer.stopRecordingBody"), [
         { text: t("oolshik:composer.keepRecording"), style: "cancel" },
@@ -551,6 +566,28 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     </View>
   )
 
+  const renderSubmitting = () => (
+    <View style={styles.contentRow}>
+      <MaterialCommunityIcons name="send-circle-outline" size={20} color={theme.colors.text} />
+      <View style={styles.submitStatusTextWrap}>
+        <Text
+          text={t("oolshik:composer.submittingStatus")}
+          style={[styles.helperText, styles.submitStatusTitle, { color: theme.colors.text }]}
+        />
+        <Text
+          text={t("oolshik:composer.pleaseWait")}
+          size="xs"
+          style={{ color: theme.colors.textDim, marginLeft: 10 }}
+        />
+      </View>
+      <ActivityIndicator
+        size="small"
+        color={theme.colors.tint}
+        style={{ marginLeft: theme.spacing.sm }}
+      />
+    </View>
+  )
+
   const renderTypeEditing = () => (
     <View style={styles.editRow}>
       <MaterialCommunityIcons
@@ -629,6 +666,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         return renderVoiceContent()
       case "transcribing":
         return renderTranscribing()
+      case "submitting":
+        return renderSubmitting()
       default:
         return renderEditing()
     }
@@ -647,11 +686,11 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
     >
       <View style={styles.suggestionHeader}>
         <View style={[styles.dot, { backgroundColor: theme.colors.tint }]} />
-        <Text text="1 | 1 km" size="xs" style={{ color: theme.colors.text }} />
+        <Text text={t("oolshik:composer.suggestionHeader")} size="xs" style={{ color: theme.colors.text }} />
       </View>
-      <Text text="• Bring groceries" size="sm" style={{ color: theme.colors.text }} />
-      <Text text="• Need help with motor" size="sm" style={{ color: theme.colors.text }} />
-      <Text text="• Switch on water pump" size="sm" style={{ color: theme.colors.text }} />
+      <Text text={t("oolshik:composer.sampleTaskGroceries")} size="sm" style={{ color: theme.colors.text }} />
+      <Text text={t("oolshik:composer.sampleTaskMotor")} size="sm" style={{ color: theme.colors.text }} />
+      <Text text={t("oolshik:composer.sampleTaskWaterPump")} size="sm" style={{ color: theme.colors.text }} />
     </Animated.View>
   )
 
@@ -699,7 +738,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
             ]}
           >
             {renderPillContent()}
-            {state !== "voice_recording" && (
+            {state !== "voice_recording" && state !== "submitting" && (
               <TouchableOpacity
                 style={styles.close}
                 accessibilityLabel={t("oolshik:composer.closeA11y")}
@@ -855,6 +894,12 @@ const styles = StyleSheet.create({
   },
   submitText: {
     fontSize: 14,
+  },
+  submitStatusTextWrap: {
+    flex: 1,
+  },
+  submitStatusTitle: {
+    marginBottom: 2,
   },
   suggestionContainer: {
     position: "absolute",
