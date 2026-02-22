@@ -32,6 +32,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
 
   const { spacing, colors, primary, success, successSoft, neutral600, neutral700 } = controller.theme
   const { current, state, handlers, role, statusInfo, offer, contact, payment, rating, derived } = controller
+  const hasVoiceUrl = current?.voiceUrl != null && String(current.voiceUrl).trim().length > 0
 
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
@@ -65,7 +66,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
               initials={derived.initials}
               createdByName={current.createdByName || t("oolshik:taskCard.someoneNearby")}
               createdAtLabel={derived.createdAtLabel}
-              voiceAvailable={!!current.voiceUrl}
+              voiceAvailable={hasVoiceUrl}
               audioLoading={controller.playback.audioLoading}
               playing={controller.playback.playing}
               onTogglePlay={handlers.togglePlay}

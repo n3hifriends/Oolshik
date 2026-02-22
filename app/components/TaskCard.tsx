@@ -93,6 +93,7 @@ export function TaskCard({
   const S = statusMap[normalizedStatus] ?? statusMap.PENDING
 
   const canAccept = !!onAccept && (status === "OPEN" || status === "PENDING")
+  const normalizedVoiceUrl = typeof voiceUrl === "string" ? voiceUrl.trim() : ""
 
   // Footer: type as ReactElement | undefined to satisfy Card's prop
   const FooterComponent = canAccept ? (
@@ -139,7 +140,7 @@ export function TaskCard({
         {/* When posted */}
         <Text text={minsAgo(createdAt, t)} size="xs" />
       </View>
-      {voiceUrl ? <VoicePlayButton uri={voiceUrl} playKey={id} /> : undefined}
+      {normalizedVoiceUrl ? <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} /> : undefined}
       {canAccept ? (
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Button

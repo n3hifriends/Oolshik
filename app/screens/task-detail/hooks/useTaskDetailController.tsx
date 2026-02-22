@@ -91,9 +91,10 @@ export function useTaskDetailController({
   const [task, setTask] = useState<TaskDetailTask | null>(taskFromStore)
 
   const current = task || taskFromStore || null
+  const playbackUri = current?.voiceUrl == null ? null : String(current.voiceUrl).trim() || null
 
   const { status: playbackStatus, toggle, stop } = useAudioPlaybackForUri(
-    current?.voiceUrl ? String(current.voiceUrl) : null,
+    playbackUri,
     current?.id ? `detail-${current.id}` : "detail",
   )
 

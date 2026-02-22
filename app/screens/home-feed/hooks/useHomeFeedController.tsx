@@ -333,6 +333,7 @@ export function useHomeFeedController({
   const renderItem = useCallback(
     ({ item }: { item: HomeFeedTask }) => {
       const titleText = typeof item.title === "string" ? item.title.trim() : ""
+      const normalizedVoiceUrl = typeof item.voiceUrl === "string" ? item.voiceUrl.trim() : ""
       const needsTitleRefresh = titleText === "..."
       const titleRefreshDisabled =
         needsTitleRefresh && (loading || isTitleRefreshCooling(item.id))
@@ -348,7 +349,7 @@ export function useHomeFeedController({
           title={item.title}
           distanceMtr={getDistanceMeters(item)}
           status={item.status === "DRAFT" ? "OPEN" : item.status}
-          voiceUrl={item.voiceUrl ? String(item.voiceUrl) : undefined}
+          voiceUrl={normalizedVoiceUrl || undefined}
           onAccept={
             viewMode === "forYou" && item.status === "OPEN"
               ? async () => {
