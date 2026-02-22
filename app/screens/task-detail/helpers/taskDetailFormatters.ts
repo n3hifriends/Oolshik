@@ -1,3 +1,5 @@
+import { formatDistanceLabel } from "@/utils/distance"
+
 export type TranslateFn = (key: string, options?: Record<string, unknown>) => string
 
 export function getInitials(name?: string) {
@@ -138,8 +140,6 @@ export function formatCountdown(ms: number | null) {
   return `${mins}:${secs}`
 }
 
-export function formatDistance(distanceMtr?: number) {
-  if (typeof distanceMtr !== "number") return null
-  if (distanceMtr < 1000) return `${distanceMtr.toFixed(0)}m`
-  return `${(distanceMtr / 1000).toFixed(1)}km`
+export function formatDistance(distanceMtr: number | undefined, t: TranslateFn) {
+  return formatDistanceLabel(distanceMtr, t)
 }

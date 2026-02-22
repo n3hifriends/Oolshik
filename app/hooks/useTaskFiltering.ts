@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 
-import { getDistanceMeters, distanceLabel } from "@/utils/distance"
+import {
+  getDistanceMeters,
+  distanceSearchLabels,
+  type DistanceTranslateFn,
+} from "@/utils/distance"
 import { normalize } from "@/utils/text"
 
 export type Status = "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
@@ -61,6 +65,7 @@ export function useTaskFiltering(
     viewMode: ViewMode
     myId?: string
     rawQuery: string
+    t?: DistanceTranslateFn
   },
 ) {
   const [query, setQuery] = useState(options.rawQuery)
@@ -76,8 +81,10 @@ export function useTaskFiltering(
   const uniqueTasks = useMemo(() => {
     const list = Array.isArray(tasks) ? tasks : []
     const deduped = new Map<unknown, TaskLike>()
-    for (const task of list) {
-      deduped.set(task?.id, task)
+    for (let index = 0; index < list.length; index++) {
+      const task = list[index]
+      const dedupeKey = task?.id ?? `__missing_id__${index}`
+      deduped.set(dedupeKey, task)
     }
     return Array.from(deduped.values())
   }, [tasks])
@@ -87,12 +94,14 @@ export function useTaskFiltering(
       const normalizedStatus = normalizeStatus(task.status)
       const distanceM = getDistanceMeters(task)
 
+      const searchDistanceTokens = distanceSearchLabels(distanceM, options.t)
+
       return {
         task,
         normalizedStatus,
         isMine: options.myId ? String(task.requesterId) === String(options.myId) : false,
         pendingAuthVisibleForForYou:
-          task.status !== "PENDING_AUTH" ||
+          normalizedStatus !== "PENDING_AUTH" ||
           (options.myId ? String(task.pendingHelperId) === String(options.myId) : false),
         searchHaystack: normalize(
           [
@@ -101,9 +110,7 @@ export function useTaskFiltering(
             task.createdByName ?? task.requesterName,
             task.createdByPhoneNumber ?? task.phoneNumber,
             task.status,
-            distanceM != null ? distanceLabel(distanceM) : "",
-            distanceM != null ? Math.round(distanceM) : "",
-            distanceM != null ? `${(distanceM / 1000).toFixed(1)} km` : "",
+            ...searchDistanceTokens,
           ]
             .filter(Boolean)
             .join(" | "),
@@ -121,7 +128,7 @@ export function useTaskFiltering(
     })
 
     return indexed
-  }, [uniqueTasks, options.myId])
+  }, [uniqueTasks, options.myId, options.t])
 
   const statusesToUse = useMemo(() => {
     if (options.selectedStatuses.size > 0) return options.selectedStatuses

@@ -88,6 +88,7 @@ export function useHomeFeedController({
     viewMode,
     myId: userId,
     rawQuery: rawSearch,
+    t,
   })
 
   useEffect(() => {

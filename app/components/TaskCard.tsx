@@ -7,6 +7,7 @@ import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
 import { RatingBadge } from "./RatingBadge"
 import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
+import { formatDistanceLabel } from "@/utils/distance"
 
 type Props = {
   id: string
@@ -109,10 +110,7 @@ export function TaskCard({
     </View>
   ) : undefined // <-- important
 
-  const distance =
-    (distanceMtr ?? 0) < 1000
-      ? `${(distanceMtr ?? 0).toFixed(0)}m`
-      : `${((distanceMtr ?? 0) / 1000).toFixed(1)}km`
+  const distance = formatDistanceLabel(distanceMtr ?? 0, t) ?? `0${t("oolshik:units.mShort")}`
 
   const HeaderRow = (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

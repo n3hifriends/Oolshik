@@ -36,6 +36,10 @@ const mr = {
     language: "भाषा",
     marathi: "मराठी",
     english: "इंग्रजी",
+    units: {
+      mShort: "मी.",
+      kmShort: "कि.मी.",
+    },
     consentTitle: "अटी व स्थान वापर",
     consentAgree: "मी सहमत आहे",
     rating: "रेटिंग",
