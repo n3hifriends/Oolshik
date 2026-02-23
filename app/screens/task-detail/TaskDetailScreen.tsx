@@ -33,6 +33,9 @@ export default function TaskDetailScreen({ navigation }: Props) {
   const { spacing, colors, primary, success, successSoft, neutral600, neutral700 } = controller.theme
   const { current, state, handlers, role, statusInfo, offer, contact, payment, rating, derived } = controller
   const hasVoiceUrl = current?.voiceUrl != null && String(current.voiceUrl).trim().length > 0
+  const completedFooterMessage = role.isRequester
+    ? t("oolshik:taskDetailScreen.thanksForConfirmingCompletion")
+    : t("oolshik:taskDetailScreen.thanksForHelping")
 
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
@@ -192,7 +195,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         reassignHelperLabel={t("oolshik:taskDetailScreen.reassignHelper")}
         reassignLimitReachedText={t("oolshik:taskDetailScreen.reassignLimitReached")}
         taskCompletedLabel={t("oolshik:taskDetailScreen.taskCompleted")}
-        thanksForHelpingLabel={t("oolshik:taskDetailScreen.thanksForHelping")}
+        thanksForHelpingLabel={completedFooterMessage}
         okLabel={t("oolshik:taskDetailScreen.ok")}
         success={success}
         successSoft={successSoft}

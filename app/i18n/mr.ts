@@ -416,6 +416,8 @@ const mr = {
       reassignLimitReached: "पुन्हा नेमणुकीची मर्यादा पूर्ण",
       taskCompleted: "काम पूर्ण ✓",
       thanksForHelping: "मदतीबद्दल धन्यवाद!",
+      thanksForConfirmingCompletion:
+        "तुम्ही हे काम पूर्ण झाले म्हणून चिन्हांकित केले. मदत मिळाल्याची पुष्टी केल्याबद्दल धन्यवाद.",
       ok: "ठीक आहे",
       reasonForGivingAway: "सोडून देण्याचे कारण",
       reasonForReject: "नाकारणाचे कारण",

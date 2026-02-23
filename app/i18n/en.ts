@@ -407,6 +407,8 @@ const en = {
       reassignLimitReached: "Reassign limit reached",
       taskCompleted: "Task completed ✓",
       thanksForHelping: "Thanks for helping!",
+      thanksForConfirmingCompletion:
+        "You marked this task as completed. Thanks for confirming the help was received.",
       ok: "Ok",
       reasonForGivingAway: "Reason for giving away",
       reasonForReject: "Reason for reject",
