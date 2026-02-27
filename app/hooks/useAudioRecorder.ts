@@ -82,18 +82,24 @@ export function useAudioRecorder(maxSeconds = 30) {
   }
 
   const stop = async () => {
-    if (!recRef.current) return
+    if (!recRef.current) return null
+    const recording = recRef.current
     try {
       if (tickRef.current) {
         clearInterval(tickRef.current)
         tickRef.current = null
       }
-      await recRef.current.stopAndUnloadAsync()
-      const out = recRef.current.getURI()
+      const status = await recording.getStatusAsync().catch(() => null)
+      await recording.stopAndUnloadAsync()
+      const out = recording.getURI()
+      const finalDurationSec = Math.max(durationSec, Math.floor((status?.durationMillis ?? 0) / 1000))
       setUri(out ?? null)
+      setDurationSec(finalDurationSec)
       setState("stopped")
+      return { uri: out ?? null, durationSec: finalDurationSec }
     } catch {
       // ignore
+      return null
     }
   }
 

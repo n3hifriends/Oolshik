@@ -183,6 +183,14 @@ const en = {
       openProfileHint: "View your profile and settings",
       logoutA11y: "Logout",
       radiusOption: "{{km}} km",
+      sortLabel: "Sort",
+      sortTime: "Time",
+      sortDistance: "Distance",
+      sortNewestFirst: "Newest first",
+      sortOldestFirst: "Oldest first",
+      sortNearestFirst: "Nearest first",
+      sortFarthestFirst: "Farthest first",
+      sortReverseHint: "Tap again to reverse order",
     },
     profileScreen: {
       heading: "Profile",
@@ -324,7 +332,8 @@ const en = {
       feedbackFailedBody: "Please try again.",
       addShortReasonTitle: "Add a short reason",
       addShortReasonBody: "Please add a short note for 'Other'.",
-      requestCancelledNotice: "Request cancelled. We have closed it and notified the helper if assigned.",
+      requestCancelledNotice:
+        "Request cancelled. We have closed it and notified the helper if assigned.",
       taskReleasedNotice: "Task released. It is now open for other helpers to accept.",
       authorizationRejectedNotice: "Authorization rejected. Searching again.",
       actionFailedTitle: "Action failed",
@@ -477,8 +486,7 @@ const en = {
         "Voice clips (<=30 seconds) may be securely uploaded for playback and moderation.",
       section2Item3:
         "Device-level indicators (such as connectivity status) and historical interaction indicators may be processed to improve task delivery reliability.",
-      section2Item4:
-        "Data is retained only as required for lawful and service-related purposes.",
+      section2Item4: "Data is retained only as required for lawful and service-related purposes.",
       section3Title: "3. Consent and Withdrawal",
       section3Item1: "Granting these permissions is essential for app functionality.",
       section3Item2:
@@ -526,7 +534,7 @@ const en = {
       useAudio: "Use this audio",
       audioSelected: "Audio selected",
       discardAudio: "Discard & Re-record",
-      audioHint: "(Audio will not be attached unless you tap \"Use this audio\")",
+      audioHint: '(Audio will not be attached unless you tap "Use this audio")',
       post: "Post",
       posting: "Posting...",
       alerts: {
@@ -566,7 +574,8 @@ const en = {
       totalPayable: "Total payable",
       breakdownHint: "Totals differ from requested amount because of manual adjustments.",
       takeAction: "Take action",
-      actionHelp: "Use your preferred UPI app to complete the transfer and return to Oolshik to confirm.",
+      actionHelp:
+        "Use your preferred UPI app to complete the transfer and return to Oolshik to confirm.",
       refreshing: "Refreshing payment request…",
       openUpi: "Pay with UPI",
       openingUpi: "Opening UPI…",

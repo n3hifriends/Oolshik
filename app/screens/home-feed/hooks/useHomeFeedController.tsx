@@ -24,6 +24,8 @@ import {
   uploadVoiceNote,
 } from "@/screens/home-feed/requesters/homeFeedRequester"
 import type {
+  HomeFeedSortKey,
+  HomeFeedSortState,
   HomeFeedStatus,
   HomeFeedTask,
   HomeFeedViewMode,
@@ -33,6 +35,39 @@ import type {
 } from "@/screens/home-feed/types"
 
 type Navigation = OolshikStackScreenProps<"OolshikHome">["navigation"]
+
+type SortableFeedItem = {
+  task: HomeFeedTask
+  index: number
+  distanceMeters: number | null
+  createdAtMs: number | null
+}
+
+const DEFAULT_HOME_FEED_SORT: HomeFeedSortState = {
+  key: "distance",
+  direction: "asc",
+}
+
+const getSortableDistanceMeters = (task: HomeFeedTask): number | null => {
+  const value = getDistanceMeters(task)
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+const getSortableCreatedAtMs = (task: HomeFeedTask): number | null => {
+  const value = new Date(task.createdAt ?? "").getTime()
+  return Number.isFinite(value) ? value : null
+}
+
+const compareNullableNumber = (
+  left: number | null,
+  right: number | null,
+  direction: "asc" | "desc",
+) => {
+  if (left == null && right == null) return 0
+  if (left == null) return 1
+  if (right == null) return -1
+  return direction === "asc" ? left - right : right - left
+}
 
 export function useHomeFeedController({
   navigation,
@@ -59,6 +94,7 @@ export function useHomeFeedController({
   const [viewMode, setViewMode] = useState<HomeFeedViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)
   const [preferredRadiusKm, setPreferredRadiusKm] = useState<number | null>(null)
+  const [sortState, setSortState] = useState<HomeFeedSortState>(DEFAULT_HOME_FEED_SORT)
 
   const profileInitials = useMemo(
     () => getInitials(userName && userName !== "You" ? userName : undefined, authEmail ?? ""),
@@ -70,7 +106,9 @@ export function useHomeFeedController({
   const [titleRefreshCooldowns, setTitleRefreshCooldowns] = useState<Record<string, number>>({})
   const titleRefreshTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  const lastLocationSyncRef = useRef<{ latitude: number; longitude: number; at: number } | null>(null)
+  const lastLocationSyncRef = useRef<{ latitude: number; longitude: number; at: number } | null>(
+    null,
+  )
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [rawSearch, setRawSearch] = useState("")
@@ -90,6 +128,45 @@ export function useHomeFeedController({
     rawQuery: rawSearch,
     t,
   })
+
+  const sortedFiltered = useMemo(() => {
+    const list = filtered as HomeFeedTask[]
+    if (!Array.isArray(list) || list.length < 2) return list
+
+    const decorated: SortableFeedItem[] = list.map((task, index) => ({
+      task,
+      index,
+      distanceMeters: getSortableDistanceMeters(task),
+      createdAtMs: getSortableCreatedAtMs(task),
+    }))
+
+    decorated.sort((left, right) => {
+      const primaryCompare =
+        sortState.key === "distance"
+          ? compareNullableNumber(left.distanceMeters, right.distanceMeters, sortState.direction)
+          : compareNullableNumber(
+              left.createdAtMs,
+              right.createdAtMs,
+              sortState.direction === "asc" ? "desc" : "asc",
+            )
+
+      if (primaryCompare !== 0) return primaryCompare
+
+      const recentFirstCompare = compareNullableNumber(left.createdAtMs, right.createdAtMs, "desc")
+      if (recentFirstCompare !== 0) return recentFirstCompare
+
+      const nearestFirstCompare = compareNullableNumber(
+        left.distanceMeters,
+        right.distanceMeters,
+        "asc",
+      )
+      if (nearestFirstCompare !== 0) return nearestFirstCompare
+
+      return left.index - right.index
+    })
+
+    return decorated.map((entry) => entry.task)
+  }, [filtered, sortState.direction, sortState.key])
 
   useEffect(() => {
     return () => {
@@ -122,6 +199,22 @@ export function useHomeFeedController({
         next.add(nextStatus)
       }
       return next
+    })
+  }, [])
+
+  const toggleSort = useCallback((key: HomeFeedSortKey) => {
+    setSortState((previous) => {
+      if (previous.key === key) {
+        return {
+          key,
+          direction: previous.direction === "asc" ? "desc" : "asc",
+        }
+      }
+
+      return {
+        key,
+        direction: "asc",
+      }
     })
   }, [])
 
@@ -335,8 +428,7 @@ export function useHomeFeedController({
       const titleText = typeof item.title === "string" ? item.title.trim() : ""
       const normalizedVoiceUrl = typeof item.voiceUrl === "string" ? item.voiceUrl.trim() : ""
       const needsTitleRefresh = titleText === "..."
-      const titleRefreshDisabled =
-        needsTitleRefresh && (loading || isTitleRefreshCooling(item.id))
+      const titleRefreshDisabled = needsTitleRefresh && (loading || isTitleRefreshCooling(item.id))
 
       const avgRating =
         userId && item.requesterId && item.requesterId === userId
@@ -357,9 +449,7 @@ export function useHomeFeedController({
                 }
               : undefined
           }
-          onTitleRefresh={
-            needsTitleRefresh ? () => refreshTitleForTask(item.id) : undefined
-          }
+          onTitleRefresh={needsTitleRefresh ? () => refreshTitleForTask(item.id) : undefined}
           titleRefreshDisabled={titleRefreshDisabled}
           onPress={() => navigation.navigate("OolshikDetail", { id: item.id })}
           createdByName={item.createdByName ?? item.requesterName}
@@ -488,15 +578,12 @@ export function useHomeFeedController({
     ])
   }, [logout, t])
 
-  const handleSearchOpen = useCallback(
-    (open: boolean) => {
-      setSearchOpen(open)
-      if (!open) {
-        setRawSearch("")
-      }
-    },
-    [],
-  )
+  const handleSearchOpen = useCallback((open: boolean) => {
+    setSearchOpen(open)
+    if (!open) {
+      setRawSearch("")
+    }
+  }, [])
 
   const handleSearchChange = useCallback((nextValue: string) => {
     setRawSearch(nextValue)
@@ -536,10 +623,11 @@ export function useHomeFeedController({
     },
     feed: {
       loading,
-      filtered: filtered as HomeFeedTask[],
+      filtered: sortedFiltered as HomeFeedTask[],
       viewMode,
       radiusMeters: radiusMeters as Radius,
       selectedStatuses,
+      sort: sortState,
       extraData,
     },
     user: {
@@ -557,6 +645,7 @@ export function useHomeFeedController({
       setViewMode: setNextViewMode,
       toggleStatus,
       setRadius: setFeedRadius,
+      toggleSort,
       onAcceptPress,
       renderItem,
       onSubmitTask: handleSubmitTask,

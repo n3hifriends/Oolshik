@@ -12,6 +12,7 @@ import { HomeFeedFilters } from "@/screens/home-feed/components/HomeFeedFilters"
 import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLocationState"
 import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
 import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
+import { HomeFeedSortBar } from "@/screens/home-feed/components/HomeFeedSortBar"
 
 type Props = OolshikStackScreenProps<"OolshikHome">
 
@@ -81,23 +82,23 @@ export default function HomeFeedScreen({ navigation }: Props) {
             <ActivityIndicator />
           </View>
         ) : (
-          <HomeFeedList
-            data={feed.filtered}
-            loading={feed.loading}
-            renderItem={handlers.renderItem}
-            onRefresh={handlers.onRefresh}
-            emptyMineText={t("oolshik:emptyMine")}
-            emptyForYouText={t("oolshik:emptyForYou")}
-            viewMode={feed.viewMode}
-            extraData={feed.extraData}
-          />
+          <>
+            <HomeFeedSortBar sort={feed.sort} onToggleSort={handlers.toggleSort} />
+            <HomeFeedList
+              data={feed.filtered}
+              loading={feed.loading}
+              renderItem={handlers.renderItem}
+              onRefresh={handlers.onRefresh}
+              emptyMineText={t("oolshik:emptyMine")}
+              emptyForYouText={t("oolshik:emptyForYou")}
+              viewMode={feed.viewMode}
+              extraData={feed.extraData}
+            />
+          </>
         )}
       </View>
 
-      <HomeFeedCreateBar
-        createLabel={t("oolshik:create")}
-        onPressCreate={handlers.openCreate}
-      />
+      <HomeFeedCreateBar createLabel={t("oolshik:create")} onPressCreate={handlers.openCreate} />
     </Screen>
   )
 }

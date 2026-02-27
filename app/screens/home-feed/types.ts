@@ -31,3 +31,12 @@ export type TranslateFn = (key: string, options?: Record<string, unknown>) => st
 export type HomeFeedViewMode = ViewMode
 
 export type HomeFeedStatus = Status
+
+export type HomeFeedSortKey = "time" | "distance"
+
+export type HomeFeedSortDirection = "asc" | "desc"
+
+export type HomeFeedSortState = {
+  key: HomeFeedSortKey
+  direction: HomeFeedSortDirection
+}
