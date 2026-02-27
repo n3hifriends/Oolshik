@@ -1,81 +1,181 @@
-import React from "react"
-import { Pressable, View } from "react-native"
+import { memo } from "react"
+import { Pressable, type StyleProp, type TextStyle, type ViewStyle, View } from "react-native"
 import { useTranslation } from "react-i18next"
+
 import { Text } from "@/components/Text"
 import type { TxKeyPath } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
 
 export type ViewMode = "forYou" | "mine"
 
-export const Segmented: React.FC<{ value: ViewMode; onChange: (v: ViewMode) => void }> = ({
-  value,
-  onChange,
-}) => {
+type SegmentedProps = {
+  value: ViewMode
+  onChange: (value: ViewMode) => void
+}
+
+type SegmentedTab = {
+  key: ViewMode
+  tx: TxKeyPath
+}
+
+const TABS: SegmentedTab[] = [
+  { key: "forYou", tx: "oolshik:tabForYou" },
+  { key: "mine", tx: "oolshik:tabMyRequests" },
+]
+
+export const Segmented = memo(function Segmented({ value, onChange }: SegmentedProps) {
   const { t } = useTranslation()
-  const { theme } = useAppTheme()
-  const { colors, spacing, isDark } = theme
-  const tabs: { key: ViewMode; tx: TxKeyPath; a11y: string }[] = [
-    { key: "forYou", tx: "oolshik:tabForYou", a11y: t("oolshik:tabForYou") },
-    { key: "mine", tx: "oolshik:tabMyRequests", a11y: t("oolshik:tabMyRequests") },
-  ]
+  const { theme, themed } = useAppTheme()
+
+  const getTabStyle = ({
+    active,
+    pressed,
+  }: {
+    active: boolean
+    pressed: boolean
+  }): StyleProp<ViewStyle> => {
+    return [
+      themed($tabBase),
+      themed(active ? $tabActive : $tabInactive),
+      active && !theme.isDark && themed($tabActiveShadow),
+      pressed && themed(active ? $tabPressedActive : $tabPressedInactive),
+    ]
+  }
+
+  const getLabelStyle = ({
+    active,
+    pressed,
+  }: {
+    active: boolean
+    pressed: boolean
+  }): StyleProp<TextStyle> => {
+    return [
+      themed($labelBase),
+      themed(active ? $labelActive : $labelInactive),
+      pressed && themed($labelPressed),
+    ]
+  }
+
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        backgroundColor: colors.palette.neutral200,
-        borderRadius: spacing.sm,
-        padding: spacing.xxxs,
-        gap: spacing.xxxs,
-        marginTop: spacing.xxxs,
-        borderWidth: 1,
-        borderColor: colors.palette.neutral300,
-      }}
-    >
-      {tabs.map((t) => {
-        const active = value === t.key
+    <View style={themed($container)}>
+      {TABS.map((tab) => {
+        const active = value === tab.key
         return (
           <Pressable
-            key={t.key}
-            onPress={() => onChange(t.key)}
+            key={tab.key}
+            onPress={() => onChange(tab.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            accessibilityLabel={t.a11y}
-            style={({ pressed }) => [
-              {
-                flex: 1,
-                minHeight: 36,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingVertical: spacing.xs,
-                paddingHorizontal: spacing.sm,
-                borderRadius: spacing.sm,
-                backgroundColor: active ? colors.palette.neutral100 : "transparent",
-                borderWidth: active ? 1 : 0,
-                borderColor: active ? colors.palette.primary200 : "transparent",
-              },
-              active &&
-                !isDark && {
-                  shadowColor: "#000",
-                  shadowOpacity: 0.08,
-                  shadowRadius: 6,
-                  shadowOffset: { width: 0, height: 2 },
-                  elevation: 2,
-                },
-              pressed &&
-                !active && {
-                  backgroundColor: colors.palette.neutral300,
-                },
-            ]}
+            accessibilityLabel={t(tab.tx)}
+            hitSlop={6}
+            android_ripple={themed($ripple)}
+            style={({ pressed }) => getTabStyle({ active, pressed })}
           >
-            <Text
-              tx={t.tx}
-              size="xs"
-              weight={active ? "semiBold" : "medium"}
-              style={{ color: active ? colors.text : colors.textDim }}
-            />
+            {({ pressed }) => (
+              <>
+                <Text
+                  tx={tab.tx}
+                  size="xs"
+                  weight={active ? "semiBold" : "medium"}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={getLabelStyle({ active, pressed })}
+                />
+
+                <View style={themed(active ? $activeRail : $inactiveRail)} />
+              </>
+            )}
           </Pressable>
         )
       })}
     </View>
   )
-}
+})
+
+const $container: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  backgroundColor: colors.palette.neutral100,
+  borderRadius: 14,
+  padding: spacing.xxxs,
+  gap: spacing.xxxs,
+  marginTop: spacing.xxxs,
+  borderWidth: 1,
+  borderColor: colors.palette.neutral300,
+})
+
+const $tabBase: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  minHeight: 40,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingVertical: spacing.xxxs,
+  paddingHorizontal: spacing.sm,
+  borderRadius: 10,
+  overflow: "hidden",
+})
+
+const $tabActive: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.palette.primary100,
+  borderWidth: 1,
+  borderColor: colors.palette.primary200,
+})
+
+const $tabInactive: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.palette.neutral100,
+  borderWidth: 1,
+  borderColor: colors.palette.neutral200,
+})
+
+const $tabActiveShadow: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  shadowColor: colors.palette.overlay50,
+  shadowOpacity: 0.12,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
+})
+
+const $tabPressedInactive: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.palette.neutral200,
+  transform: [{ scale: 0.99 }],
+})
+
+const $tabPressedActive: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.palette.primary200,
+  transform: [{ scale: 0.99 }],
+})
+
+const $labelBase: ThemedStyle<TextStyle> = () => ({
+  textAlign: "center",
+  flexShrink: 1,
+})
+
+const $labelActive: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.primary600,
+})
+
+const $labelInactive: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.neutral600,
+})
+
+const $labelPressed: ThemedStyle<TextStyle> = () => ({
+  opacity: 0.95,
+})
+
+const $activeRail: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  position: "absolute",
+  left: spacing.sm,
+  right: spacing.sm,
+  bottom: 4,
+  height: 2,
+  borderRadius: 2,
+  backgroundColor: colors.palette.primary500,
+})
+
+const $inactiveRail: ThemedStyle<ViewStyle> = () => ({
+  display: "none",
+})
+
+const $ripple: ThemedStyle<{ color: string }> = ({ colors }) => ({
+  color: colors.palette.primary100,
+})
