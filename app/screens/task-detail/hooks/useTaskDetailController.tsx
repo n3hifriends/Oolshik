@@ -4,6 +4,7 @@ import { useFocusEffect } from "@react-navigation/native"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { useAppTheme } from "@/theme/context"
+import { normalizeRating } from "@/components/StarRating/utils"
 import { useTaskStore } from "@/store/taskStore"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { useAuth } from "@/context/AuthContext"
@@ -16,10 +17,18 @@ import {
   saveSubmittedFeedbackSnapshot,
   type SubmittedFeedbackSnapshot,
 } from "@/features/feedback/storage/feedbackQueue"
-import type { PaymentScanPayload, PaymentTaskContext, OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
+import type {
+  PaymentScanPayload,
+  PaymentTaskContext,
+  OolshikStackScreenProps,
+} from "@/navigators/OolshikNavigator"
 import type { PaymentRequestApiResponse, Task } from "@/api/client"
 import type { TextFieldAccessoryProps } from "@/components/TextField"
 import { canEditOfferForTask, parseOfferInput } from "@/utils/offerRules"
+import {
+  hasSeenPaymentNotice,
+  markPaymentNoticeSeen,
+} from "@/screens/task-detail/helpers/paymentNoticeGate"
 import {
   formatDistance,
   getInitials,
@@ -50,7 +59,12 @@ import {
   revealPhone,
   updateTaskOffer,
 } from "@/screens/task-detail/requesters/taskDetailRequester"
-import type { RecoveryAction, ReasonModalState, StatusPaletteMap, TaskDetailTask } from "@/screens/task-detail/types"
+import type {
+  RecoveryAction,
+  ReasonModalState,
+  StatusPaletteMap,
+  TaskDetailTask,
+} from "@/screens/task-detail/types"
 
 const MAX_REASSIGN = 2
 
@@ -62,7 +76,8 @@ function toTaskDetailTask(task: Task | null | undefined): TaskDetailTask | null 
 }
 
 function getTaskPhoneNumber(task: TaskDetailTask | null, isRequester: boolean) {
-  const requesterPhone = task?.requesterPhoneNumber || task?.createdByPhoneNumber || task?.phoneNumber
+  const requesterPhone =
+    task?.requesterPhoneNumber || task?.createdByPhoneNumber || task?.phoneNumber
   const helperPhone = task?.helperPhoneNumber || task?.helperPhone
   return isRequester ? helperPhone : requesterPhone
 }
@@ -83,7 +98,10 @@ export function useTaskDetailController({
   const { userId } = useAuth()
 
   const taskFromStore = useMemo(
-    () => toTaskDetailTask(tasks.find((candidate) => String(candidate.id) === String(taskId)) as Task | undefined),
+    () =>
+      toTaskDetailTask(
+        tasks.find((candidate) => String(candidate.id) === String(taskId)) as Task | undefined,
+      ),
     [tasks, taskId],
   )
 
@@ -93,10 +111,11 @@ export function useTaskDetailController({
   const current = task || taskFromStore || null
   const playbackUri = current?.voiceUrl == null ? null : String(current.voiceUrl).trim() || null
 
-  const { status: playbackStatus, toggle, stop } = useAudioPlaybackForUri(
-    playbackUri,
-    current?.id ? `detail-${current.id}` : "detail",
-  )
+  const {
+    status: playbackStatus,
+    toggle,
+    stop,
+  } = useAudioPlaybackForUri(playbackUri, current?.id ? `detail-${current.id}` : "detail")
 
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
 
@@ -107,6 +126,7 @@ export function useTaskDetailController({
   const [authDecision, setAuthDecision] = useState<"approved" | "rejected" | null>(null)
   const [rating, setRating] = useState<number>(2.5)
   const authExpiredRef = useRef(false)
+  const paymentNoticeDialogOpenRef = useRef(false)
 
   const [csatRating, setCsatRating] = useState(4)
   const [csatTag, setCsatTag] = useState<string | null>(null)
@@ -138,10 +158,18 @@ export function useTaskDetailController({
 
   const statusMap: StatusPaletteMap = {
     PENDING: { label: t("oolshik:status.pending"), bg: primarySoft, fg: primary },
-    PENDING_AUTH: { label: t("oolshik:status.pendingAuth"), bg: colors.palette.primary100, fg: primary },
+    PENDING_AUTH: {
+      label: t("oolshik:status.pendingAuth"),
+      bg: colors.palette.primary100,
+      fg: primary,
+    },
     ASSIGNED: { label: t("oolshik:status.assigned"), bg: warningSoft, fg: warning },
     COMPLETED: { label: t("oolshik:status.completed"), bg: successSoft, fg: success },
-    CANCELLED: { label: t("oolshik:status.cancelled"), bg: colors.palette.neutral200, fg: neutral700 },
+    CANCELLED: {
+      label: t("oolshik:status.cancelled"),
+      bg: colors.palette.neutral200,
+      fg: neutral700,
+    },
   }
 
   useFocusEffect(
@@ -255,7 +283,7 @@ export function useTaskDetailController({
   const hasHelper = !!current?.helperId || !!current?.pendingHelperId
   const canViewContact = isRequester
     ? !!rawStatus && rawStatus !== "OPEN" && hasHelper
-    : !!fullPhone
+    : (isHelper || isPendingHelper) && !!fullPhone
 
   useEffect(() => {
     const nextPhone = getTaskPhoneNumber(current, isRequester)
@@ -289,11 +317,12 @@ export function useTaskDetailController({
       ? t("oolshik:taskDetailScreen.noOffer")
       : `₹${currentOfferAmount.toFixed(2)} ${current?.offerCurrency || "INR"}`
 
-  const { msUntilReassign, msUntilAuthExpiry, reassignCountdown, authCountdown, authExpired } = useTaskTimers({
-    rawStatus,
-    helperAcceptedAt: current?.helperAcceptedAt,
-    pendingAuthExpiresAt: current?.pendingAuthExpiresAt,
-  })
+  const { msUntilReassign, msUntilAuthExpiry, reassignCountdown, authCountdown, authExpired } =
+    useTaskTimers({
+      rawStatus,
+      helperAcceptedAt: current?.helperAcceptedAt,
+      pendingAuthExpiresAt: current?.pendingAuthExpiresAt,
+    })
 
   useEffect(() => {
     if (!recoveryNotice) return
@@ -373,8 +402,13 @@ export function useTaskDetailController({
     msUntilReassign === 0 &&
     (current?.reassignedCount ?? 0) < MAX_REASSIGN
 
-  const activePaymentStatus = (activePayment?.status ?? activePayment?.snapshot?.status ?? "").toUpperCase()
-  const paymentAwaitingUser = activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"
+  const activePaymentStatus = (
+    activePayment?.status ??
+    activePayment?.snapshot?.status ??
+    ""
+  ).toUpperCase()
+  const paymentAwaitingUser =
+    activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"
   const paymentCanAct = !!activePayment?.canPay && paymentAwaitingUser
   const paymentStatusText = paymentStatusLabel(activePaymentStatus, t)
   const paymentExpiresText = paymentExpiryText(activePayment?.snapshot?.expiresAt, t)
@@ -418,7 +452,9 @@ export function useTaskDetailController({
           ? {
               ...prev,
               offerAmount:
-                typeof res.data?.offerAmount === "number" ? res.data.offerAmount : parsedOffer.amount,
+                typeof res.data?.offerAmount === "number"
+                  ? res.data.offerAmount
+                  : parsedOffer.amount,
               offerCurrency: res.data?.offerCurrency ?? "INR",
               offerUpdatedAt: res.data?.offerUpdatedAt ?? new Date().toISOString(),
             }
@@ -435,46 +471,92 @@ export function useTaskDetailController({
     }
   }, [canEditOffer, current, offerInput, offerSaving, t])
 
+  const withPaymentNoticeGate = useCallback(
+    (onContinue: () => void) => {
+      if (paymentNoticeDialogOpenRef.current) return
+      if (hasSeenPaymentNotice(userId)) {
+        onContinue()
+        return
+      }
+
+      paymentNoticeDialogOpenRef.current = true
+      Alert.alert(
+        t("payment:notice.title"),
+        `${t("payment:notice.line1")}
+
+${t("payment:notice.line2")}`,
+        [
+          {
+            text: t("payment:notice.cancelCta"),
+            style: "cancel",
+            onPress: () => {
+              paymentNoticeDialogOpenRef.current = false
+            },
+          },
+          {
+            text: t("payment:notice.primaryCta"),
+            onPress: () => {
+              markPaymentNoticeSeen(userId)
+              paymentNoticeDialogOpenRef.current = false
+              onContinue()
+            },
+          },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => {
+            paymentNoticeDialogOpenRef.current = false
+          },
+        },
+      )
+    },
+    [t, userId],
+  )
+
   const openPaymentFlow = useCallback(() => {
     if (!current || !activePayment?.id) return
 
-    const paymentScanPayload: PaymentScanPayload = {
-      rawPayload: activePayment.upiIntent ?? "",
-      format: "upi-uri",
-      payeeVpa: activePayment.snapshot?.payeeVpa ?? null,
-      payeeName: activePayment.snapshot?.payeeName ?? null,
-      txnRef: activePayment.snapshot?.txnRef ?? null,
-      mcc: activePayment.snapshot?.mcc ?? null,
-      merchantId: activePayment.snapshot?.merchantId ?? null,
-      amount:
-        typeof activePayment.snapshot?.amountRequested === "number"
-          ? activePayment.snapshot.amountRequested
+    withPaymentNoticeGate(() => {
+      const paymentScanPayload: PaymentScanPayload = {
+        rawPayload: activePayment.upiIntent ?? "",
+        format: "upi-uri",
+        payeeVpa: activePayment.snapshot?.payeeVpa ?? null,
+        payeeName: activePayment.snapshot?.payeeName ?? null,
+        txnRef: activePayment.snapshot?.txnRef ?? null,
+        mcc: activePayment.snapshot?.mcc ?? null,
+        merchantId: activePayment.snapshot?.merchantId ?? null,
+        amount:
+          typeof activePayment.snapshot?.amountRequested === "number"
+            ? activePayment.snapshot.amountRequested
+            : null,
+        currency: activePayment.snapshot?.currency ?? "INR",
+        note: activePayment.snapshot?.note ?? null,
+        scanLocation: null,
+        scannedAt: activePayment.snapshot?.createdAt ?? new Date().toISOString(),
+        guidelines: [
+          t("oolshik:taskDetailScreen.verifyRecipientGuideline"),
+          t("oolshik:taskDetailScreen.markPaidGuideline"),
+        ],
+      }
+
+      const taskContext: PaymentTaskContext = {
+        id: String(current.id),
+        title: current.title ?? current.description ?? null,
+        createdByName: current.createdByName ?? null,
+        createdByPhoneNumber: current.createdByPhoneNumber
+          ? String(current.createdByPhoneNumber)
           : null,
-      currency: activePayment.snapshot?.currency ?? "INR",
-      note: activePayment.snapshot?.note ?? null,
-      scanLocation: null,
-      scannedAt: activePayment.snapshot?.createdAt ?? new Date().toISOString(),
-      guidelines: [
-        t("oolshik:taskDetailScreen.verifyRecipientGuideline"),
-        t("oolshik:taskDetailScreen.markPaidGuideline"),
-      ],
-    }
+      }
 
-    const taskContext: PaymentTaskContext = {
-      id: String(current.id),
-      title: current.title ?? current.description ?? null,
-      createdByName: current.createdByName ?? null,
-      createdByPhoneNumber: current.createdByPhoneNumber ? String(current.createdByPhoneNumber) : null,
-    }
-
-    navigation.navigate("PaymentPay", {
-      taskId: String(current.id),
-      paymentRequestId: activePayment.id,
-      scanPayload: paymentScanPayload,
-      taskContext,
-      upiIntentOverride: activePayment.upiIntent,
+      navigation.navigate("PaymentPay", {
+        taskId: String(current.id),
+        paymentRequestId: activePayment.id,
+        scanPayload: paymentScanPayload,
+        taskContext,
+        upiIntentOverride: activePayment.upiIntent,
+      })
     })
-  }, [activePayment, current, navigation, t])
+  }, [activePayment, current, navigation, t, withPaymentNoticeGate])
 
   const openPaymentsScanner = useCallback(() => {
     if (rawStatus !== "ASSIGNED") return
@@ -498,8 +580,13 @@ export function useTaskDetailController({
     }
 
     setHelperPaymentAmountError(null)
-    navigation.navigate("QrScanner", { taskId: String(current.id), amount: Number(parsed.toFixed(2)) })
-  }, [current?.id, helperPaymentAmountInput, navigation, rawStatus, t])
+    withPaymentNoticeGate(() => {
+      navigation.navigate("QrScanner", {
+        taskId: String(current.id),
+        amount: Number(parsed.toFixed(2)),
+      })
+    })
+  }, [current?.id, helperPaymentAmountInput, navigation, rawStatus, t, withPaymentNoticeGate])
 
   const onRevealPhone = useCallback(async () => {
     if (!current?.id) return
@@ -540,7 +627,10 @@ export function useTaskDetailController({
     if (!current) return
 
     if (isRequester) {
-      Alert.alert(t("oolshik:taskDetailScreen.infoTitle"), t("oolshik:taskDetailScreen.onlyHelpersCanAccept"))
+      Alert.alert(
+        t("oolshik:taskDetailScreen.infoTitle"),
+        t("oolshik:taskDetailScreen.onlyHelpersCanAccept"),
+      )
       return
     }
 
@@ -599,7 +689,9 @@ export function useTaskDetailController({
                 },
           )
         } else {
-          setTask((prev) => (prev ? { ...prev, status: "ASSIGNED", pendingAuthExpiresAt: null } : prev))
+          setTask((prev) =>
+            prev ? { ...prev, status: "ASSIGNED", pendingAuthExpiresAt: null } : prev,
+          )
         }
 
         setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationApproved"))
@@ -669,8 +761,9 @@ export function useTaskDetailController({
 
     setRatingSubmitting(true)
     try {
+      const cleanRating = normalizeRating(rating, { min: 0, max: 5, step: 0.5 })
       const res = await rateTask(String(current.id), {
-        rating,
+        rating: cleanRating,
         feedback: undefined,
       })
 
@@ -682,8 +775,8 @@ export function useTaskDetailController({
         prev
           ? {
               ...prev,
-              ratingByRequester: isRequester ? rating : prev.ratingByRequester,
-              ratingByHelper: isHelper ? rating : prev.ratingByHelper,
+              ratingByRequester: isRequester ? cleanRating : prev.ratingByRequester,
+              ratingByHelper: isHelper ? cleanRating : prev.ratingByHelper,
             }
           : prev,
       )
@@ -791,11 +884,24 @@ export function useTaskDetailController({
       }
       closeReasonSheet()
     } catch {
-      Alert.alert(t("oolshik:taskDetailScreen.actionFailedTitle"), t("oolshik:taskDetailScreen.actionFailedBody"))
+      Alert.alert(
+        t("oolshik:taskDetailScreen.actionFailedTitle"),
+        t("oolshik:taskDetailScreen.actionFailedBody"),
+      )
     } finally {
       setActionLoading(false)
     }
-  }, [closeReasonSheet, coords, current?.id, fetchNearby, reasonModal.action, reasonModal.reasonCode, reasonModal.reasonText, status, t])
+  }, [
+    closeReasonSheet,
+    coords,
+    current?.id,
+    fetchNearby,
+    reasonModal.action,
+    reasonModal.reasonCode,
+    reasonModal.reasonText,
+    status,
+    t,
+  ])
 
   const onReassign = useCallback(async () => {
     if (!current?.id) return
@@ -856,7 +962,10 @@ export function useTaskDetailController({
         // fall through to alert
       }
 
-      Alert.alert(t("oolshik:taskDetailScreen.noMapsTitle"), t("oolshik:taskDetailScreen.noMapsBody", { lat, lon }))
+      Alert.alert(
+        t("oolshik:taskDetailScreen.noMapsTitle"),
+        t("oolshik:taskDetailScreen.noMapsBody", { lat, lon }),
+      )
     },
     [t],
   )
@@ -902,7 +1011,10 @@ export function useTaskDetailController({
   const cancelReasons = useMemo(
     () => [
       { code: "NOT_NEEDED", label: t("oolshik:taskDetailScreen.cancelReasonNotNeeded") },
-      { code: "FOUND_ALTERNATIVE", label: t("oolshik:taskDetailScreen.cancelReasonFoundAlternative") },
+      {
+        code: "FOUND_ALTERNATIVE",
+        label: t("oolshik:taskDetailScreen.cancelReasonFoundAlternative"),
+      },
       { code: "WRONG_TASK", label: t("oolshik:taskDetailScreen.cancelReasonWrongTask") },
       { code: "OTHER", label: t("oolshik:taskDetailScreen.reasonOther") },
     ],
@@ -1013,7 +1125,8 @@ export function useTaskDetailController({
     contact: {
       contactLabel,
       canViewContact,
-      displayPhone: isRevealed && fullPhone ? String(fullPhone) : maskPhoneNumber(fullPhone || "•••••••••••••"),
+      displayPhone:
+        isRevealed && fullPhone ? String(fullPhone) : maskPhoneNumber(fullPhone || "•••••••••••••"),
       canCall: !!fullPhone,
     },
     offer: {
@@ -1050,29 +1163,30 @@ export function useTaskDetailController({
       paymentRequesterNotified: isHelper && activePayment?.payerRole === "REQUESTER",
       tagStrings: tags,
       ratingTexts: {
-        youRated: myRating != null
-          ? t("oolshik:taskDetailScreen.youRated", { rating: myRating.toFixed(1) })
-          : "",
+        youRated:
+          myRating != null
+            ? t("oolshik:taskDetailScreen.youRated", { rating: myRating.toFixed(1) })
+            : "",
         helperRatedYou:
           otherPartyRating != null
             ? t("oolshik:taskDetailScreen.helperRatedYou", { rating: otherPartyRating.toFixed(1) })
             : "",
         requesterRatedYou:
           otherPartyRating != null
-            ? t("oolshik:taskDetailScreen.requesterRatedYou", { rating: otherPartyRating.toFixed(1) })
+            ? t("oolshik:taskDetailScreen.requesterRatedYou", {
+                rating: otherPartyRating.toFixed(1),
+              })
             : "",
         ratingSubmittedValue:
           submittedCsat?.rating != null
             ? t("oolshik:taskDetailScreen.ratingSubmittedValue", { rating: submittedCsat.rating })
             : undefined,
-        tagSubmitted:
-          submittedCsat?.tags?.length
-            ? t("oolshik:taskDetailScreen.tagLabel", { tag: submittedCsat.tags.join(", ") })
-            : undefined,
-        commentSubmitted:
-          submittedCsat?.message
-            ? t("oolshik:taskDetailScreen.commentLabel", { comment: submittedCsat.message })
-            : undefined,
+        tagSubmitted: submittedCsat?.tags?.length
+          ? t("oolshik:taskDetailScreen.tagLabel", { tag: submittedCsat.tags.join(", ") })
+          : undefined,
+        commentSubmitted: submittedCsat?.message
+          ? t("oolshik:taskDetailScreen.commentLabel", { comment: submittedCsat.message })
+          : undefined,
       },
     },
     reasons: {

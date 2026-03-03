@@ -64,6 +64,16 @@ const mr = {
     ratingOkay: "ठीकठाक",
     ratingGood: "चांगला",
     ratingGreat: "उत्तम",
+    starRating: {
+      poor: "कमकुवत",
+      okay: "ठीकठाक",
+      good: "चांगले",
+      excellent: "उत्तम",
+      currentRatingA11y: "रेटिंग, {{value}} पैकी {{max}}",
+      setRatingA11y: "रेटिंग {{value}} वर सेट करा",
+      dragHint: "अर्धा स्टार निवडण्यासाठी टॅप करा किंवा सरकवा.",
+      valueOutOf: "{{value}} / {{max}}",
+    },
     feedback: {
       title: "अभिप्राय",
       subtitle: "ॲप सुधारण्यासाठी तुमचा अभिप्राय उपयुक्त ठरेल.",
@@ -557,6 +567,13 @@ const mr = {
     },
   },
   payment: {
+    notice: {
+      title: "पेमेंट सूचना",
+      line1: "पेमेंट तुमच्या UPI ॲपमध्ये होते. Oolshik तुमचे पेमेंट प्रक्रिया करत नाही किंवा साठवत नाही.",
+      line2: "तुमच्या निर्णयानेच पेमेंट करा. पेमेंट करण्यापूर्वी प्राप्तकर्त्याचे तपशील तपासा.",
+      primaryCta: "मला समजले",
+      cancelCta: "रद्द करा",
+    },
     pay: {
       defaultStatus: "पेमेंट प्रतीक्षेत",
       transferAmount: "ट्रान्सफर रक्कम",

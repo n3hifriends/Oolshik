@@ -281,7 +281,6 @@ export default function TaskDetailScreen({ navigation }: Props) {
         quickTagOptional={t("oolshik:taskDetailScreen.quickTagOptional")}
         sendFeedbackLabel={t("oolshik:taskDetailScreen.sendFeedback")}
         submittingLabel="..."
-        rateNumberA11y={(value) => t("oolshik:taskDetailScreen.rateNumberA11y", { value })}
         tagA11y={(tag) => t("oolshik:taskDetailScreen.tagA11y", { tag })}
         primary={primary}
         primary100={colors.palette.primary100}

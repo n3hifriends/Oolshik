@@ -3,13 +3,14 @@ import { Alert, Pressable, View } from "react-native"
 import { useTranslation } from "react-i18next"
 import { useRoute } from "@react-navigation/native"
 
-import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
+import { Screen } from "@/components/Screen"
+import { StarRating } from "@/components/StarRating/StarRating"
+import { normalizeRating } from "@/components/StarRating/utils"
+import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
-import { SmileySlider } from "@/components/SmileySlider"
-import { useAppTheme } from "@/theme/context"
 import { submitFeedback } from "@/features/feedback/storage/feedbackQueue"
+import { useAppTheme } from "@/theme/context"
 
 const MAX_DESC = 300
 
@@ -37,14 +38,16 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
   )
 
   const toggleTag = (tag: string) => {
-    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+    setTags((prev) => (prev.includes(tag) ? prev.filter((activeTag) => activeTag !== tag) : [...prev, tag]))
   }
 
   const onSubmit = async () => {
     if (loading) return
     setLoading(true)
 
-    const cleanRating = Math.max(1, Math.min(5, Math.round(rating)))
+    // CSAT endpoint is integer today; keep contract while retaining a half-step UI.
+    const normalizedRating = normalizeRating(rating, { min: 0, max: 5, step: 0.5 })
+    const cleanRating = Math.max(1, Math.min(5, Math.round(normalizedRating)))
     const trimmed = desc.trim().slice(0, MAX_DESC)
 
     const res = await submitFeedback({
@@ -104,7 +107,7 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
 
       <View style={{ gap: spacing.sm }}>
         <Text tx="oolshik:feedback.ratingPrompt" weight="medium" />
-        <SmileySlider value={rating} onChange={setRating} />
+        <StarRating value={rating} onChange={setRating} step={0.5} disabled={loading} showLabel />
       </View>
 
       <View style={{ gap: spacing.xs }}>
@@ -122,7 +125,7 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
           multiline
           numberOfLines={4}
           value={desc}
-          onChangeText={(t) => setDesc(t.slice(0, MAX_DESC))}
+          onChangeText={(textValue) => setDesc(textValue.slice(0, MAX_DESC))}
           placeholderTx="oolshik:descriptionOptional"
           editable={!loading}
           style={{ minHeight: 100 }}
