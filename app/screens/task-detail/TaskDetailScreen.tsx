@@ -32,6 +32,10 @@ export default function TaskDetailScreen({ navigation }: Props) {
 
   const { spacing, colors, primary, success, successSoft, neutral600, neutral700 } = controller.theme
   const { current, state, handlers, role, statusInfo, offer, contact, payment, rating, derived } = controller
+  const hasVoiceUrl = current?.voiceUrl != null && String(current.voiceUrl).trim().length > 0
+  const completedFooterMessage = role.isRequester
+    ? t("oolshik:taskDetailScreen.thanksForConfirmingCompletion")
+    : t("oolshik:taskDetailScreen.thanksForHelping")
 
   return (
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
@@ -65,7 +69,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
               initials={derived.initials}
               createdByName={current.createdByName || t("oolshik:taskCard.someoneNearby")}
               createdAtLabel={derived.createdAtLabel}
-              voiceAvailable={!!current.voiceUrl}
+              voiceAvailable={hasVoiceUrl}
               audioLoading={controller.playback.audioLoading}
               playing={controller.playback.playing}
               onTogglePlay={handlers.togglePlay}
@@ -191,7 +195,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         reassignHelperLabel={t("oolshik:taskDetailScreen.reassignHelper")}
         reassignLimitReachedText={t("oolshik:taskDetailScreen.reassignLimitReached")}
         taskCompletedLabel={t("oolshik:taskDetailScreen.taskCompleted")}
-        thanksForHelpingLabel={t("oolshik:taskDetailScreen.thanksForHelping")}
+        thanksForHelpingLabel={completedFooterMessage}
         okLabel={t("oolshik:taskDetailScreen.ok")}
         success={success}
         successSoft={successSoft}
@@ -277,7 +281,6 @@ export default function TaskDetailScreen({ navigation }: Props) {
         quickTagOptional={t("oolshik:taskDetailScreen.quickTagOptional")}
         sendFeedbackLabel={t("oolshik:taskDetailScreen.sendFeedback")}
         submittingLabel="..."
-        rateNumberA11y={(value) => t("oolshik:taskDetailScreen.rateNumberA11y", { value })}
         tagA11y={(tag) => t("oolshik:taskDetailScreen.tagA11y", { tag })}
         primary={primary}
         primary100={colors.palette.primary100}

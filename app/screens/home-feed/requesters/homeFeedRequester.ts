@@ -1,5 +1,6 @@
 import { OolshikApi } from "@/api"
-import type { Task } from "@/api/client"
+import type { ActiveRequestCapReachedPayload, Task } from "@/api/client"
+import { toActiveRequestCapPayload } from "@/api/client"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
 import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 import type { VoiceNote } from "@/screens/home-feed/types"
@@ -8,6 +9,7 @@ type ApiLikeResponse<T> = {
   ok?: boolean
   status?: number
   data?: T | null
+  activeCap?: ActiveRequestCapReachedPayload | null
   problem?: string | null
   originalError?: {
     message?: string
@@ -57,10 +59,12 @@ export type CreateTaskPayload = {
 
 export async function createTask(payload: CreateTaskPayload) {
   const res = (await OolshikApi.createTask(payload)) as ApiLikeResponse<Task>
+  const activeCap = res?.activeCap ?? toActiveRequestCapPayload(res?.data)
   return {
     ok: !!res?.ok,
     status: res?.status,
     data: res?.ok && res?.data ? res.data : null,
+    activeCap,
     message:
       extractMessageFromData(res?.data) ||
       (typeof res?.problem === "string" ? res.problem : undefined) ||

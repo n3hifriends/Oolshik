@@ -1,6 +1,8 @@
 import React from "react"
 import { Pressable, View } from "react-native"
+
 import { Button } from "@/components/Button"
+import { StarRating } from "@/components/StarRating/StarRating"
 import { Text } from "@/components/Text"
 import type { SubmittedFeedbackSnapshot } from "@/features/feedback/storage/feedbackQueue"
 
@@ -23,7 +25,6 @@ type CsatSectionProps = {
   quickTagOptional: string
   sendFeedbackLabel: string
   submittingLabel: string
-  rateNumberA11y: (value: number) => string
   tagA11y: (tag: string) => string
   primary: string
   primary100: string
@@ -64,32 +65,14 @@ export function CsatSection(props: CsatSectionProps) {
         </View>
       ) : (
         <>
-          <View style={{ flexDirection: "row", gap: props.spacingXs }}>
-            {[1, 2, 3, 4, 5].map((val) => {
-              const active = Math.round(props.csatRating) === val
-              return (
-                <Pressable
-                  key={`csat-${val}`}
-                  onPress={() => props.onSelectRating(val)}
-                  accessibilityRole="button"
-                  accessibilityLabel={props.rateNumberA11y(val)}
-                  style={({ pressed }) => ({
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: 1,
-                    borderColor: active ? props.primary : props.neutral300,
-                    backgroundColor: active ? props.primary100 : "transparent",
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <Text text={String(val)} weight="medium" />
-                </Pressable>
-              )
-            })}
-          </View>
+          <StarRating
+            value={props.csatRating}
+            onChange={props.onSelectRating}
+            // Keep CSAT semantics aligned with existing integer submit flow.
+            step={1}
+            disabled={props.csatSubmitting}
+            showLabel
+          />
 
           <View style={{ gap: props.spacingXs }}>
             <Text text={props.quickTagOptional} size="xs" style={{ color: props.neutral600 }} />

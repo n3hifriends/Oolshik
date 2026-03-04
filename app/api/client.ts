@@ -90,13 +90,16 @@ const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API
   .trim()
   .replace(/\/+$/, "")
 const BASE_URL = /\/api$/i.test(rawHost) ? rawHost : `${rawHost}/api`
+const REQUEST_TIMEOUT_MS = 10_000
 
-// ---------- Axios instance (shared) ----------
-export const axiosInstance: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}`,
-  timeout: 10000,
+const createHttpClientConfig = () => ({
+  baseURL: BASE_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: { "Content-Type": "application/json" },
 })
+
+// ---------- Axios instance (shared) ----------
+export const axiosInstance: AxiosInstance = axios.create(createHttpClientConfig())
 
 // ---------- Single-flight refresh queue ----------
 let isRefreshing = false
@@ -132,11 +135,7 @@ axiosInstance.interceptors.request.use((config) => {
 })
 
 // A raw axios (no interceptors) for refresh call
-const raw = axios.create({
-  baseURL: `${BASE_URL}`,
-  timeout: 10000,
-  headers: { "Content-Type": "application/json" },
-})
+const raw = axios.create(createHttpClientConfig())
 // ---- logging for raw axios (refresh) ----
 raw.interceptors.request.use((config) => {
   ;(config as any as ReqMeta)._tsStart = Date.now()
@@ -294,8 +293,8 @@ axiosInstance.interceptors.response.use(
 
 // ---------- Apisauce wrapper (your app should use this) ----------
 export const api: ApisauceInstance = create({
-  baseURL: `${BASE_URL}/api`,
-  timeout: 10000,
+  baseURL: BASE_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   axiosInstance, // 👈 use our configured axios with interceptors
 })
 api.addAsyncRequestTransform(async (request) => {
@@ -322,7 +321,15 @@ export type ServerTask = {
   id: string
   title?: string
   description?: string
-  status: "DRAFT" | "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status:
+    | "DRAFT"
+    | "PENDING"
+    | "PENDING_AUTH"
+    | "ASSIGNED"
+    | "COMPLETED"
+    | "OPEN"
+    | "CANCELLED"
+    | "CANCELED"
   voiceUrl?: string | null
   latitude: number
   longitude: number
@@ -448,6 +455,61 @@ export type PaymentRequestApiResponse = {
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
+export type ActiveRequestSummaryItem = {
+  id: string
+  status: ServerTask["status"] | string
+  createdAt: string
+}
+
+export type ActiveRequestSummary = {
+  cap: number
+  activeCount: number
+  blocked: boolean
+  suggestedRequestId?: string | null
+  activeRequests: ActiveRequestSummaryItem[]
+}
+
+export type ActiveRequestCapReachedPayload = {
+  code: "ACTIVE_REQUEST_CAP_REACHED"
+  message: string
+  cap: number
+  activeCount: number
+  activeRequestIds: string[]
+  suggestedRequestId?: string | null
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return !!input && typeof input === "object" && !Array.isArray(input)
+}
+
+export function toActiveRequestCapPayload(input: unknown): ActiveRequestCapReachedPayload | null {
+  if (!isRecord(input)) return null
+  if (input.code !== "ACTIVE_REQUEST_CAP_REACHED") return null
+
+  const cap = Number(input.cap)
+  const activeCount = Number(input.activeCount)
+  if (!Number.isFinite(cap) || cap < 1) return null
+  if (!Number.isFinite(activeCount) || activeCount < 0) return null
+
+  const activeRequestIds = Array.isArray(input.activeRequestIds)
+    ? input.activeRequestIds.filter((id): id is string => typeof id === "string")
+    : []
+  if (activeRequestIds.length === 0) return null
+
+  const message = typeof input.message === "string" ? input.message : "Active request limit reached."
+  const suggestedRequestId =
+    typeof input.suggestedRequestId === "string" ? input.suggestedRequestId : null
+
+  return {
+    code: "ACTIVE_REQUEST_CAP_REACHED",
+    message,
+    cap,
+    activeCount,
+    activeRequestIds,
+    suggestedRequestId,
+  }
+}
+
 type CreateTaskPayload = {
   voiceUrl?: string
   description?: string
@@ -466,7 +528,15 @@ const toClientTask = (t: ServerTask): Task => ({ ...t })
 
 export const OolshikApi = {
   // Create Request
-  createTask: (payload: CreateTaskPayload) => api.post("/requests", payload),
+  createTask: async (payload: CreateTaskPayload) => {
+    const response = await api.post("/requests", payload)
+    return {
+      ...response,
+      activeCap: toActiveRequestCapPayload(response.data),
+    }
+  },
+
+  getActiveSummary: () => api.get<ActiveRequestSummary>("/requests/active-summary"),
 
   // Nearby
   findTaskByTaskId: (taskId: string) => api.get(`/requests/${taskId}`),
@@ -520,20 +590,18 @@ export const OolshikApi = {
     api.post(`/requests/${taskId}/rate`, payload),
 
   // Cancel / Release / Reassign
-  cancelTask: (
-    taskId: string,
-    payload?: { reasonCode: string; reasonText?: string },
-  ) => api.post(`/requests/${taskId}/cancel`, payload ?? {}),
+  cancelTask: (taskId: string, payload?: { reasonCode: string; reasonText?: string }) =>
+    api.post(`/requests/${taskId}/cancel`, payload ?? {}),
 
-  releaseTask: (
-    taskId: string,
-    payload?: { reasonCode?: string; reasonText?: string },
-  ) => api.post(`/requests/${taskId}/release`, payload ?? {}),
+  releaseTask: (taskId: string, payload?: { reasonCode?: string; reasonText?: string }) =>
+    api.post(`/requests/${taskId}/release`, payload ?? {}),
 
   reassignTask: (taskId: string) => api.post(`/requests/${taskId}/reassign`, {}),
 
-  updateTaskOffer: (taskId: string, payload: { offerAmount?: number | null; offerCurrency?: string }) =>
-    api.patch<OfferUpdateApiResponse>(`/requests/${taskId}/offer`, payload),
+  updateTaskOffer: (
+    taskId: string,
+    payload: { offerAmount?: number | null; offerCurrency?: string },
+  ) => api.patch<OfferUpdateApiResponse>(`/requests/${taskId}/offer`, payload),
 
   // Reviews
   addReview: (payload: { taskId: string; rating: number; comment?: string }) =>
@@ -551,8 +619,7 @@ export const OolshikApi = {
   // Device token (push)
   registerDevice: (token: string, platform?: string) =>
     api.post("/users/device", { token, platform }),
-  unregisterDevice: (token: string) =>
-    api.delete("/users/device", {}, { data: { token } }),
+  unregisterDevice: (token: string) => api.delete("/users/device", {}, { data: { token } }),
 
   // Profile stats
   getMyStats: () => api.get<UserStats>("/users/me/stats"),

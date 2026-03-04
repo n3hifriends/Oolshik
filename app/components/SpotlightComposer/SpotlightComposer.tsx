@@ -36,6 +36,7 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder"
 
 import { transcribeAudio } from "./transcription"
 import { useReduceMotion } from "./useReduceMotion"
+import { isActiveCapHandledError } from "@/features/active-cap/useActiveRequestCapGuard"
 
 let Portal: any = null
 try {
@@ -76,6 +77,7 @@ type ComposerSubmitPayload = {
 
 export interface SpotlightComposerProps {
   onSubmitTask?: (payload: ComposerSubmitPayload) => Promise<void> | void
+  onBeforeOpen?: (mode: ComposerMode) => Promise<boolean> | boolean
 }
 
 const FAB_SIZE = 56
@@ -113,7 +115,7 @@ const lerp = (a: number, b: number, t: number): number => {
 const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
+export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightComposerProps) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
   const reduceMotion = useReduceMotion()
@@ -127,6 +129,9 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
 
   const textInputRef = useRef<TextInput>(null)
   const isMounted = useRef(true)
+  const stateRef = useRef<ComposerState>("idle")
+  const closingRef = useRef(false)
+  const submitInFlightRef = useRef(false)
   const setEditingState = useCallback(() => setState("editing"), [])
 
   const { uri, start, stop, reset, recording, durationSec } = useAudioRecorder(30)
@@ -168,6 +173,10 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   useEffect(() => {
     latestRecording.current = { uri, durationSec }
   }, [durationSec, uri])
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     const micCenterX = insets.left + theme.spacing.md + FAB_SIZE / 2
@@ -235,6 +244,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   }, [])
 
   const resetState = useCallback(() => {
+    closingRef.current = false
+    submitInFlightRef.current = false
     setState("idle")
     setMode(null)
     setText("")
@@ -246,6 +257,8 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   }, [hideMicFab, hidePenFab, reset, suggestionsProgress])
 
   const closeComposer = useCallback(() => {
+    if (closingRef.current || stateRef.current === "idle") return
+    closingRef.current = true
     setState("closing")
     scrimOpacity.value = withTiming(0, { duration: durationScrim })
     suggestionsProgress.value = withTiming(0, { duration: durationClose })
@@ -253,6 +266,10 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       if (finished) runOnJS(resetState)()
     })
   }, [durationClose, durationScrim, openProgress, resetState, scrimOpacity, suggestionsProgress])
+
+  const swallowOverlayPress = useCallback((event: any) => {
+    event?.stopPropagation?.()
+  }, [])
 
   const handleVoiceStart = useCallback(async () => {
     setState("voice_recording")
@@ -276,36 +293,47 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const handleOpen = useCallback(
     (nextMode: ComposerMode) => {
       if (state !== "idle") return
-      setMode(nextMode)
-      setState("opening")
-      if (nextMode === "voice") {
-        hidePenFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
-      } else {
-        hideMicFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
-      }
-      triggerHaptic("impactLight")
-      scrimOpacity.value = withTiming(1, { duration: durationScrim })
-      openProgress.value = 0
-      openProgress.value = withSpring(
-        1,
-        {
-          damping: reduceMotion ? 18 : 14,
-          stiffness: reduceMotion ? 140 : 210,
-        },
-        (finished) => {
-          if (!finished) return
-          suggestionsProgress.value = withDelay(
-            reduceMotion ? 40 : 140,
-            withTiming(1, { duration: reduceMotion ? 150 : 260 }),
-          )
-          if (nextMode === "voice") {
-            runOnJS(handleVoiceStart)()
-          } else {
-            runOnJS(setEditingState)()
-            runOnJS(focusInput)()
+      const openComposer = async () => {
+        if (onBeforeOpen) {
+          try {
+            const allowed = await onBeforeOpen(nextMode)
+            if (!allowed) return
+          } catch {
+            return
           }
-        },
-      )
+        }
+        setMode(nextMode)
+        setState("opening")
+        if (nextMode === "voice") {
+          hidePenFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
+        } else {
+          hideMicFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
+        }
+        triggerHaptic("impactLight")
+        scrimOpacity.value = withTiming(1, { duration: durationScrim })
+        openProgress.value = 0
+        openProgress.value = withSpring(
+          1,
+          {
+            damping: reduceMotion ? 18 : 14,
+            stiffness: reduceMotion ? 140 : 210,
+          },
+          (finished) => {
+            if (!finished) return
+            suggestionsProgress.value = withDelay(
+              reduceMotion ? 40 : 140,
+              withTiming(1, { duration: reduceMotion ? 150 : 260 }),
+            )
+            if (nextMode === "voice") {
+              runOnJS(handleVoiceStart)()
+            } else {
+              runOnJS(setEditingState)()
+              runOnJS(focusInput)()
+            }
+          },
+        )
+      }
+      void openComposer()
     },
     [
       focusInput,
@@ -319,17 +347,20 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       suggestionsProgress,
       triggerHaptic,
       setEditingState,
+      onBeforeOpen,
     ],
   )
 
   const handleStopRecording = useCallback(
     async (shouldTranscribe = true) => {
-      await stop()
-      let { uri: filePath, durationSec: recordedDuration } = latestRecording.current
+      const stopped = await stop()
+      let filePath = stopped?.uri ?? latestRecording.current.uri
+      let recordedDuration = stopped?.durationSec ?? latestRecording.current.durationSec
       if (!filePath) {
         // allow state to flush
         await new Promise((r) => setTimeout(r, 50))
-        ;({ uri: filePath, durationSec: recordedDuration } = latestRecording.current)
+        filePath = latestRecording.current.uri
+        recordedDuration = latestRecording.current.durationSec
       }
       if (!filePath) {
         closeComposer()
@@ -343,7 +374,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       setState("transcribing")
       try {
         const transcript = await transcribeAudio(filePath)
-        if (!isMounted.current || state === "closing") return
+        if (!isMounted.current || closingRef.current || stateRef.current === "closing") return
         setText(transcript)
         setState("editing")
         // only focus input for typed mode
@@ -358,10 +389,11 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   )
 
   const handleSubmit = useCallback(async () => {
-    if (state === "submitting") return
+    if (submitInFlightRef.current || closingRef.current || stateRef.current === "closing") return
     const trimmed = text.trim()
     const safeText = trimmed || (mode === "voice" && voiceNote ? t("oolshik:taskCard.voiceTask") : "")
     if (!safeText) return
+    submitInFlightRef.current = true
     setState("submitting")
     const submitStartedAt = Date.now()
     try {
@@ -382,7 +414,12 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       } else {
         Alert.alert(t("oolshik:composer.submittedTitle"), t("oolshik:composer.submittedBody"))
       }
-    } catch {
+    } catch (error) {
+      submitInFlightRef.current = false
+      if (isActiveCapHandledError(error)) {
+        setState("editing")
+        return
+      }
       Alert.alert(t("oolshik:composer.unableSubmitTitle"), t("oolshik:composer.unableSubmitBody"))
       setState("editing")
       return
@@ -391,7 +428,14 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   }, [closeComposer, mode, onSubmitTask, state, t, text, voiceNote])
 
   const onScrimPress = useCallback(() => {
-    if (state === "submitting") {
+    if (
+      submitInFlightRef.current ||
+      closingRef.current ||
+      stateRef.current === "closing" ||
+      state === "submitting" ||
+      state === "opening" ||
+      state === "closing"
+    ) {
       return
     }
     if (state === "voice_recording") {
@@ -467,6 +511,9 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   }))
 
   const pillActiveBackground = theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"
+  const canSubmit = text.trim().length > 0 || (mode === "voice" && !!voiceNote)
+  const submitDisabled =
+    !canSubmit || state === "opening" || state === "closing" || state === "transcribing" || state === "submitting"
 
   const renderIdleFabs = () => (
     <View
@@ -618,9 +665,11 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       />
       <TouchableOpacity
         accessibilityLabel={t("oolshik:composer.submitTaskA11y")}
+        disabled={submitDisabled}
         onPress={handleSubmit}
         style={[
           styles.submitPill,
+          submitDisabled ? styles.submitPillDisabled : null,
           { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
         ]}
       >
@@ -647,9 +696,11 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       />
       <TouchableOpacity
         accessibilityLabel={t("oolshik:composer.submitTaskA11y")}
+        disabled={submitDisabled}
         onPress={handleSubmit}
         style={[
           styles.submitPill,
+          submitDisabled ? styles.submitPillDisabled : null,
           { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
         ]}
       >
@@ -728,26 +779,28 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
               ]}
             />
           )}
-          <RNView
-            style={[
-              styles.pillInner,
-              {
-                borderColor: theme.isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-                backgroundColor: theme.isDark ? "rgba(24,24,28,0.9)" : "rgba(255,255,255,0.96)",
-              },
-            ]}
-          >
-            {renderPillContent()}
-            {state !== "voice_recording" && state !== "submitting" && (
-              <TouchableOpacity
-                style={styles.close}
-                accessibilityLabel={t("oolshik:composer.closeA11y")}
-                onPress={closeComposer}
-              >
-                <Icon icon="x" />
-              </TouchableOpacity>
-            )}
-          </RNView>
+          <Pressable onPress={swallowOverlayPress} style={styles.pillPressShield}>
+            <RNView
+              style={[
+                styles.pillInner,
+                {
+                  borderColor: theme.isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+                  backgroundColor: theme.isDark ? "rgba(24,24,28,0.9)" : "rgba(255,255,255,0.96)",
+                },
+              ]}
+            >
+              {renderPillContent()}
+              {state !== "voice_recording" && state !== "submitting" && (
+                <TouchableOpacity
+                  style={styles.close}
+                  accessibilityLabel={t("oolshik:composer.closeA11y")}
+                  onPress={closeComposer}
+                >
+                  <Icon icon="x" />
+                </TouchableOpacity>
+              )}
+            </RNView>
+          </Pressable>
         </Animated.View>
 
         <RNView
@@ -774,9 +827,9 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
         ) : (
           <Modal
             visible={showOverlay}
-            // transparent
+            transparent
             animationType="none"
-            onRequestClose={() => {}}
+            onRequestClose={onScrimPress}
             statusBarTranslucent
           >
             <RNView style={{ flex: 1 }} pointerEvents="box-none">
@@ -878,6 +931,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  pillPressShield: {
+    flex: 1,
+  },
   scrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.35)",
@@ -891,6 +947,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  submitPillDisabled: {
+    opacity: 0.55,
   },
   submitText: {
     fontSize: 14,

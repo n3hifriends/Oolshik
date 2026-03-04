@@ -18,6 +18,8 @@ import { useTaskStore } from "@/store/taskStore"
 import { uploadAudioSmart } from "@/audio/uploadAudio"
 import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 import { parseOfferInput } from "@/utils/offerRules"
+import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
+import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 
 type Radius = 1 | 2 | 5
 
@@ -47,6 +49,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { userId, userName } = useAuth()
   const { fetchNearby } = useTaskStore()
+  const activeCapGuard = useActiveRequestCapGuard(navigation)
 
   useFocusEffect(
     React.useCallback(() => {
@@ -188,6 +191,11 @@ export default function CreateTaskScreen({ navigation }: any) {
     }
     const offerAmount = parsedOffer.amount
 
+    const canCreate = await activeCapGuard.ensureCanCreateRequestOrRedirect()
+    if (!canCreate) {
+      return
+    }
+
     setSubmitting(true)
     try {
       const voiceUrl = await uploadVoiceIfNeeded()
@@ -207,6 +215,9 @@ export default function CreateTaskScreen({ navigation }: any) {
 
       const res = await OolshikApi.createTask(payload)
       if (!res.ok || !res.data) {
+        if (activeCapGuard.handleCreateCapResponse(res)) {
+          return
+        }
         const errMsg =
           (res as any)?.data?.message ||
           (res as any)?.problem ||
@@ -243,11 +254,12 @@ export default function CreateTaskScreen({ navigation }: any) {
   }
 
   return (
-    <Screen
-      preset="scroll"
-      safeAreaEdges={["top", "bottom"]}
-      contentContainerStyle={{ padding: 16, gap: 12 }}
-    >
+    <>
+      <Screen
+        preset="scroll"
+        safeAreaEdges={["top", "bottom"]}
+        contentContainerStyle={{ padding: 16, gap: 12 }}
+      >
       <Text preset="heading" text={t("task:create.heading")} />
 
       {status !== "ready" && (
@@ -389,11 +401,13 @@ export default function CreateTaskScreen({ navigation }: any) {
       </View>
 
       {/* Submit */}
-      <Button
-        text={submitting ? t("task:create.posting") : t("task:create.post")}
-        onPress={handleSubmitTask}
-        // disabled={submitting || !coords}
-      />
-    </Screen>
+        <Button
+          text={submitting ? t("task:create.posting") : t("task:create.post")}
+          onPress={handleSubmitTask}
+          // disabled={submitting || !coords}
+        />
+      </Screen>
+      <ActiveRequestCapDialog {...activeCapGuard.dialogProps} />
+    </>
   )
 }

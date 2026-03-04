@@ -1,5 +1,6 @@
 import { ComponentType } from "react"
 import {
+  ActivityIndicator,
   Pressable,
   PressableProps,
   PressableStateCallbackType,
@@ -83,6 +84,10 @@ export interface ButtonProps extends PressableProps {
    * An optional style override for the disabled state
    */
   disabledStyle?: StyleProp<ViewStyle>
+  /**
+   * Shows a busy state and disables button interactions.
+   */
+  loading?: boolean
 }
 
 /**
@@ -114,12 +119,16 @@ export function Button(props: ButtonProps) {
     LeftAccessory,
     disabled,
     disabledStyle: $disabledViewStyleOverride,
+    loading = false,
     ...rest
   } = props
 
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
 
   const preset: Presets = props.preset ?? "default"
+  const isDisabled = !!disabled || loading
+  const spinnerColor = themed($spinnerColorPresets[preset]).color ?? theme.colors.text
+
   /**
    * @param {PressableStateCallbackType} root0 - The root object containing the pressed state.
    * @param {boolean} root0.pressed - The pressed state.
@@ -129,8 +138,9 @@ export function Button(props: ButtonProps) {
     return [
       themed($viewPresets[preset]),
       $viewStyleOverride,
-      !!pressed && themed([$pressedViewPresets[preset], $pressedViewStyleOverride]),
-      !!disabled && $disabledViewStyleOverride,
+      !isDisabled && !!pressed && themed([$pressedViewPresets[preset], $pressedViewStyleOverride]),
+      isDisabled && themed($disabledViewPresets[preset]),
+      isDisabled && $disabledViewStyleOverride,
     ]
   }
   /**
@@ -142,8 +152,9 @@ export function Button(props: ButtonProps) {
     return [
       themed($textPresets[preset]),
       $textStyleOverride,
-      !!pressed && themed([$pressedTextPresets[preset], $pressedTextStyleOverride]),
-      !!disabled && $disabledTextStyleOverride,
+      !isDisabled && !!pressed && themed([$pressedTextPresets[preset], $pressedTextStyleOverride]),
+      isDisabled && themed($disabledTextPresets[preset]),
+      isDisabled && $disabledTextStyleOverride,
     ]
   }
 
@@ -151,25 +162,38 @@ export function Button(props: ButtonProps) {
     <Pressable
       style={$viewStyle}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      android_ripple={themed($ripplePresets[preset])}
       {...rest}
-      disabled={disabled}
+      disabled={isDisabled}
     >
       {(state) => (
         <>
-          {!!LeftAccessory && (
-            <LeftAccessory style={$leftAccessoryStyle} pressableState={state} disabled={disabled} />
+          {!loading && !!LeftAccessory && (
+            <LeftAccessory
+              style={$leftAccessoryStyle}
+              pressableState={state}
+              disabled={isDisabled}
+            />
           )}
+
+          {loading ? (
+            <ActivityIndicator
+              color={spinnerColor}
+              size="small"
+              style={themed($loadingSpinnerStyle)}
+            />
+          ) : null}
 
           <Text tx={tx} text={text} txOptions={txOptions} style={$textStyle(state)}>
             {children}
           </Text>
 
-          {!!RightAccessory && (
+          {!loading && !!RightAccessory && (
             <RightAccessory
               style={$rightAccessoryStyle}
               pressableState={state}
-              disabled={disabled}
+              disabled={isDisabled}
             />
           )}
         </>
@@ -179,19 +203,20 @@ export function Button(props: ButtonProps) {
 }
 
 const $baseViewStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 56,
-  borderRadius: 4,
+  minHeight: 50,
+  borderRadius: 14,
   justifyContent: "center",
   alignItems: "center",
   paddingVertical: spacing.sm,
-  paddingHorizontal: spacing.sm,
+  paddingHorizontal: spacing.lg,
   overflow: "hidden",
 })
 
 const $baseTextStyle: ThemedStyle<TextStyle> = ({ typography }) => ({
-  fontSize: 16,
+  fontSize: 15,
   lineHeight: 20,
   fontFamily: typography.primary.medium,
+  letterSpacing: 0.2,
   textAlign: "center",
   flexShrink: 1,
   flexGrow: 0,
@@ -207,42 +232,109 @@ const $leftAccessoryStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   zIndex: 1,
 })
 
+const $loadingSpinnerStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  marginEnd: spacing.xs,
+})
+
 const $viewPresets: Record<Presets, ThemedStyleArray<ViewStyle>> = {
   default: [
     $styles.row,
     $baseViewStyle,
     ({ colors }) => ({
       borderWidth: 1,
-      borderColor: colors.palette.neutral400,
+      borderColor: colors.palette.neutral300,
       backgroundColor: colors.palette.neutral100,
     }),
   ],
   filled: [
     $styles.row,
     $baseViewStyle,
-    ({ colors }) => ({ backgroundColor: colors.palette.neutral300 }),
+    ({ colors }) => ({
+      borderWidth: 1,
+      borderColor: colors.palette.primary500,
+      backgroundColor: colors.palette.primary500,
+      shadowColor: colors.palette.overlay50,
+      shadowOpacity: 0.16,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    }),
   ],
   reversed: [
     $styles.row,
     $baseViewStyle,
-    ({ colors }) => ({ backgroundColor: colors.palette.neutral800 }),
+    ({ colors }) => ({
+      borderWidth: 1,
+      borderColor: colors.palette.neutral700,
+      backgroundColor: colors.palette.neutral800,
+    }),
   ],
 }
 
 const $textPresets: Record<Presets, ThemedStyleArray<TextStyle>> = {
-  default: [$baseTextStyle],
-  filled: [$baseTextStyle],
+  default: [$baseTextStyle, ({ colors }) => ({ color: colors.palette.neutral700 })],
+  filled: [$baseTextStyle, ({ colors }) => ({ color: colors.palette.neutral100 })],
   reversed: [$baseTextStyle, ({ colors }) => ({ color: colors.palette.neutral100 })],
 }
 
 const $pressedViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
-  default: ({ colors }) => ({ backgroundColor: colors.palette.neutral200 }),
-  filled: ({ colors }) => ({ backgroundColor: colors.palette.neutral400 }),
-  reversed: ({ colors }) => ({ backgroundColor: colors.palette.neutral700 }),
+  default: ({ colors }) => ({
+    backgroundColor: colors.palette.neutral200,
+    borderColor: colors.palette.primary300,
+    transform: [{ scale: 0.985 }],
+  }),
+  filled: ({ colors }) => ({
+    backgroundColor: colors.palette.primary400,
+    borderColor: colors.palette.primary400,
+    transform: [{ scale: 0.985 }],
+  }),
+  reversed: ({ colors }) => ({
+    backgroundColor: colors.palette.neutral700,
+    borderColor: colors.palette.neutral700,
+    transform: [{ scale: 0.985 }],
+  }),
 }
 
 const $pressedTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
-  default: () => ({ opacity: 0.9 }),
-  filled: () => ({ opacity: 0.9 }),
-  reversed: () => ({ opacity: 0.9 }),
+  default: () => ({ opacity: 0.95 }),
+  filled: () => ({ opacity: 0.95 }),
+  reversed: () => ({ opacity: 0.95 }),
+}
+
+const $disabledViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
+  default: ({ colors }) => ({
+    backgroundColor: colors.palette.neutral200,
+    borderColor: colors.palette.neutral300,
+    opacity: 0.7,
+  }),
+  filled: ({ colors }) => ({
+    backgroundColor: colors.palette.neutral300,
+    borderColor: colors.palette.neutral300,
+    opacity: 0.75,
+    shadowOpacity: 0,
+    elevation: 0,
+  }),
+  reversed: ({ colors }) => ({
+    backgroundColor: colors.palette.neutral600,
+    borderColor: colors.palette.neutral500,
+    opacity: 0.75,
+  }),
+}
+
+const $disabledTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
+  default: ({ colors }) => ({ color: colors.palette.neutral500 }),
+  filled: ({ colors }) => ({ color: colors.palette.neutral600 }),
+  reversed: ({ colors }) => ({ color: colors.palette.neutral300 }),
+}
+
+const $ripplePresets: Record<Presets, ThemedStyle<{ color: string }>> = {
+  default: ({ colors }) => ({ color: colors.palette.primary100 }),
+  filled: ({ colors }) => ({ color: colors.palette.primary300 }),
+  reversed: ({ colors }) => ({ color: colors.palette.neutral500 }),
+}
+
+const $spinnerColorPresets: Record<Presets, ThemedStyle<{ color: string }>> = {
+  default: ({ colors }) => ({ color: colors.palette.neutral700 }),
+  filled: ({ colors }) => ({ color: colors.palette.neutral100 }),
+  reversed: ({ colors }) => ({ color: colors.palette.neutral100 }),
 }

@@ -54,7 +54,12 @@ export function TaskDetailHeader(props: TaskDetailHeaderProps) {
           {props.refreshing ? (
             <ActivityIndicator size="small" color={props.primaryColor} />
           ) : (
-            <Text text={props.refreshLabel} size="xs" weight="medium" style={{ color: props.textDimColor }} />
+            <Text
+              text={props.refreshLabel}
+              size="xs"
+              weight="medium"
+              style={{ color: props.textDimColor }}
+            />
           )}
         </Pressable>
         <Button

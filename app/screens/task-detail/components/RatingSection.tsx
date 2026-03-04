@@ -1,8 +1,9 @@
 import React from "react"
 import { View } from "react-native"
+
 import { Button } from "@/components/Button"
+import { StarRating } from "@/components/StarRating/StarRating"
 import { Text } from "@/components/Text"
-import { SmileySlider } from "@/components/SmileySlider"
 
 type RatingSectionProps = {
   visible: boolean
@@ -53,8 +54,13 @@ export function RatingSection(props: RatingSectionProps) {
 
       {props.myRating == null ? (
         <>
-          <SmileySlider disabled={false} value={props.rating} onChange={props.setRating} />
-          <Text style={{ textAlign: "center", marginTop: 6, opacity: 0.6 }}>{props.rating.toFixed(1)} / 5.0</Text>
+          <StarRating
+            value={props.rating}
+            onChange={props.setRating}
+            step={0.5}
+            disabled={props.ratingSubmitting}
+            showLabel
+          />
           <Button
             text={props.ratingSubmitting ? props.submittingLabel : props.submitLabel}
             onPress={props.onSubmitRating}

@@ -12,6 +12,8 @@ import { HomeFeedFilters } from "@/screens/home-feed/components/HomeFeedFilters"
 import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLocationState"
 import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
 import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
+import { HomeFeedSortBar } from "@/screens/home-feed/components/HomeFeedSortBar"
+import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 
 type Props = OolshikStackScreenProps<"OolshikHome">
 
@@ -27,7 +29,10 @@ export default function HomeFeedScreen({ navigation }: Props) {
 
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
-      <SpotlightComposer onSubmitTask={handlers.onSubmitTask} />
+      <SpotlightComposer
+        onSubmitTask={handlers.onSubmitTask}
+        onBeforeOpen={handlers.onBeforeComposerOpen}
+      />
 
       <LogoutButton
         onPress={handlers.onLogoutPress}
@@ -81,23 +86,25 @@ export default function HomeFeedScreen({ navigation }: Props) {
             <ActivityIndicator />
           </View>
         ) : (
-          <HomeFeedList
-            data={feed.filtered}
-            loading={feed.loading}
-            renderItem={handlers.renderItem}
-            onRefresh={handlers.onRefresh}
-            emptyMineText={t("oolshik:emptyMine")}
-            emptyForYouText={t("oolshik:emptyForYou")}
-            viewMode={feed.viewMode}
-            extraData={feed.extraData}
-          />
+          <>
+            <HomeFeedSortBar sort={feed.sort} onToggleSort={handlers.toggleSort} />
+            <HomeFeedList
+              data={feed.filtered}
+              loading={feed.loading}
+              renderItem={handlers.renderItem}
+              onRefresh={handlers.onRefresh}
+              emptyMineText={t("oolshik:emptyMine")}
+              emptyForYouText={t("oolshik:emptyForYou")}
+              viewMode={feed.viewMode}
+              extraData={feed.extraData}
+            />
+          </>
         )}
       </View>
 
-      <HomeFeedCreateBar
-        createLabel={t("oolshik:create")}
-        onPressCreate={handlers.openCreate}
-      />
+      <HomeFeedCreateBar createLabel={t("oolshik:create")} onPressCreate={handlers.openCreate} />
+
+      <ActiveRequestCapDialog {...state.activeCapDialog} />
     </Screen>
   )
 }
