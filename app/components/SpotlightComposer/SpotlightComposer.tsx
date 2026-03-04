@@ -36,6 +36,7 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder"
 
 import { transcribeAudio } from "./transcription"
 import { useReduceMotion } from "./useReduceMotion"
+import { isActiveCapHandledError } from "@/features/active-cap/useActiveRequestCapGuard"
 
 let Portal: any = null
 try {
@@ -76,6 +77,7 @@ type ComposerSubmitPayload = {
 
 export interface SpotlightComposerProps {
   onSubmitTask?: (payload: ComposerSubmitPayload) => Promise<void> | void
+  onBeforeOpen?: (mode: ComposerMode) => Promise<boolean> | boolean
 }
 
 const FAB_SIZE = 56
@@ -113,7 +115,7 @@ const lerp = (a: number, b: number, t: number): number => {
 const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
+export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightComposerProps) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
   const reduceMotion = useReduceMotion()
@@ -291,36 +293,47 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
   const handleOpen = useCallback(
     (nextMode: ComposerMode) => {
       if (state !== "idle") return
-      setMode(nextMode)
-      setState("opening")
-      if (nextMode === "voice") {
-        hidePenFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
-      } else {
-        hideMicFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
-      }
-      triggerHaptic("impactLight")
-      scrimOpacity.value = withTiming(1, { duration: durationScrim })
-      openProgress.value = 0
-      openProgress.value = withSpring(
-        1,
-        {
-          damping: reduceMotion ? 18 : 14,
-          stiffness: reduceMotion ? 140 : 210,
-        },
-        (finished) => {
-          if (!finished) return
-          suggestionsProgress.value = withDelay(
-            reduceMotion ? 40 : 140,
-            withTiming(1, { duration: reduceMotion ? 150 : 260 }),
-          )
-          if (nextMode === "voice") {
-            runOnJS(handleVoiceStart)()
-          } else {
-            runOnJS(setEditingState)()
-            runOnJS(focusInput)()
+      const openComposer = async () => {
+        if (onBeforeOpen) {
+          try {
+            const allowed = await onBeforeOpen(nextMode)
+            if (!allowed) return
+          } catch {
+            return
           }
-        },
-      )
+        }
+        setMode(nextMode)
+        setState("opening")
+        if (nextMode === "voice") {
+          hidePenFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
+        } else {
+          hideMicFab.value = withTiming(1, { duration: reduceMotion ? 80 : 140 })
+        }
+        triggerHaptic("impactLight")
+        scrimOpacity.value = withTiming(1, { duration: durationScrim })
+        openProgress.value = 0
+        openProgress.value = withSpring(
+          1,
+          {
+            damping: reduceMotion ? 18 : 14,
+            stiffness: reduceMotion ? 140 : 210,
+          },
+          (finished) => {
+            if (!finished) return
+            suggestionsProgress.value = withDelay(
+              reduceMotion ? 40 : 140,
+              withTiming(1, { duration: reduceMotion ? 150 : 260 }),
+            )
+            if (nextMode === "voice") {
+              runOnJS(handleVoiceStart)()
+            } else {
+              runOnJS(setEditingState)()
+              runOnJS(focusInput)()
+            }
+          },
+        )
+      }
+      void openComposer()
     },
     [
       focusInput,
@@ -334,6 +347,7 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       suggestionsProgress,
       triggerHaptic,
       setEditingState,
+      onBeforeOpen,
     ],
   )
 
@@ -400,8 +414,12 @@ export function SpotlightComposer({ onSubmitTask }: SpotlightComposerProps) {
       } else {
         Alert.alert(t("oolshik:composer.submittedTitle"), t("oolshik:composer.submittedBody"))
       }
-    } catch {
+    } catch (error) {
       submitInFlightRef.current = false
+      if (isActiveCapHandledError(error)) {
+        setState("editing")
+        return
+      }
       Alert.alert(t("oolshik:composer.unableSubmitTitle"), t("oolshik:composer.unableSubmitBody"))
       setState("editing")
       return

@@ -180,6 +180,16 @@ const mr = {
       sampleTaskMotor: "• मोटारसाठी मदत हवी आहे",
       sampleTaskWaterPump: "• पाण्याचा पंप सुरू करून द्या",
     },
+    activeCap: {
+      title: "आधीच्या विनंत्या पूर्ण करा",
+      body_open: "नवीन विनंती करण्यासाठी आधी एक सक्रिय विनंती पूर्ण करा किंवा रद्द करा.",
+      body_assigned:
+        "तुमची एक विनंती सध्या सुरू आहे. नवीन विनंती करण्यापूर्वी ती पूर्ण करा किंवा रद्द करा.",
+      primaryOpen: "सक्रिय विनंती उघडा",
+      secondaryView: "सक्रिय विनंत्या पहा",
+      close: "बंद करा",
+      capReachedFmt: "तुम्ही जास्तीत जास्त {{cap}} सक्रिय विनंत्या ठेवू शकता.",
+    },
     homeScreen: {
       locationNotAvailableTitle: "स्थान उपलब्ध नाही",
       locationNotAvailableBody: "स्थान सक्षम करून पुन्हा प्रयत्न करा.",

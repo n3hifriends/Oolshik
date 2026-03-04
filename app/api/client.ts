@@ -455,6 +455,61 @@ export type PaymentRequestApiResponse = {
 // Keep a Task type for app-facing code if needed later; for now it mirrors ServerTask
 export type Task = ServerTask
 
+export type ActiveRequestSummaryItem = {
+  id: string
+  status: ServerTask["status"] | string
+  createdAt: string
+}
+
+export type ActiveRequestSummary = {
+  cap: number
+  activeCount: number
+  blocked: boolean
+  suggestedRequestId?: string | null
+  activeRequests: ActiveRequestSummaryItem[]
+}
+
+export type ActiveRequestCapReachedPayload = {
+  code: "ACTIVE_REQUEST_CAP_REACHED"
+  message: string
+  cap: number
+  activeCount: number
+  activeRequestIds: string[]
+  suggestedRequestId?: string | null
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return !!input && typeof input === "object" && !Array.isArray(input)
+}
+
+export function toActiveRequestCapPayload(input: unknown): ActiveRequestCapReachedPayload | null {
+  if (!isRecord(input)) return null
+  if (input.code !== "ACTIVE_REQUEST_CAP_REACHED") return null
+
+  const cap = Number(input.cap)
+  const activeCount = Number(input.activeCount)
+  if (!Number.isFinite(cap) || cap < 1) return null
+  if (!Number.isFinite(activeCount) || activeCount < 0) return null
+
+  const activeRequestIds = Array.isArray(input.activeRequestIds)
+    ? input.activeRequestIds.filter((id): id is string => typeof id === "string")
+    : []
+  if (activeRequestIds.length === 0) return null
+
+  const message = typeof input.message === "string" ? input.message : "Active request limit reached."
+  const suggestedRequestId =
+    typeof input.suggestedRequestId === "string" ? input.suggestedRequestId : null
+
+  return {
+    code: "ACTIVE_REQUEST_CAP_REACHED",
+    message,
+    cap,
+    activeCount,
+    activeRequestIds,
+    suggestedRequestId,
+  }
+}
+
 type CreateTaskPayload = {
   voiceUrl?: string
   description?: string
@@ -473,7 +528,15 @@ const toClientTask = (t: ServerTask): Task => ({ ...t })
 
 export const OolshikApi = {
   // Create Request
-  createTask: (payload: CreateTaskPayload) => api.post("/requests", payload),
+  createTask: async (payload: CreateTaskPayload) => {
+    const response = await api.post("/requests", payload)
+    return {
+      ...response,
+      activeCap: toActiveRequestCapPayload(response.data),
+    }
+  },
+
+  getActiveSummary: () => api.get<ActiveRequestSummary>("/requests/active-summary"),
 
   // Nearby
   findTaskByTaskId: (taskId: string) => api.get(`/requests/${taskId}`),

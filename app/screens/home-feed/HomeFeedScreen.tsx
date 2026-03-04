@@ -13,6 +13,7 @@ import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLo
 import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
 import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
 import { HomeFeedSortBar } from "@/screens/home-feed/components/HomeFeedSortBar"
+import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 
 type Props = OolshikStackScreenProps<"OolshikHome">
 
@@ -28,7 +29,10 @@ export default function HomeFeedScreen({ navigation }: Props) {
 
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
-      <SpotlightComposer onSubmitTask={handlers.onSubmitTask} />
+      <SpotlightComposer
+        onSubmitTask={handlers.onSubmitTask}
+        onBeforeOpen={handlers.onBeforeComposerOpen}
+      />
 
       <LogoutButton
         onPress={handlers.onLogoutPress}
@@ -99,6 +103,8 @@ export default function HomeFeedScreen({ navigation }: Props) {
       </View>
 
       <HomeFeedCreateBar createLabel={t("oolshik:create")} onPressCreate={handlers.openCreate} />
+
+      <ActiveRequestCapDialog {...state.activeCapDialog} />
     </Screen>
   )
 }

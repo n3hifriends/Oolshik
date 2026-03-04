@@ -10,6 +10,7 @@ import { getDistanceMeters } from "@/utils/distance"
 import { kmDistance } from "@/utils/haversine"
 import { TaskCard } from "@/components/TaskCard"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
+import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
 import {
   getInitials,
   normalizeRadius,
@@ -78,6 +79,7 @@ export function useHomeFeedController({
 }) {
   const { theme } = useAppTheme()
   const { colors: themeColors, spacing, isDark } = theme
+  const activeCapGuard = useActiveRequestCapGuard(navigation)
 
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
@@ -491,6 +493,11 @@ export function useHomeFeedController({
         throw new Error(t("oolshik:homeScreen.alreadySubmitting"))
       }
 
+      const canCreate = await activeCapGuard.ensureCanCreateRequestOrRedirect()
+      if (!canCreate) {
+        throw activeCapGuard.createHandledError()
+      }
+
       const effectiveRadiusKm =
         preferredRadiusKm != null ? normalizeRadius(preferredRadiusKm) : radiusMeters
 
@@ -519,6 +526,10 @@ export function useHomeFeedController({
         })
 
         if (!result.ok || !result.data) {
+          if (result.activeCap) {
+            activeCapGuard.handleCreateCapResponse(result.activeCap)
+            throw activeCapGuard.createHandledError()
+          }
           throw new Error(result.message || t("oolshik:homeScreen.tryAgain"))
         }
 
@@ -541,6 +552,7 @@ export function useHomeFeedController({
       t,
       userId,
       userName,
+      activeCapGuard,
     ],
   )
 
@@ -640,6 +652,7 @@ export function useHomeFeedController({
       searchOpen,
       rawSearch,
       creatingTask,
+      activeCapDialog: activeCapGuard.dialogProps,
     },
     handlers: {
       setViewMode: setNextViewMode,
@@ -655,8 +668,13 @@ export function useHomeFeedController({
       setSearchOpen: handleSearchOpen,
       onSearchChange: handleSearchChange,
       onSearchClear: handleSearchClear,
+      onBeforeComposerOpen: activeCapGuard.ensureCanCreateRequestOrRedirect,
       openProfile: () => navigation.navigate("OolshikProfile"),
-      openCreate: () => navigation.navigate("OolshikCreate"),
+      openCreate: async () => {
+        const canCreate = await activeCapGuard.ensureCanCreateRequestOrRedirect()
+        if (!canCreate) return
+        navigation.navigate("OolshikCreate")
+      },
     },
   }
 }

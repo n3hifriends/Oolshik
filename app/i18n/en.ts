@@ -172,6 +172,16 @@ const en = {
       sampleTaskMotor: "• Help with motor",
       sampleTaskWaterPump: "• Switch on water pump",
     },
+    activeCap: {
+      title: "Finish your current requests",
+      body_open: "Complete or cancel one active request to create a new one.",
+      body_assigned:
+        "One of your requests is in progress. Complete or cancel it before creating another request.",
+      primaryOpen: "Open active request",
+      secondaryView: "View active requests",
+      close: "Close",
+      capReachedFmt: "You can have up to {{cap}} active requests.",
+    },
     homeScreen: {
       locationNotAvailableTitle: "Location not available",
       locationNotAvailableBody: "Turn on location and try again.",
