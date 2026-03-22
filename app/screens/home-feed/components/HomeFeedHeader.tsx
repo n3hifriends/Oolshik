@@ -22,18 +22,27 @@ type HomeFeedHeaderProps = {
   neutral100: string
   primary200: string
   primary500: string
+  condensed: boolean
 }
 
 export function HomeFeedHeader(props: HomeFeedHeaderProps) {
   const { t } = useTranslation()
+  const avatarSize = props.condensed ? 34 : 38
+  const avatarInnerSize = props.condensed ? 26 : 30
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}>
+    <View
+      style={{
+        paddingHorizontal: 16,
+        paddingTop: props.condensed ? 4 : 8,
+        paddingBottom: props.condensed ? 8 : 12,
+      }}
+    >
       <View
         style={{
           flexDirection: "row",
           alignItems: props.searchOpen ? "flex-start" : "center",
-          gap: 10,
+          gap: props.condensed ? 8 : 10,
         }}
       >
         <Pressable
@@ -44,9 +53,9 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
           hitSlop={8}
           style={({ pressed }) => [
             {
-              width: 38,
-              height: 38,
-              borderRadius: 19,
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
               backgroundColor: props.neutral100,
               borderWidth: 1,
               borderColor: props.primary200,
@@ -66,9 +75,9 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
         >
           <View
             style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
+              width: avatarInnerSize,
+              height: avatarInnerSize,
+              borderRadius: avatarInnerSize / 2,
               backgroundColor: props.primary500,
               alignItems: "center",
               justifyContent: "center",
@@ -90,7 +99,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
         </View>
       </View>
 
-      <Segmented value={props.viewMode} onChange={props.onChangeViewMode} />
+      <Segmented value={props.viewMode} onChange={props.onChangeViewMode} compact />
     </View>
   )
 }

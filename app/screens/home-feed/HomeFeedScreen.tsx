@@ -12,7 +12,6 @@ import { HomeFeedFilters } from "@/screens/home-feed/components/HomeFeedFilters"
 import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLocationState"
 import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
 import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
-import { HomeFeedSortBar } from "@/screens/home-feed/components/HomeFeedSortBar"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 
 type Props = OolshikStackScreenProps<"OolshikHome">
@@ -57,13 +56,23 @@ export default function HomeFeedScreen({ navigation }: Props) {
         neutral100={theme.themeColors.palette.neutral100}
         primary200={theme.themeColors.palette.primary200}
         primary500={theme.themeColors.palette.primary500}
+        condensed={feed.controlsCondensed}
       />
 
       <HomeFeedFilters
+        viewMode={feed.viewMode}
         radiusMeters={feed.radiusMeters}
         onSetRadius={handlers.setRadius}
         selectedStatuses={feed.selectedStatuses}
+        availableStatuses={feed.availableStatuses}
         onToggleStatus={handlers.toggleStatus}
+        onSelectAllStatuses={handlers.selectAllStatuses}
+        sort={feed.sort}
+        onToggleSort={handlers.toggleSort}
+        expanded={feed.filtersExpanded}
+        onToggleExpanded={handlers.toggleFiltersExpanded}
+        condensed={feed.controlsCondensed}
+        resultCount={feed.filtered.length}
       />
 
       <View style={{ flex: 1, paddingHorizontal: 16, backgroundColor: colors.background }}>
@@ -87,12 +96,12 @@ export default function HomeFeedScreen({ navigation }: Props) {
           </View>
         ) : (
           <>
-            <HomeFeedSortBar sort={feed.sort} onToggleSort={handlers.toggleSort} />
             <HomeFeedList
               data={feed.filtered}
               loading={feed.loading}
               renderItem={handlers.renderItem}
               onRefresh={handlers.onRefresh}
+              onScrollOffsetChange={handlers.onListScrollOffsetChange}
               emptyMineText={t("oolshik:emptyMine")}
               emptyForYouText={t("oolshik:emptyForYou")}
               viewMode={feed.viewMode}

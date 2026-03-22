@@ -49,6 +49,11 @@ const DEFAULT_HOME_FEED_SORT: HomeFeedSortState = {
   direction: "asc",
 }
 
+const DEFAULT_MY_REQUESTS_SORT: HomeFeedSortState = {
+  key: "time",
+  direction: "asc",
+}
+
 const getSortableDistanceMeters = (task: HomeFeedTask): number | null => {
   const value = getDistanceMeters(task)
   return typeof value === "number" && Number.isFinite(value) ? value : null
@@ -89,14 +94,23 @@ export function useHomeFeedController({
 
   const lastFetchKeyRef = useRef<string | null>(null)
   const suppressNextFetchRef = useRef(false)
-  const userTouchedStatusesRef = useRef(false)
-  const selectedStatusesRef = useRef<Set<HomeFeedStatus>>(new Set())
-
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<HomeFeedStatus>>(new Set())
   const [viewMode, setViewMode] = useState<HomeFeedViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)
   const [preferredRadiusKm, setPreferredRadiusKm] = useState<number | null>(null)
-  const [sortState, setSortState] = useState<HomeFeedSortState>(DEFAULT_HOME_FEED_SORT)
+  const [forYouSortState, setForYouSortState] = useState<HomeFeedSortState>(DEFAULT_HOME_FEED_SORT)
+  const [myRequestsSortState, setMyRequestsSortState] =
+    useState<HomeFeedSortState>(DEFAULT_MY_REQUESTS_SORT)
+  const [forYouSelectedStatuses, setForYouSelectedStatuses] = useState<Set<HomeFeedStatus>>(
+    new Set(),
+  )
+  const [myRequestSelectedStatuses, setMyRequestSelectedStatuses] = useState<Set<HomeFeedStatus>>(
+    new Set(),
+  )
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [controlsCondensed, setControlsCondensed] = useState(false)
+  const controlsCondensedRef = useRef(false)
+  const forYouTouchedStatusesRef = useRef(false)
+  const myRequestsTouchedStatusesRef = useRef(false)
 
   const profileInitials = useMemo(
     () => getInitials(userName && userName !== "You" ? userName : undefined, authEmail ?? ""),
@@ -116,12 +130,10 @@ export function useHomeFeedController({
   const [rawSearch, setRawSearch] = useState("")
   const searchInputRef = useRef<TextInput>(null)
 
+  const selectedStatuses = viewMode === "forYou" ? forYouSelectedStatuses : myRequestSelectedStatuses
+  const sortState = viewMode === "forYou" ? forYouSortState : myRequestsSortState
   const sortedStatuses = useMemo(() => Array.from(selectedStatuses).sort(), [selectedStatuses])
   const statusesKey = useMemo(() => sortedStatuses.join(","), [sortedStatuses])
-
-  useEffect(() => {
-    selectedStatusesRef.current = selectedStatuses
-  }, [selectedStatuses])
 
   const { filtered } = useTaskFiltering(taskItems, {
     selectedStatuses,
@@ -191,10 +203,40 @@ export function useHomeFeedController({
     }
   }, [])
 
+  const availableStatuses = useMemo(() => {
+    const list = Array.isArray(taskItems) ? taskItems : []
+    const unique = Array.from(new Map(list.map((task) => [task.id, task])).values())
+
+    const isMine = (task: HomeFeedTask) =>
+      userId ? String(task.requesterId) === String(userId) : false
+
+    let result = unique.filter((task) => (viewMode === "mine" ? isMine(task) : !isMine(task)))
+
+    result = result.filter((task) => {
+      if (task.status !== "PENDING_AUTH") return true
+      if (viewMode === "mine") return true
+      return userId ? String(task.pendingHelperId) === String(userId) : false
+    })
+
+    const activeStatuses = new Set<HomeFeedStatus>()
+    result.forEach((task) => {
+      const normalized = normalizeStatus(task.status)
+      if (normalized) activeStatuses.add(normalized)
+    })
+
+    return STATUS_ORDER.filter((statusValue) => activeStatuses.has(statusValue))
+  }, [taskItems, userId, viewMode])
+
   const toggleStatus = useCallback((nextStatus: HomeFeedStatus) => {
-    setSelectedStatuses((previous) => {
-      userTouchedStatusesRef.current = true
-      const next = new Set(previous)
+    const setSelectedStatusesForView =
+      viewMode === "forYou" ? setForYouSelectedStatuses : setMyRequestSelectedStatuses
+    const touchedRef = viewMode === "forYou" ? forYouTouchedStatusesRef : myRequestsTouchedStatusesRef
+    setSelectedStatusesForView((previous) => {
+      touchedRef.current = true
+      const next =
+        previous.size === 0 && availableStatuses.length > 0
+          ? new Set(availableStatuses)
+          : new Set(previous)
       if (next.has(nextStatus)) {
         next.delete(nextStatus)
       } else {
@@ -202,10 +244,23 @@ export function useHomeFeedController({
       }
       return next
     })
-  }, [])
+  }, [availableStatuses, viewMode])
+
+  const selectAllStatuses = useCallback((statuses: HomeFeedStatus[]) => {
+    const next = new Set(statuses)
+    if (viewMode === "forYou") {
+      forYouTouchedStatusesRef.current = true
+      setForYouSelectedStatuses(next)
+      return
+    }
+    myRequestsTouchedStatusesRef.current = true
+    setMyRequestSelectedStatuses(next)
+  }, [viewMode])
 
   const toggleSort = useCallback((key: HomeFeedSortKey) => {
-    setSortState((previous) => {
+    if (viewMode === "mine" && key === "distance") return
+    const setSortStateForView = viewMode === "forYou" ? setForYouSortState : setMyRequestsSortState
+    setSortStateForView((previous) => {
       if (previous.key === key) {
         return {
           key,
@@ -218,18 +273,12 @@ export function useHomeFeedController({
         direction: "asc",
       }
     })
-  }, [])
+  }, [viewMode])
 
   const setNextViewMode = useCallback((nextViewMode: HomeFeedViewMode) => {
     setViewMode(nextViewMode)
+    setFiltersExpanded(false)
   }, [])
-
-  useEffect(() => {
-    userTouchedStatusesRef.current = false
-    if (selectedStatusesRef.current.size === 0) return
-    suppressNextFetchRef.current = true
-    setSelectedStatuses(new Set())
-  }, [viewMode])
 
   useFocusEffect(
     useCallback(() => {
@@ -278,12 +327,13 @@ export function useHomeFeedController({
     useCallback(() => {
       if (status !== "ready" || !coords) return
 
-      const statusesArg = userTouchedStatusesRef.current ? sortedStatuses : undefined
+      const shouldUseStatusFilter = viewMode === "forYou" && forYouTouchedStatusesRef.current
+      const statusesArg = shouldUseStatusFilter ? sortedStatuses : undefined
       const key = [
         coords.latitude.toFixed(5),
         coords.longitude.toFixed(5),
         radiusMeters,
-        userTouchedStatusesRef.current ? statusesKey : "auto",
+        shouldUseStatusFilter ? statusesKey : "auto",
       ].join("|")
 
       if (suppressNextFetchRef.current) {
@@ -304,43 +354,28 @@ export function useHomeFeedController({
       sortedStatuses,
       status,
       statusesKey,
+      viewMode,
     ]),
   )
 
-  const availableStatuses = useMemo(() => {
-    const list = Array.isArray(taskItems) ? taskItems : []
-    const unique = Array.from(new Map(list.map((task) => [task.id, task])).values())
-
-    const isMine = (task: HomeFeedTask) =>
-      userId ? String(task.requesterId) === String(userId) : false
-
-    let result = unique.filter((task) => (viewMode === "mine" ? isMine(task) : !isMine(task)))
-
-    result = result.filter((task) => {
-      if (task.status !== "PENDING_AUTH") return true
-      if (viewMode === "mine") return true
-      return userId ? String(task.pendingHelperId) === String(userId) : false
-    })
-
-    const activeStatuses = new Set<HomeFeedStatus>()
-    result.forEach((task) => {
-      const normalized = normalizeStatus(task.status)
-      if (normalized) activeStatuses.add(normalized)
-    })
-
-    return STATUS_ORDER.filter((statusValue) => activeStatuses.has(statusValue))
-  }, [taskItems, userId, viewMode])
-
   useEffect(() => {
-    if (userTouchedStatusesRef.current) return
+    const touchedRef = viewMode === "forYou" ? forYouTouchedStatusesRef : myRequestsTouchedStatusesRef
+    const setSelectedStatusesForView =
+      viewMode === "forYou" ? setForYouSelectedStatuses : setMyRequestSelectedStatuses
+    const matchesAvailableStatuses =
+      selectedStatuses.size === availableStatuses.length &&
+      availableStatuses.every((statusValue) => selectedStatuses.has(statusValue))
+    if (touchedRef.current) return
     if (loading) return
     if (!taskItems || taskItems.length === 0) return
-    if (selectedStatuses.size > 0) return
+    if (matchesAvailableStatuses) return
     if (availableStatuses.length === 0) return
 
-    suppressNextFetchRef.current = true
-    setSelectedStatuses(new Set(availableStatuses))
-  }, [availableStatuses, loading, selectedStatuses.size, taskItems])
+    if (viewMode === "forYou") {
+      suppressNextFetchRef.current = true
+    }
+    setSelectedStatusesForView(new Set(availableStatuses))
+  }, [availableStatuses, loading, selectedStatuses, taskItems, viewMode])
 
   const onAcceptPress = useCallback(
     async (taskId: string) => {
@@ -404,7 +439,8 @@ export function useHomeFeedController({
       if (isTitleRefreshCooling(taskId)) return
 
       scheduleTitleRefreshCooldown(taskId)
-      const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+      const statusesArg =
+        viewMode === "forYou" && sortedStatuses.length ? sortedStatuses : undefined
 
       try {
         await fetchNearby(coords.latitude, coords.longitude, statusesArg)
@@ -422,6 +458,7 @@ export function useHomeFeedController({
       sortedStatuses,
       status,
       t,
+      viewMode,
     ],
   )
 
@@ -573,9 +610,9 @@ export function useHomeFeedController({
       return
     }
 
-    const statusesArg = sortedStatuses.length ? sortedStatuses : undefined
+    const statusesArg = viewMode === "forYou" && sortedStatuses.length ? sortedStatuses : undefined
     void fetchNearby(coords.latitude, coords.longitude, statusesArg)
-  }, [coords, fetchNearby, refresh, sortedStatuses, status])
+  }, [coords, fetchNearby, refresh, sortedStatuses, status, viewMode])
 
   const onLogoutPress = useCallback(() => {
     Alert.alert(t("oolshik:homeScreen.logoutTitle"), t("oolshik:homeScreen.logoutBody"), [
@@ -610,8 +647,10 @@ export function useHomeFeedController({
       viewMode,
       loading,
       titleRefreshCooldowns,
+      controlsCondensed,
+      filtersExpanded,
     }),
-    [loading, titleRefreshCooldowns, viewMode],
+    [controlsCondensed, filtersExpanded, loading, titleRefreshCooldowns, viewMode],
   )
 
   const setFeedRadius = useCallback(
@@ -620,6 +659,20 @@ export function useHomeFeedController({
     },
     [setRadius],
   )
+
+  const handleToggleFiltersExpanded = useCallback(() => {
+    setFiltersExpanded((previous) => !previous)
+  }, [])
+
+  const handleListScrollOffsetChange = useCallback((offsetY: number) => {
+    const nextCondensed = offsetY > 24
+    if (controlsCondensedRef.current === nextCondensed) return
+    controlsCondensedRef.current = nextCondensed
+    setControlsCondensed(nextCondensed)
+    if (nextCondensed) {
+      setFiltersExpanded(false)
+    }
+  }, [])
 
   return {
     theme: {
@@ -639,7 +692,10 @@ export function useHomeFeedController({
       viewMode,
       radiusMeters: radiusMeters as Radius,
       selectedStatuses,
+      availableStatuses,
       sort: sortState,
+      filtersExpanded,
+      controlsCondensed,
       extraData,
     },
     user: {
@@ -657,8 +713,11 @@ export function useHomeFeedController({
     handlers: {
       setViewMode: setNextViewMode,
       toggleStatus,
+      selectAllStatuses,
       setRadius: setFeedRadius,
       toggleSort,
+      toggleFiltersExpanded: handleToggleFiltersExpanded,
+      onListScrollOffsetChange: handleListScrollOffsetChange,
       onAcceptPress,
       renderItem,
       onSubmitTask: handleSubmitTask,

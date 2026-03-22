@@ -9,6 +9,7 @@ type HomeFeedListProps = {
   loading: boolean
   renderItem: ({ item }: { item: HomeFeedTask }) => ReactElement | null
   onRefresh: () => void
+  onScrollOffsetChange?: (offsetY: number) => void
   emptyMineText: string
   emptyForYouText: string
   viewMode: HomeFeedViewMode
@@ -30,8 +31,15 @@ export function HomeFeedList(props: HomeFeedListProps) {
       maxToRenderPerBatch={10}
       windowSize={5}
       removeClippedSubviews
+      keyboardShouldPersistTaps="handled"
+      scrollEventThrottle={16}
       refreshing={props.loading}
       onRefresh={props.onRefresh}
+      onScroll={
+        props.onScrollOffsetChange
+          ? (event) => props.onScrollOffsetChange?.(event.nativeEvent.contentOffset.y)
+          : undefined
+      }
       contentContainerStyle={{ paddingBottom: 140 }}
       ListEmptyComponent={
         <Text
