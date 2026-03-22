@@ -214,6 +214,10 @@ const en = {
       sortNearestFirst: "Nearest first",
       sortFarthestFirst: "Farthest first",
       sortReverseHint: "Tap again to reverse the order",
+      allStatuses: "All statuses",
+      statusesSelectedSummary: "{{count}} selected",
+      showingCountSummary: "{{count}} shown",
+      statusControlA11y: "Open status filters",
     },
     profileScreen: {
       heading: "Profile",

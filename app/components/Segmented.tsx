@@ -12,6 +12,7 @@ export type ViewMode = "forYou" | "mine"
 type SegmentedProps = {
   value: ViewMode
   onChange: (value: ViewMode) => void
+  compact?: boolean
 }
 
 type SegmentedTab = {
@@ -24,7 +25,11 @@ const TABS: SegmentedTab[] = [
   { key: "mine", tx: "oolshik:tabMyRequests" },
 ]
 
-export const Segmented = memo(function Segmented({ value, onChange }: SegmentedProps) {
+export const Segmented = memo(function Segmented({
+  value,
+  onChange,
+  compact = false,
+}: SegmentedProps) {
   const { t } = useTranslation()
   const { theme, themed } = useAppTheme()
 
@@ -70,7 +75,10 @@ export const Segmented = memo(function Segmented({ value, onChange }: SegmentedP
             accessibilityLabel={t(tab.tx)}
             hitSlop={6}
             android_ripple={themed($ripple)}
-            style={({ pressed }) => getTabStyle({ active, pressed })}
+            style={({ pressed }) => [
+              getTabStyle({ active, pressed }),
+              compact ? themed($tabCompact) : null,
+            ]}
           >
             {({ pressed }) => (
               <>
@@ -113,6 +121,12 @@ const $tabBase: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.sm,
   borderRadius: 10,
   overflow: "hidden",
+})
+
+const $tabCompact: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 36,
+  paddingVertical: spacing.xxxs,
+  paddingHorizontal: spacing.xs,
 })
 
 const $tabActive: ThemedStyle<ViewStyle> = ({ colors }) => ({

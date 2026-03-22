@@ -222,6 +222,10 @@ const mr = {
       sortNearestFirst: "जवळचे प्रथम",
       sortFarthestFirst: "दूरचे प्रथम",
       sortReverseHint: "क्रम उलटण्यासाठी पुन्हा टॅप करा",
+      allStatuses: "सर्व स्थिती",
+      statusesSelectedSummary: "{{count}} निवडले",
+      showingCountSummary: "{{count}} दाखवले",
+      statusControlA11y: "स्थिती फिल्टर उघडा",
     },
     profileScreen: {
       heading: "प्रोफाइल",
