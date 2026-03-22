@@ -7,7 +7,14 @@ import {
 } from "@/utils/distance"
 import { normalize } from "@/utils/text"
 
-export type Status = "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
+export type Status =
+  | "OPEN"
+  | "PENDING_AUTH"
+  | "ASSIGNED"
+  | "WORK_DONE_PENDING_CONFIRMATION"
+  | "REVIEW_REQUIRED"
+  | "COMPLETED"
+  | "CANCELLED"
 export type ViewMode = "forYou" | "mine"
 
 type TaskLike = {
@@ -50,6 +57,8 @@ const normalizeStatus = (status?: string | null): Status | null => {
     raw === "OPEN" ||
     raw === "PENDING_AUTH" ||
     raw === "ASSIGNED" ||
+    raw === "WORK_DONE_PENDING_CONFIRMATION" ||
+    raw === "REVIEW_REQUIRED" ||
     raw === "COMPLETED" ||
     raw === "CANCELLED"
   ) {

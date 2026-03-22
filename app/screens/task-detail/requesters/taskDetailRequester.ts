@@ -105,12 +105,42 @@ export async function reassignTask(taskId: string) {
   }
 }
 
-export async function completeTask(taskId: string) {
-  const res = (await OolshikApi.completeTask(taskId)) as ApiLikeResponse<unknown>
+export async function markTaskDone(taskId: string) {
+  const res = (await OolshikApi.markRequestDone(taskId)) as ApiLikeResponse<Partial<Task>>
   return {
     ok: !!res?.ok,
     status: res?.status,
-    data: res?.data,
+    data: res?.ok && res?.data ? res.data : null,
+    message: extractMessage(res?.data),
+  }
+}
+
+export async function confirmTaskCompletion(taskId: string) {
+  const res = (await OolshikApi.confirmRequestCompletion(taskId)) as ApiLikeResponse<Partial<Task>>
+  return {
+    ok: !!res?.ok,
+    status: res?.status,
+    data: res?.ok && res?.data ? res.data : null,
+    message: extractMessage(res?.data),
+  }
+}
+
+export async function reportTaskIssue(taskId: string, payload: ReasonPayload) {
+  const res = (await OolshikApi.reportRequestIssue(taskId, payload)) as ApiLikeResponse<Partial<Task>>
+  return {
+    ok: !!res?.ok,
+    status: res?.status,
+    data: res?.ok && res?.data ? res.data : null,
+    message: extractMessage(res?.data),
+  }
+}
+
+export async function completeTask(taskId: string) {
+  const res = (await OolshikApi.completeTask(taskId)) as ApiLikeResponse<Partial<Task>>
+  return {
+    ok: !!res?.ok,
+    status: res?.status,
+    data: res?.ok && res?.data ? res.data : null,
     message: extractMessage(res?.data),
   }
 }

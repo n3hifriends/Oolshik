@@ -3,11 +3,20 @@ import { Pressable } from "react-native"
 import { useTranslation } from "react-i18next"
 import { Text } from "@/components/Text"
 
-type Status = "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
+type Status =
+  | "OPEN"
+  | "PENDING_AUTH"
+  | "ASSIGNED"
+  | "WORK_DONE_PENDING_CONFIRMATION"
+  | "REVIEW_REQUIRED"
+  | "COMPLETED"
+  | "CANCELLED"
 const STATUS_COLORS: Record<Status, string> = {
   OPEN: "#0EA5E9",
   PENDING_AUTH: "#2563EB",
   ASSIGNED: "#F59E0B",
+  WORK_DONE_PENDING_CONFIRMATION: "#7C3AED",
+  REVIEW_REQUIRED: "#EA580C",
   COMPLETED: "#10B981",
   CANCELLED: "#EF4444",
 }
@@ -15,6 +24,8 @@ const STATUS_LABEL_KEYS: Record<Status, string> = {
   OPEN: "oolshik:status.open",
   PENDING_AUTH: "oolshik:status.pendingAuth",
   ASSIGNED: "oolshik:status.assigned",
+  WORK_DONE_PENDING_CONFIRMATION: "oolshik:status.waitingConfirmation",
+  REVIEW_REQUIRED: "oolshik:status.reviewRequired",
   COMPLETED: "oolshik:status.completed",
   CANCELLED: "oolshik:status.cancelled",
 }
@@ -22,6 +33,8 @@ const STATUS_BG: Record<Status, string> = {
   OPEN: "rgba(14,165,233,0.10)",
   PENDING_AUTH: "rgba(37,99,235,0.10)",
   ASSIGNED: "rgba(245,158,11,0.10)",
+  WORK_DONE_PENDING_CONFIRMATION: "rgba(124,58,237,0.10)",
+  REVIEW_REQUIRED: "rgba(234,88,12,0.10)",
   COMPLETED: "rgba(16,185,129,0.10)",
   CANCELLED: "rgba(239,68,68,0.12)",
 }

@@ -326,6 +326,8 @@ export type ServerTask = {
     | "PENDING"
     | "PENDING_AUTH"
     | "ASSIGNED"
+    | "WORK_DONE_PENDING_CONFIRMATION"
+    | "REVIEW_REQUIRED"
     | "COMPLETED"
     | "OPEN"
     | "CANCELLED"
@@ -347,6 +349,9 @@ export type ServerTask = {
   pendingAuthExpiresAt?: string | null
   cancelledAt?: string | null
   cancelledBy?: string | null
+  workDoneAt?: string | null
+  completionConfirmationExpiresAt?: string | null
+  completionMode?: "REQUESTER_CONFIRMED" | "AUTO_TIMEOUT" | string | null
   reassignedCount?: number | null
   releasedCount?: number | null
   requesterName?: string
@@ -359,6 +364,10 @@ export type ServerTask = {
   offerAmount?: number | null
   offerCurrency?: string | null
   offerUpdatedAt?: string | null
+  canMarkDone?: boolean | null
+  canConfirm?: boolean | null
+  canReportIssue?: boolean | null
+  canRate?: boolean | null
 }
 
 export type Page<T> = {
@@ -582,6 +591,14 @@ export const OolshikApi = {
 
   rejectRequest: (taskId: string, payload: { reasonCode: string; reasonText?: string }) =>
     api.post(`/requests/${taskId}/reject`, payload),
+
+  markRequestDone: (taskId: string) => api.post(`/requests/${taskId}/mark-done`, {}),
+
+  confirmRequestCompletion: (taskId: string) =>
+    api.post(`/requests/${taskId}/confirm-completion`, {}),
+
+  reportRequestIssue: (taskId: string, payload: { reasonCode: string; reasonText?: string }) =>
+    api.post(`/requests/${taskId}/report-issue`, payload),
 
   // Complete
   completeTask: (taskId: string) => api.post(`/requests/${taskId}/complete`, {}),

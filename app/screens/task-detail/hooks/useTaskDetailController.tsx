@@ -50,11 +50,14 @@ import {
   authorizeRequest,
   cancelTask,
   completeTask,
+  confirmTaskCompletion,
   fetchActivePaymentRequest,
   fetchTaskById,
+  markTaskDone,
   rateTask,
   reassignTask,
   rejectRequest,
+  reportTaskIssue,
   releaseTask,
   revealPhone,
   updateTaskOffer,
@@ -126,7 +129,9 @@ export function useTaskDetailController({
   const [authDecision, setAuthDecision] = useState<"approved" | "rejected" | null>(null)
   const [rating, setRating] = useState<number>(2.5)
   const authExpiredRef = useRef(false)
+  const refreshInFlightRef = useRef(false)
   const paymentNoticeDialogOpenRef = useRef(false)
+  const [markDoneConfirmVisible, setMarkDoneConfirmVisible] = useState(false)
 
   const [csatRating, setCsatRating] = useState(4)
   const [csatTag, setCsatTag] = useState<string | null>(null)
@@ -164,9 +169,24 @@ export function useTaskDetailController({
       fg: primary,
     },
     ASSIGNED: { label: t("oolshik:status.assigned"), bg: warningSoft, fg: warning },
+    WORK_DONE_PENDING_CONFIRMATION: {
+      label: t("oolshik:status.waitingConfirmation"),
+      bg: "#EDE9FE",
+      fg: "#6D28D9",
+    },
+    REVIEW_REQUIRED: {
+      label: t("oolshik:status.reviewRequired"),
+      bg: "#FFEDD5",
+      fg: "#C2410C",
+    },
     COMPLETED: { label: t("oolshik:status.completed"), bg: successSoft, fg: success },
     CANCELLED: {
       label: t("oolshik:status.cancelled"),
+      bg: colors.palette.neutral200,
+      fg: neutral700,
+    },
+    UNKNOWN: {
+      label: t("oolshik:taskDetailScreen.unknownStatus"),
       bg: colors.palette.neutral200,
       fg: neutral700,
     },
@@ -226,7 +246,8 @@ export function useTaskDetailController({
   }, [taskId, taskFromStore])
 
   const refreshTask = useCallback(async () => {
-    if (!taskId || refreshing) return
+    if (!taskId || refreshInFlightRef.current) return
+    refreshInFlightRef.current = true
     setRefreshing(true)
     try {
       const res = await fetchTaskById(taskId)
@@ -241,9 +262,10 @@ export function useTaskDetailController({
         res.message || t("oolshik:taskDetailScreen.refreshFailedBody"),
       )
     } finally {
+      refreshInFlightRef.current = false
       setRefreshing(false)
     }
-  }, [refreshing, taskId, t, upsertTask])
+  }, [taskId, t, upsertTask])
 
   const statusChip = statusMap[normalizedStatus] ?? statusMap.PENDING
 
@@ -275,6 +297,13 @@ export function useTaskDetailController({
       setPaymentLoading(false)
     }
   }, [isHelper, isRequester, taskId])
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshTask()
+      void loadActivePayment()
+    }, [loadActivePayment, refreshTask]),
+  )
 
   const contactLabel = isRequester
     ? t("oolshik:taskDetailScreen.contactHelperPhone")
@@ -309,6 +338,11 @@ export function useTaskDetailController({
     (rawStatus === "OPEN" || rawStatus === "ASSIGNED" || rawStatus === "PENDING_AUTH")
 
   const canRelease = isHelper && rawStatus === "ASSIGNED"
+  const canMarkDone = current?.canMarkDone ?? (isHelper && rawStatus === "ASSIGNED")
+  const canConfirmCompletion =
+    current?.canConfirm ?? (isRequester && rawStatus === "WORK_DONE_PENDING_CONFIRMATION")
+  const canReportIssue =
+    current?.canReportIssue ?? (isRequester && rawStatus === "WORK_DONE_PENDING_CONFIRMATION")
   const canEditOffer = canEditOfferForTask(isRequester, rawStatus, current?.helperId ?? null)
 
   const currentOfferAmount = typeof current?.offerAmount === "number" ? current.offerAmount : null
@@ -317,12 +351,19 @@ export function useTaskDetailController({
       ? t("oolshik:taskDetailScreen.noOffer")
       : `₹${currentOfferAmount.toFixed(2)} ${current?.offerCurrency || "INR"}`
 
-  const { msUntilReassign, msUntilAuthExpiry, reassignCountdown, authCountdown, authExpired } =
-    useTaskTimers({
-      rawStatus,
-      helperAcceptedAt: current?.helperAcceptedAt,
-      pendingAuthExpiresAt: current?.pendingAuthExpiresAt,
-    })
+  const {
+    msUntilReassign,
+    msUntilAuthExpiry,
+    reassignCountdown,
+    authCountdown,
+    authExpired,
+    completionConfirmationCountdown,
+  } = useTaskTimers({
+    rawStatus,
+    helperAcceptedAt: current?.helperAcceptedAt,
+    pendingAuthExpiresAt: current?.pendingAuthExpiresAt,
+    completionConfirmationExpiresAt: current?.completionConfirmationExpiresAt,
+  })
 
   useEffect(() => {
     if (!recoveryNotice) return
@@ -733,12 +774,58 @@ ${t("payment:notice.line2")}`,
     }
   }, [actionLoading, coords, current?.id, fetchNearby, status, t])
 
+  const onMarkDone = useCallback(() => {
+    if (!current?.id) return
+    if (!canMarkDone) {
+      Alert.alert(t("oolshik:taskDetailScreen.markDoneNotAllowed"))
+      return
+    }
+    setMarkDoneConfirmVisible(true)
+  }, [canMarkDone, current?.id, t])
+
+  const closeMarkDoneConfirm = useCallback(() => {
+    if (actionLoading) return
+    setMarkDoneConfirmVisible(false)
+  }, [actionLoading])
+
+  const confirmMarkDone = useCallback(async () => {
+    if (!current?.id || actionLoading) return
+
+    setMarkDoneConfirmVisible(false)
+    setActionLoading(true)
+    try {
+      const res = await markTaskDone(String(current.id))
+      if (!res.ok) throw new Error("mark-done-failed")
+      if (res.data) {
+        setTask((prev) => (prev ? { ...prev, ...res.data } : (res.data as TaskDetailTask)))
+      }
+      setRecoveryNotice(t("oolshik:taskDetailScreen.waitingForConfirmationNotice"))
+    } catch {
+      Alert.alert(t("oolshik:taskDetailScreen.markDoneFailed"))
+    } finally {
+      setActionLoading(false)
+    }
+  }, [actionLoading, current?.id, t])
+
   const onComplete = useCallback(async () => {
     if (!current?.id) return
 
-    const res = await completeTask(String(current.id))
+    const res =
+      rawStatus === "WORK_DONE_PENDING_CONFIRMATION"
+        ? await confirmTaskCompletion(String(current.id))
+        : await completeTask(String(current.id))
+
     if (res.ok) {
-      setTask((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+      if (res.data) {
+        setTask((prev) => (prev ? { ...prev, ...res.data } : (res.data as TaskDetailTask)))
+      } else {
+        setTask((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+      }
+      return
+    }
+
+    if (rawStatus === "WORK_DONE_PENDING_CONFIRMATION") {
+      Alert.alert(t("oolshik:taskDetailScreen.confirmCompletionFailed"))
       return
     }
 
@@ -752,7 +839,7 @@ ${t("payment:notice.line2")}`,
     }
 
     Alert.alert(t("oolshik:taskDetailScreen.errorCompletingTask"))
-  }, [current?.id, t])
+  }, [current?.id, rawStatus, t])
 
   const onSubmitRating = useCallback(async () => {
     if (!current?.id) return
@@ -877,6 +964,15 @@ ${t("payment:notice.line2")}`,
           setTask((prev) => (prev ? { ...prev, status: "OPEN", pendingHelperId: null } : prev))
         }
         setRecoveryNotice(t("oolshik:taskDetailScreen.authorizationRejectedNotice"))
+      } else if (reasonModal.action === "issue") {
+        const res = await reportTaskIssue(String(current.id), payload)
+        if (!res.ok) throw new Error("issue-failed")
+        if (res.data) {
+          setTask((prev) => (prev ? { ...prev, ...res.data } : (res.data as TaskDetailTask)))
+        } else {
+          setTask((prev) => (prev ? { ...prev, status: "REVIEW_REQUIRED" } : prev))
+        }
+        setRecoveryNotice(t("oolshik:taskDetailScreen.issueReportedNotice"))
       }
 
       if (coords && status === "ready") {
@@ -1040,16 +1136,28 @@ ${t("payment:notice.line2")}`,
     [t],
   )
 
+  const issueReasons = useMemo(
+    () => [
+      { code: "NOT_DONE", label: t("oolshik:taskDetailScreen.issueReasonNotDone") },
+      { code: "PARTIALLY_DONE", label: t("oolshik:taskDetailScreen.issueReasonPartiallyDone") },
+      { code: "QUALITY_ISSUE", label: t("oolshik:taskDetailScreen.issueReasonQuality") },
+      { code: "OTHER", label: t("oolshik:taskDetailScreen.reasonOther") },
+    ],
+    [t],
+  )
+
   const currentReasons =
     reasonModal.action === "release"
       ? releaseReasons
       : reasonModal.action === "reject"
         ? rejectReasons
+        : reasonModal.action === "issue"
+          ? issueReasons
         : cancelReasons
 
   const ratingBadgeValue = normalizedStatus === "COMPLETED" ? otherPartyRating : oppositeAvgRating
   const showRatingBadge = ratingBadgeValue != null
-  const canRate = normalizedStatus === "COMPLETED" && (isRequester || isHelper)
+  const canRate = current?.canRate ?? (normalizedStatus === "COMPLETED" && (isRequester || isHelper))
   const distanceLabel = formatDistance(current?.distanceMtr, t)
 
   const paymentAmountText =
@@ -1083,6 +1191,7 @@ ${t("payment:notice.line2")}`,
       ratingSubmitting,
       recoveryNotice,
       authDecision,
+      markDoneConfirmVisible,
       csatRating,
       csatTag,
       csatSubmitting,
@@ -1117,10 +1226,14 @@ ${t("payment:notice.line2")}`,
       statusChip,
       authCountdown,
       authExpired,
+      completionConfirmationCountdown,
       reassignCountdown,
       canReassign,
       canCancel,
       canRelease,
+      canMarkDone,
+      canConfirmCompletion,
+      canReportIssue,
     },
     contact: {
       contactLabel,
@@ -1194,6 +1307,7 @@ ${t("payment:notice.line2")}`,
       cancelReasons,
       releaseReasons,
       rejectReasons,
+      issueReasons,
     },
     handlers: {
       refreshTask,
@@ -1205,6 +1319,9 @@ ${t("payment:notice.line2")}`,
       openMap: () => openInMaps(current?.latitude || 0, current?.longitude || 0),
       onAccept,
       onAuthorize,
+      onMarkDone,
+      closeMarkDoneConfirm,
+      confirmMarkDone,
       onComplete,
       onSubmitRating,
       onSubmitCsat,

@@ -2,6 +2,7 @@ import React from "react"
 import { ActivityIndicator, View } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
+import { AlertDialog } from "@/components/AlertDialog"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
@@ -153,15 +154,21 @@ export default function TaskDetailScreen({ navigation }: Props) {
         requesterName={derived.requesterName}
         requesterFallback={t("oolshik:taskDetailScreen.requesterFallback")}
         authCountdown={statusInfo.authCountdown}
+        completionConfirmationCountdown={statusInfo.completionConfirmationCountdown}
+        completionMode={current?.completionMode}
         authExpired={statusInfo.authExpired}
         actionLoading={state.actionLoading}
         canCancel={statusInfo.canCancel}
         canRelease={statusInfo.canRelease}
         canReassign={statusInfo.canReassign}
+        canMarkDone={statusInfo.canMarkDone}
+        canConfirmCompletion={statusInfo.canConfirmCompletion}
+        canReportIssue={statusInfo.canReportIssue}
         reassignCountdown={statusInfo.reassignCountdown}
         reassignLimitReached={derived.reassignLimitReached}
         onAuthorize={handlers.onAuthorize}
         onAccept={handlers.onAccept}
+        onMarkDone={handlers.onMarkDone}
         onComplete={handlers.onComplete}
         onOpenReason={handlers.openReasonSheet}
         onReassign={handlers.onReassign}
@@ -184,7 +191,20 @@ export default function TaskDetailScreen({ navigation }: Props) {
         createdThisRequestText={t("oolshik:taskDetailScreen.createdThisRequest")}
         waitingForHelperToAcceptText={t("oolshik:taskDetailScreen.waitingForHelperToAccept")}
         acceptTaskLabel={t("oolshik:acceptTask")}
-        canMarkCompletedText={t("oolshik:taskDetailScreen.canMarkCompleted")}
+        autoCompletedText={t("oolshik:taskDetailScreen.completedAutomatically")}
+        helperCanMarkDoneText={t("oolshik:taskDetailScreen.helperCanMarkDone")}
+        waitingForHelperToMarkDoneText={t("oolshik:taskDetailScreen.waitingForHelperToMarkDone")}
+        waitingForConfirmationText={t("oolshik:taskDetailScreen.waitingForConfirmation")}
+        helperMarkedDoneText={t("oolshik:taskDetailScreen.helperMarkedDone", {
+          time: statusInfo.completionConfirmationCountdown ?? "",
+        })}
+        completionTimerText={t("oolshik:taskDetailScreen.completionTimer", {
+          time: statusInfo.completionConfirmationCountdown ?? "",
+        })}
+        markDoneLabel={t("oolshik:taskDetailScreen.markDone")}
+        confirmCompletionLabel={t("oolshik:taskDetailScreen.confirmCompletion")}
+        reportIssueLabel={t("oolshik:taskDetailScreen.reportIssue")}
+        reviewRequiredText={t("oolshik:taskDetailScreen.reviewRequiredText")}
         completeTaskLabel={t("oolshik:completeTask")}
         waitingRequesterToCompleteText={t("oolshik:taskDetailScreen.waitingForRequesterToComplete")}
         cancelRequestLabel={t("oolshik:taskDetailScreen.cancelRequest")}
@@ -300,7 +320,9 @@ export default function TaskDetailScreen({ navigation }: Props) {
             ? t("oolshik:taskDetailScreen.reasonForGivingAway")
             : state.reasonModal.action === "reject"
               ? t("oolshik:taskDetailScreen.reasonForReject")
-              : t("oolshik:taskDetailScreen.reasonForCancel")
+              : state.reasonModal.action === "issue"
+                ? t("oolshik:taskDetailScreen.reasonForIssue")
+                : t("oolshik:taskDetailScreen.reasonForCancel")
         }
         reasons={controller.reasons.currentReasons}
         addShortNotePlaceholder={t("oolshik:taskDetailScreen.addShortNote")}
@@ -317,6 +339,24 @@ export default function TaskDetailScreen({ navigation }: Props) {
         onConfirm={handlers.onConfirmReason}
         onSelectReason={handlers.setReasonCode}
         onChangeReasonText={handlers.setReasonText}
+      />
+
+      <AlertDialog
+        visible={state.markDoneConfirmVisible}
+        title={t("oolshik:taskDetailScreen.markDoneConfirmTitle")}
+        message={t("oolshik:taskDetailScreen.markDoneConfirmBody")}
+        onDismiss={handlers.closeMarkDoneConfirm}
+        actions={[
+          {
+            text: t("common:cancel"),
+            onPress: handlers.closeMarkDoneConfirm,
+          },
+          {
+            text: state.actionLoading ? "..." : t("oolshik:taskDetailScreen.markDone"),
+            tone: "primary",
+            onPress: handlers.confirmMarkDone,
+          },
+        ]}
       />
     </Screen>
   )
