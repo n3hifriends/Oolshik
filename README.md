@@ -15,7 +15,7 @@ e.g. cd /Users/nitinkalokhe/.nvm/versions/node/v22.18.0/bin/node and hit /Applic
 yarn install
 yarn start
 Or
-EXPO_PUBLIC_API_URL=http://<YOUR_LAN_IP>:8080 npx expo start --lan --clear
+EXPO_PUBLIC_API_URL=http://192.168.29.209:8080 npx expo start --lan --clear
 ```
 
 To make things work on your local simulator, or on your phone, you need first to [run `eas build`](https://github.com/infinitered/ignite/blob/master/docs/expo/EAS.md). We have many shortcuts on `package.json` to make it easier:

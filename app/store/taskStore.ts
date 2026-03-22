@@ -9,7 +9,17 @@ type Task = {
   title?: string
   description?: string
   distanceMtr?: number
-  status: "DRAFT" | "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status:
+    | "DRAFT"
+    | "PENDING"
+    | "PENDING_AUTH"
+    | "ASSIGNED"
+    | "WORK_DONE_PENDING_CONFIRMATION"
+    | "REVIEW_REQUIRED"
+    | "COMPLETED"
+    | "OPEN"
+    | "CANCELLED"
+    | "CANCELED"
   latitude?: number
   longitude?: number
   requesterId?: string
@@ -35,6 +45,9 @@ type Task = {
   pendingAuthExpiresAt?: string | null
   cancelledAt?: string | null
   cancelledBy?: string | null
+  workDoneAt?: string | null
+  completionConfirmationExpiresAt?: string | null
+  completionMode?: string | null
   reassignedCount?: number | null
   releasedCount?: number | null
 }
@@ -43,7 +56,14 @@ type TaskTab = "ALL" | "CREATED" | "ACCEPTED" | "COMPLETED"
 
 const normalizeStatus = (
   status?: Task["status"] | string | null,
-): "OPEN" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" => {
+):
+  | "OPEN"
+  | "PENDING_AUTH"
+  | "ASSIGNED"
+  | "WORK_DONE_PENDING_CONFIRMATION"
+  | "REVIEW_REQUIRED"
+  | "COMPLETED"
+  | "CANCELLED" => {
   const raw = String(status ?? "")
     .trim()
     .toUpperCase()
@@ -54,6 +74,8 @@ const normalizeStatus = (
     raw === "OPEN" ||
     raw === "PENDING_AUTH" ||
     raw === "ASSIGNED" ||
+    raw === "WORK_DONE_PENDING_CONFIRMATION" ||
+    raw === "REVIEW_REQUIRED" ||
     raw === "COMPLETED" ||
     raw === "CANCELLED"
   ) {
@@ -108,7 +130,15 @@ export const useTaskStore = create<State>((set, get) => ({
         const allowed = new Set(
           (statuses?.length
             ? statuses
-            : ["OPEN", "PENDING_AUTH", "ASSIGNED", "COMPLETED", "CANCELLED"]) as any,
+            : [
+                "OPEN",
+                "PENDING_AUTH",
+                "ASSIGNED",
+                "WORK_DONE_PENDING_CONFIRMATION",
+                "REVIEW_REQUIRED",
+                "COMPLETED",
+                "CANCELLED",
+              ]) as any,
         )
         const filtered = normalizeTasks(MOCK_NEARBY_TASKS)
           .filter((t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status))

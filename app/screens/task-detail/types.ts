@@ -6,7 +6,7 @@ export type TaskDetailTask = Task & {
   helperPhone?: string
 }
 
-export type RecoveryAction = "cancel" | "release" | "reject"
+export type RecoveryAction = "cancel" | "release" | "reject" | "issue"
 
 export type ReasonModalState = {
   visible: boolean
@@ -25,8 +25,11 @@ export type StatusPaletteMap = {
   PENDING: StatusPalette
   PENDING_AUTH: StatusPalette
   ASSIGNED: StatusPalette
+  WORK_DONE_PENDING_CONFIRMATION: StatusPalette
+  REVIEW_REQUIRED: StatusPalette
   COMPLETED: StatusPalette
   CANCELLED: StatusPalette
+  UNKNOWN: StatusPalette
 }
 
 export type ActivePayment = PaymentRequestApiResponse | null

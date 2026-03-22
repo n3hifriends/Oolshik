@@ -4,6 +4,8 @@ export const STATUS_ORDER: HomeFeedStatus[] = [
   "OPEN",
   "PENDING_AUTH",
   "ASSIGNED",
+  "WORK_DONE_PENDING_CONFIRMATION",
+  "REVIEW_REQUIRED",
   "COMPLETED",
   "CANCELLED",
 ]
@@ -21,6 +23,8 @@ export const normalizeStatus = (status?: string): HomeFeedStatus | null => {
     raw === "OPEN" ||
     raw === "PENDING_AUTH" ||
     raw === "ASSIGNED" ||
+    raw === "WORK_DONE_PENDING_CONFIRMATION" ||
+    raw === "REVIEW_REQUIRED" ||
     raw === "COMPLETED" ||
     raw === "CANCELLED"
   ) {

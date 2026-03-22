@@ -3,6 +3,8 @@ export type TaskDetailRawStatus =
   | "PENDING"
   | "PENDING_AUTH"
   | "ASSIGNED"
+  | "WORK_DONE_PENDING_CONFIRMATION"
+  | "REVIEW_REQUIRED"
   | "COMPLETED"
   | "OPEN"
   | "CANCELLED"
@@ -11,7 +13,15 @@ export type TaskDetailRawStatus =
   | undefined
   | null
 
-export type NormalizedTaskStatus = "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED"
+export type NormalizedTaskStatus =
+  | "PENDING"
+  | "PENDING_AUTH"
+  | "ASSIGNED"
+  | "WORK_DONE_PENDING_CONFIRMATION"
+  | "REVIEW_REQUIRED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "UNKNOWN"
 
 export function normalizeTaskStatus(rawStatus: TaskDetailRawStatus): NormalizedTaskStatus {
   switch (rawStatus) {
@@ -19,6 +29,10 @@ export function normalizeTaskStatus(rawStatus: TaskDetailRawStatus): NormalizedT
       return "PENDING"
     case "PENDING_AUTH":
       return "PENDING_AUTH"
+    case "WORK_DONE_PENDING_CONFIRMATION":
+      return "WORK_DONE_PENDING_CONFIRMATION"
+    case "REVIEW_REQUIRED":
+      return "REVIEW_REQUIRED"
     case "CANCELLED":
     case "CANCELED":
       return "CANCELLED"
@@ -27,7 +41,7 @@ export function normalizeTaskStatus(rawStatus: TaskDetailRawStatus): NormalizedT
     case "COMPLETED":
       return rawStatus
     default:
-      return "PENDING"
+      return "UNKNOWN"
   }
 }
 

@@ -14,7 +14,16 @@ type Props = {
   title?: string
   distanceMtr?: number
   onAccept?: () => void
-  status?: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "OPEN" | "CANCELLED" | "CANCELED"
+  status?:
+    | "PENDING"
+    | "PENDING_AUTH"
+    | "ASSIGNED"
+    | "WORK_DONE_PENDING_CONFIRMATION"
+    | "REVIEW_REQUIRED"
+    | "COMPLETED"
+    | "OPEN"
+    | "CANCELLED"
+    | "CANCELED"
   voiceUrl?: string | null
   onPress?: () => void
   createdByName?: string
@@ -73,7 +82,14 @@ export function TaskCard({
 
   // Normalize backend statuses to UI statuses
   // Backend may send OPEN; map it to PENDING visually. Handle CANCELLED/CANCELED gracefully.
-  const normalizedStatus: "PENDING" | "PENDING_AUTH" | "ASSIGNED" | "COMPLETED" | "CANCELLED" =
+  const normalizedStatus:
+    | "PENDING"
+    | "PENDING_AUTH"
+    | "ASSIGNED"
+    | "WORK_DONE_PENDING_CONFIRMATION"
+    | "REVIEW_REQUIRED"
+    | "COMPLETED"
+    | "CANCELLED" =
     status === "OPEN"
       ? "PENDING"
       : status === "CANCELLED" || status === "CANCELED"
@@ -87,6 +103,16 @@ export function TaskCard({
     PENDING: { label: t("oolshik:status.pending"), bg: colors.palette.primary200, fg: neutral700 },
     PENDING_AUTH: { label: t("oolshik:status.pendingAuth"), bg: colors.palette.primary100, fg: neutral700 },
     ASSIGNED: { label: t("oolshik:status.assigned"), bg: colors.palette.warningSoft400, fg: neutral700 },
+    WORK_DONE_PENDING_CONFIRMATION: {
+      label: t("oolshik:status.waitingConfirmation"),
+      bg: "#EDE9FE",
+      fg: "#6D28D9",
+    },
+    REVIEW_REQUIRED: {
+      label: t("oolshik:status.reviewRequired"),
+      bg: "#FFEDD5",
+      fg: "#C2410C",
+    },
     COMPLETED: { label: t("oolshik:status.completed"), bg: colors.palette.successSoft400, fg: neutral700 },
     CANCELLED: { label: t("oolshik:status.cancelled"), bg: colors.palette.neutral200, fg: neutral700 },
   } as const
