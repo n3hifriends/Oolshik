@@ -480,7 +480,8 @@ const en = {
     },
     login: {
       heading: "Log in",
-      subheading: "Join your nearby support network with a sign-in flow that stays quick and clear.",
+      subheading:
+        "Join your nearby support network with a sign-in flow that stays quick and clear.",
       modeHelper: "Choose the sign-in method that works best on this device.",
       authUnavailable: "Sign-in is not available on this build right now.",
       continueWithGoogle: "Continue with Google",
@@ -490,6 +491,8 @@ const en = {
       googleBenefitFast: "Fastest option when Google is already set up on this device.",
       googleBenefitTrusted: "Your app session is still issued and secured by Oolshik.",
       googleBenefitProfile: "Your name and email can be filled in with fewer steps.",
+      googlePhoneRequiredNote:
+        "Enter your phone number to continue with Google. You can type it manually or use the phone hint option.",
       googleUnavailable: "Google sign-in is not configured on this build yet.",
       googleLoading: "Connecting...",
       googleSuccess: "Google sign-in succeeded.",
@@ -503,6 +506,24 @@ const en = {
       stepCounter: "Step {{current}} of {{total}}",
       stepVerifyMobile: "Verify mobile",
       phoneHint: "We will text a one-time code to this number.",
+      phoneHintAlertTitle: "Phone number hint",
+      useMyPhoneNumber: "Choose my phone number",
+      phoneHintBadge: "Recommended",
+      phoneHintActionHelper:
+        "Faster than typing. Pick a saved number on this phone and review it before continuing.",
+      phoneHintPrefillNote:
+        "Android only. This fills the field with a number you choose on-device. You can edit it before continuing.",
+      phoneHintPrefilled: "Phone number filled in. Review it before you continue.",
+      phoneHintAlreadyFilled: "This phone number is already filled in.",
+      phoneHintCancelled: "No phone number was selected.",
+      phoneHintUnavailable: "Phone number hint is not available on this build right now.",
+      phoneHintPlayServicesUnavailable:
+        "Google Play Services is unavailable on this device, so we couldn't suggest your phone number.",
+      phoneHintUnavailableOnDevice:
+        "This device can't provide a phone number hint right now. You can keep typing it manually.",
+      phoneHintInvalidNumber:
+        "The selected number doesn't match the Indian mobile format used in this app.",
+      phoneHintFailed: "Couldn't read a phone number hint right now. Please type it manually.",
       stepEnterOtp: "Enter 6-digit code",
       otpHint: "Enter the verification code we just sent.",
       sendOtpFirst: "Send the OTP first to unlock code entry.",

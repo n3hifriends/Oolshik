@@ -505,6 +505,8 @@ const mr = {
       googleBenefitFast: "या डिव्हाइसवर Google तयार असेल तर हा सर्वात जलद पर्याय आहे.",
       googleBenefitTrusted: "तरीही तुमचे ॲप सेशन ऊलशिक कडूनच सुरक्षितपणे जारी केले जाते.",
       googleBenefitProfile: "नाव आणि ईमेल कमी स्टेप्समध्ये भरता येतात.",
+      googlePhoneRequiredNote:
+        "Google ने पुढे जाण्यासाठी तुमचा फोन नंबर टाका. तुम्ही तो हाताने टाकू शकता किंवा फोन हिंट पर्याय वापरू शकता.",
       googleUnavailable: "या बिल्डमध्ये Google लॉगिन अजून कॉन्फिगर केलेले नाही.",
       googleLoading: "जोडत आहोत...",
       googleSuccess: "Google लॉगिन यशस्वी झाले.",
@@ -518,6 +520,24 @@ const mr = {
       stepCounter: "{{total}} पैकी स्टेप {{current}}",
       stepVerifyMobile: "मोबाइल पडताळा",
       phoneHint: "या नंबरवर एक-वेळचा कोड पाठवला जाईल.",
+      phoneHintAlertTitle: "फोन नंबर हिंट",
+      useMyPhoneNumber: "माझा फोन नंबर निवडा",
+      phoneHintBadge: "शिफारस केलेले",
+      phoneHintActionHelper:
+        "टाइप करण्यापेक्षा जलद. या फोनमधला सेव्ह केलेला नंबर निवडा आणि पुढे जाण्यापूर्वी तपासा.",
+      phoneHintPrefillNote:
+        "फक्त Android वर. तुम्ही डिव्हाइसवर निवडलेला नंबर या फील्डमध्ये भरला जाईल. पुढे जाण्यापूर्वी तो बदलू शकता.",
+      phoneHintPrefilled: "फोन नंबर भरला गेला आहे. पुढे जाण्यापूर्वी तपासा.",
+      phoneHintAlreadyFilled: "हा फोन नंबर आधीच भरलेला आहे.",
+      phoneHintCancelled: "कोणताही फोन नंबर निवडला गेला नाही.",
+      phoneHintUnavailable: "या बिल्डमध्ये सध्या फोन नंबर हिंट उपलब्ध नाही.",
+      phoneHintPlayServicesUnavailable:
+        "या डिव्हाइसवर Google Play Services उपलब्ध नाहीत, त्यामुळे फोन नंबर सुचवता आला नाही.",
+      phoneHintUnavailableOnDevice:
+        "या डिव्हाइसवर सध्या फोन नंबर हिंट मिळू शकत नाही. तुम्ही नंबर हाताने टाकू शकता.",
+      phoneHintInvalidNumber:
+        "निवडलेला नंबर या ॲपमध्ये वापरल्या जाणाऱ्या भारतीय मोबाइल फॉरमॅटशी जुळत नाही.",
+      phoneHintFailed: "सध्या फोन नंबर हिंट वाचता आला नाही. कृपया नंबर हाताने टाका.",
       stepEnterOtp: "६-अंकी कोड टाका",
       otpHint: "आत्ताच पाठवलेला पडताळणी कोड टाका.",
       sendOtpFirst: "कोड टाकण्यासाठी आधी OTP पाठवा.",
