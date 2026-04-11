@@ -5,7 +5,6 @@ import { create, ApisauceInstance } from "apisauce"
 import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import Config from "@/config"
-import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth"
 import i18n from "i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
 
@@ -118,7 +117,7 @@ function flushSubscribers(newAccess: string | null) {
 }
 
 // Paths that should NOT attach Authorization or trigger refresh
-const AUTH_WHITELIST = ["/auth/otp/request", "/auth/otp/verify", "/auth/refresh"]
+const AUTH_WHITELIST = ["/auth/otp/request", "/auth/otp/verify", "/auth/google", "/auth/refresh"]
 
 // ---------- Attach access token ----------
 axiosInstance.interceptors.request.use((config) => {
@@ -158,42 +157,6 @@ raw.interceptors.response.use(
     return Promise.reject(err)
   },
 )
-
-let authReadyPromise: Promise<FirebaseAuthTypes.User | null> | null = null
-function waitForFirebaseUser(timeoutMs = 5000) {
-  if (auth().currentUser) return Promise.resolve(auth().currentUser)
-  if (!authReadyPromise) {
-    authReadyPromise = new Promise<FirebaseAuthTypes.User | null>((resolve) => {
-      let settled = false
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true
-          resolve(null)
-        }
-      }, timeoutMs)
-      const unsub = auth().onAuthStateChanged((user) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        unsub()
-        resolve(user)
-      })
-    }).finally(() => {
-      authReadyPromise = null
-    })
-  }
-  return authReadyPromise
-}
-
-async function getFirebaseIdToken(force = false) {
-  try {
-    const user = auth().currentUser ?? (await waitForFirebaseUser())
-    if (!user) return null
-    return await user.getIdToken(force)
-  } catch (e) {
-    return null
-  }
-}
 
 async function refreshAccessToken(): Promise<string> {
   const refresh = tokens.refresh
@@ -300,21 +263,8 @@ export const api: ApisauceInstance = create({
 api.addAsyncRequestTransform(async (request) => {
   request.headers = request.headers ?? {}
   request.headers["Accept-Language"] = normalizeLocaleTag(i18n.language)
-  const idToken = await getFirebaseIdToken(false)
-  const headerToken = idToken ?? tokens.access
-  if (headerToken) {
-    request.headers.Authorization = `Bearer ${headerToken}`
-  }
-})
-
-// Optional: retry once on 401 with a forced refresh
-api.addAsyncResponseTransform(async (response) => {
-  if (response.status === 401) {
-    const fresh = await getFirebaseIdToken(true)
-    if (fresh) {
-      setLoginTokens(fresh, undefined)
-      return
-    }
+  if (tokens.access) {
+    request.headers.Authorization = `Bearer ${tokens.access}`
   }
 })
 export type ServerTask = {
@@ -416,8 +366,9 @@ export type UserStats = {
 
 export type AuthMeResponse = {
   id?: string | number
-  phone?: string
+  phone?: string | null
   email?: string
+  emailVerified?: boolean
   displayName?: string
   roles?: string
   languages?: string
@@ -653,6 +604,8 @@ export const OolshikApi = {
   requestOtp: (phone: string) => api.post("/auth/otp/request", { phone }),
   verifyOtp: (payload: { phone: string; code: string; displayName?: string; email?: string }) =>
     api.post<{ accessToken: string; refreshToken: string }>("/auth/otp/verify", payload),
+  googleSignIn: (payload: { idToken: string; phone?: string }) =>
+    api.post<{ accessToken: string; refreshToken: string }>("/auth/google", payload),
   complete: (displayName: string, email: string) =>
     api.post("/auth/complete", { displayName, email }),
   me: () => api.get<AuthMeResponse>("/auth/me"),

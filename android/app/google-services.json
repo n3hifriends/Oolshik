@@ -12,7 +12,20 @@
           "package_name": "com.oolshik.aan"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "263296903071-v73slipdgnp9ffj4vlnav47usqpf4l3t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.oolshik.aan",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "263296903071-l80n6ccefcn05s5apnobtlpl1cc0fd5t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA_iBhrmYQHRNLLEQTFVQkQVctGOgpcmec"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "263296903071-l80n6ccefcn05s5apnobtlpl1cc0fd5t.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "263296903071-e6t5p5s4on6naqbkpieo1enrudr2d6ch.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.oolshik.aan"
+              }
+            }
+          ]
         }
       }
     }

@@ -30,6 +30,8 @@ const resources = {
   hi,
 }
 
+const namespaces = Object.keys(en)
+
 const deviceLocaleTag = pickDeviceLocaleTag(Localization.getLocales())
 const locale = deviceLocaleTag
   ? Localization.getLocales().find((item) => normalizeLocaleTag(item.languageTag) === deviceLocaleTag)
@@ -50,6 +52,8 @@ export const initI18n = async () => {
 
   await i18n.init({
     resources,
+    ns: namespaces,
+    defaultNS: "common",
     lng: deviceLocaleTag ?? fallbackLocale,
     fallbackLng: fallbackLocale,
     interpolation: {
