@@ -4,3 +4,4 @@ import { MockOolshikApi } from "./mockClient"
 
 // export const OolshikApi = FLAGS.USE_MOCK_UPLOAD_CREATE ? MockOolshikApi : RealOolshikApi
 export const OolshikApi = RealOolshikApi
+export type { AuthMeResponse, PaymentProfileApiResponse, PaymentProfileEditApiResponse } from "./client"

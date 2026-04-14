@@ -27,6 +27,7 @@ type ActionFooterProps = {
   completionMode?: string | null
   authExpired: boolean
   actionLoading: boolean
+  confirmCompletionLoading: boolean
   canCancel: boolean
   canRelease: boolean
   canReassign: boolean
@@ -259,6 +260,7 @@ export function ActionFooter(props: ActionFooterProps) {
                     text={props.confirmCompletionLabel}
                     onPress={props.onComplete}
                     disabled={props.actionLoading}
+                    loading={props.confirmCompletionLoading}
                     style={{ flex: 1, paddingVertical: props.spacingXs }}
                   />
                 ) : null}

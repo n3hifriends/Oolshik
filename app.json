@@ -16,6 +16,7 @@
   ],
   "android": {
     "icon": "./assets/images/app-icon-android-legacy.png",
+    "scheme": "com.oolshik.aan",
     "package": "com.oolshik.aan",
     "adaptiveIcon": {
       "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",

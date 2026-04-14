@@ -1,4 +1,5 @@
 import { setLoginTokens } from "@/api/client"
+import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import { navigationRef } from "@/navigators/navigationUtilities"
 import {
@@ -81,10 +82,14 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV])
 
-  // ✅ on mount & whenever authToken changes (e.g., app relaunch), sync header once
-  // useEffect(() => {
-  //   setLoginTokens(authToken || undefined)
-  // }, [authToken])
+  useEffect(() => {
+    // Legacy-state recovery: older installs can retain `auth.token` while
+    // transport storage lacks `auth.accessToken`, which makes the app appear
+    // signed in but sends protected requests without Authorization.
+    if (!authToken) return
+    if (tokens.access) return
+    setLoginTokens(authToken, tokens.refresh)
+  }, [authToken])
 
   useEffect(() => {
     const handler = () => {

@@ -1,5 +1,5 @@
 import React from "react"
-import { ActivityIndicator, View } from "react-native"
+import { ActivityIndicator, Modal, View } from "react-native"
 import { useRoute } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
 import { AlertDialog } from "@/components/AlertDialog"
@@ -158,6 +158,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         completionMode={current?.completionMode}
         authExpired={statusInfo.authExpired}
         actionLoading={state.actionLoading}
+        confirmCompletionLoading={state.actionLoading && state.actionKind === "confirmCompletion"}
         canCancel={statusInfo.canCancel}
         canRelease={statusInfo.canRelease}
         canReassign={statusInfo.canReassign}
@@ -236,6 +237,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         onHelperAmountChange={handlers.onHelperPaymentAmountChange}
         onOpenScanner={handlers.openPaymentsScanner}
         paymentButtonLabel={t("oolshik:taskDetailScreen.payments")}
+        directPaymentLabel={t("payment:direct.helperCta")}
         PaymentAmountPrefix={payment.PaymentAmountPrefix}
         showActivePayment={(role.isRequester || role.isHelper) && !!state.activePayment}
         paymentUpdateTitle={t("oolshik:taskDetailScreen.paymentUpdate")}
@@ -248,6 +250,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         payWithUpiLabel={t("oolshik:taskDetailScreen.payWithUpi")}
         refreshLabel={t("oolshik:taskDetailScreen.refresh")}
         onOpenPaymentFlow={handlers.openPaymentFlow}
+        onOpenDirectPaymentFlow={handlers.openDirectPaymentFlow}
         onRefreshPayment={handlers.loadActivePayment}
         showHelperWaitingText={derived.paymentRequesterNotified}
         helperWaitingText={t("oolshik:taskDetailScreen.requesterNotifiedForPayment")}
@@ -358,6 +361,48 @@ export default function TaskDetailScreen({ navigation }: Props) {
           },
         ]}
       />
+
+      <Modal
+        transparent
+        visible={state.actionLoading && state.actionKind === "confirmCompletion"}
+        animationType="fade"
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.28)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              minWidth: 240,
+              maxWidth: "90%",
+              borderRadius: 20,
+              paddingVertical: 24,
+              paddingHorizontal: 20,
+              alignItems: "center",
+              gap: spacing.sm,
+              backgroundColor: colors.palette.neutral100,
+              borderWidth: 1,
+              borderColor: colors.palette.neutral300,
+            }}
+          >
+            <ActivityIndicator size="large" color={primary} />
+            <Text
+              text={t("oolshik:taskDetailScreen.confirmCompletionProgressTitle")}
+              weight="bold"
+            />
+            <Text
+              text={t("oolshik:taskDetailScreen.confirmCompletionProgressBody")}
+              size="xs"
+              style={{ color: colors.textDim, textAlign: "center" }}
+            />
+          </View>
+        </View>
+      </Modal>
     </Screen>
   )
 }

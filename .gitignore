@@ -66,6 +66,10 @@ buck-out/
 # VS Code
 .vscode
 
+# Claude Code local artifacts
+.claude/worktrees/
+.claude/settings.local.json
+
 # Expo
 .expo/*
 bin/Exponent.app

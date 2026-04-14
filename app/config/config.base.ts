@@ -2,6 +2,9 @@ export interface ConfigBaseProps {
   persistNavigation: "always" | "dev" | "prod" | "never"
   catchErrors: "always" | "dev" | "prod" | "never"
   exitRoutes: string[]
+  AUTH_PHONE_OTP_ENABLED: boolean
+  AUTH_GOOGLE_ENABLED: boolean
+  AUTH_GOOGLE_REQUIRE_PHONE: boolean
 }
 
 export type PersistNavigationConfig = ConfigBaseProps["persistNavigation"]
@@ -21,6 +24,9 @@ const BaseConfig: ConfigBaseProps = {
    * is pressed while in that screen. Only affects Android.
    */
   exitRoutes: ["Welcome"],
+  AUTH_PHONE_OTP_ENABLED: false,
+  AUTH_GOOGLE_ENABLED: true,
+  AUTH_GOOGLE_REQUIRE_PHONE: true,
 }
 
 export default BaseConfig

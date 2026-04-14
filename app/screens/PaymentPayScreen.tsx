@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Alert, Linking, StyleSheet, View, ViewStyle } from "react-native"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
 import type {
   OolshikStackScreenProps,
   PaymentScanPayload,
@@ -13,6 +14,7 @@ import type { Theme } from "@/theme/types"
 import { OolshikApi } from "@/api/client"
 import { useTranslation } from "react-i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
+import { maskUpiId } from "@/utils/paymentProfile"
 
 type PaymentBreakdownItem = {
   label: string
@@ -29,6 +31,7 @@ type PaymentSnapshot = {
   id?: string
   payeeName?: string | null
   payeeVpa?: string | null
+  payeeMaskedVpa?: string | null
   amountRequested?: number | null
   note?: string | null
   dueDate?: string | null
@@ -127,6 +130,7 @@ const mergePaymentPayload = (
     next.snapshot.amountRequested ?? base.snapshot.amountRequested ?? null
   mergedSnapshot.payeeName = next.snapshot.payeeName ?? base.snapshot.payeeName ?? null
   mergedSnapshot.payeeVpa = next.snapshot.payeeVpa ?? base.snapshot.payeeVpa ?? null
+  mergedSnapshot.payeeMaskedVpa = next.snapshot.payeeMaskedVpa ?? base.snapshot.payeeMaskedVpa ?? null
   mergedSnapshot.note = next.snapshot.note ?? base.snapshot.note ?? null
   mergedSnapshot.status = next.snapshot.status ?? base.snapshot.status ?? DEFAULT_STATUS
   mergedSnapshot.lastUpdated = next.snapshot.lastUpdated ?? base.snapshot.lastUpdated ?? null
@@ -346,9 +350,25 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const breakdown = snapshot.breakdown ?? []
   const highlights = snapshot.highlights ?? []
   const disclaimers = snapshot.disclaimers ?? scanPayload.guidelines ?? []
+  const displayUpiId = snapshot.payeeMaskedVpa ?? maskUpiId(snapshot.payeeVpa ?? scanPayload.payeeVpa)
   const breakdownTotal = breakdown.reduce((sum, item) => sum + (item.amount ?? 0), 0)
   const inlineError = error && payment ? error : null
   const supportLink = payment?.supportLink ?? seedPayment?.supportLink
+  const contextTitle = taskContext?.title?.trim() || snapshot.highlights?.find((item) => item.label === "Task")?.value
+  const requesterName =
+    taskContext?.createdByName?.trim() ||
+    snapshot.highlights?.find((item) => item.label === "Requester")?.value ||
+    snapshot.payeeName ||
+    null
+  const displayReference = formatReference(snapshot.id ?? paymentRequestId ?? taskId)
+  const technicalReference = snapshot.id ?? paymentRequestId ?? null
+  const heroMessage = buildHeroMessage({
+    note: snapshot.note,
+    contextTitle,
+    requesterName,
+    t,
+  })
+  const requesterInitials = buildInitials(requesterName)
   const statusText = useMemo(() => {
     const status = (snapshot.status ?? DEFAULT_STATUS).toUpperCase()
     switch (status) {
@@ -370,34 +390,128 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   return (
     <Screen style={$root} preset="scroll" contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.heroLabel} text={t("payment:pay.transferAmount")} />
-        <Text style={styles.heroAmount} text={amountDisplay} />
-        <View style={styles.heroMetaRow}>
-          <View style={styles.heroChip}>
-            <Text
-              style={styles.heroChipText}
-              text={statusText.toUpperCase()}
-            />
+        <View style={styles.heroGlow} />
+        <View style={styles.heroHeader}>
+          <View>
+            <Text style={styles.heroLabel} text={t("payment:pay.transferAmount")} />
+            <Text style={styles.heroAmount} text={amountDisplay} />
           </View>
-          {dueDisplay ? <Text style={styles.heroMetaText} text={t("payment:pay.duePrefix", { date: dueDisplay })} /> : null}
+          <View style={styles.heroStatusPill}>
+            <MaterialCommunityIcons
+              name="progress-clock"
+              size={16}
+              color={theme.colors.palette.neutral100}
+            />
+            <Text style={styles.heroStatusText} text={statusText.toUpperCase()} />
+          </View>
         </View>
-        {snapshot.note ? <Text style={styles.heroNote}>{snapshot.note}</Text> : null}
+
+        <Text style={styles.heroSupportText}>
+          {heroMessage}
+        </Text>
+
+        <View style={styles.heroMetaRow}>
+          {dueDisplay ? (
+            <View style={styles.metaChip}>
+              <MaterialCommunityIcons
+                name="calendar-clock-outline"
+                size={14}
+                color={theme.colors.palette.neutral100}
+              />
+              <Text style={styles.metaChipText} text={t("payment:pay.duePrefix", { date: dueDisplay })} />
+            </View>
+          ) : null}
+          {displayReference ? (
+            <View style={styles.metaChip}>
+              <MaterialCommunityIcons
+                name="pound"
+                size={14}
+                color={theme.colors.palette.neutral100}
+              />
+              <Text style={styles.metaChipText} text={`${t("payment:pay.reference")}: ${displayReference}`} />
+            </View>
+          ) : null}
+        </View>
+
+        {(contextTitle || requesterName) ? (
+          <View style={styles.contextCard}>
+            <View style={styles.contextHeader}>
+              <View style={styles.contextIconBadge}>
+                <MaterialCommunityIcons
+                  name="clipboard-text-outline"
+                  size={18}
+                  color={theme.colors.palette.primary500}
+                />
+              </View>
+              <Text style={styles.contextEyebrow} text={t("payment:pay.taskContext")} />
+            </View>
+
+            <Text
+              style={styles.contextTitle}
+              text={contextTitle || t("payment:pay.contextFallbackTitle")}
+            />
+
+            {requesterName ? (
+              <View style={styles.requesterCard}>
+                <View style={styles.requesterAvatar}>
+                  <Text style={styles.requesterAvatarText} text={requesterInitials} />
+                </View>
+                <View style={styles.requesterCopy}>
+                  <Text style={styles.requesterLabel} text={t("payment:pay.requestedBy")} />
+                  <Text style={styles.requesterName} text={requesterName} />
+                </View>
+                {taskContext?.createdByPhoneNumber ? (
+                  <View style={styles.requesterContactPill}>
+                    <MaterialCommunityIcons
+                      name="phone-outline"
+                      size={14}
+                      color={theme.colors.palette.primary500}
+                    />
+                    <Text
+                      style={styles.requesterContactText}
+                      numberOfLines={1}
+                      text={taskContext.createdByPhoneNumber}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle} text={t("payment:pay.payeeDetails")} />
-        <View style={styles.row}>
-          <Text style={styles.rowLabel} text={t("payment:pay.recipient")} />
-          <Text style={styles.rowValue} numberOfLines={1} text={snapshot.payeeName ?? "—"} />
+        <View style={styles.payeeHero}>
+          <View style={styles.payeeAvatar}>
+            <MaterialCommunityIcons
+              name="account-cash-outline"
+              size={22}
+              color={theme.colors.palette.primary500}
+            />
+          </View>
+          <View style={styles.payeeHeroCopy}>
+            <Text style={styles.payeeEyebrow} text={t("payment:pay.recipient")} />
+            <Text style={styles.payeeName} numberOfLines={1} text={snapshot.payeeName ?? "—"} />
+            <Text
+              style={[styles.payeeUpi, styles.monoValue]}
+              numberOfLines={1}
+              text={displayUpiId ?? "—"}
+            />
+          </View>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel} text={t("payment:pay.upiId")} />
-          <Text
-            style={[styles.rowValue, styles.monoValue]}
-            numberOfLines={1}
-            text={snapshot.payeeVpa ?? "—"}
-          />
+
+        <View style={styles.detailGrid}>
+          <View style={styles.detailTile}>
+            <Text style={styles.detailTileLabel} text={t("payment:pay.upiId")} />
+            <Text style={[styles.detailTileValue, styles.monoValue]} numberOfLines={1} text={displayUpiId ?? "—"} />
+          </View>
+          <View style={styles.detailTile}>
+            <Text style={styles.detailTileLabel} text={t("payment:pay.reference")} />
+            <Text style={[styles.detailTileValue, styles.monoValue]} numberOfLines={1} text={displayReference ?? "—"} />
+          </View>
         </View>
+
         {snapshot.paymentWindow ? (
           <View style={styles.row}>
             <Text style={styles.rowLabel} text={t("payment:pay.paymentWindow")} />
@@ -414,10 +528,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
             />
           </View>
         ) : null}
-        {snapshot.id ? (
+        {technicalReference ? (
           <View style={styles.row}>
             <Text style={styles.rowLabel} text={t("payment:pay.requestId")} />
-            <Text style={styles.rowValue} numberOfLines={1} text={snapshot.id} />
+            <Text style={[styles.rowValue, styles.monoSubtle]} numberOfLines={1} text={technicalReference} />
           </View>
         ) : null}
         {highlights.length ? (
@@ -430,6 +544,9 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
             ))}
           </View>
         ) : null}
+        <Text style={styles.secureNote}>
+          {t("payment:pay.secureNote")}
+        </Text>
       </View>
 
       {breakdown.length ? (
@@ -561,6 +678,7 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
     snapshot: {
       ...snapshotData,
       highlights,
+      payeeMaskedVpa: snapshotData.payeeMaskedVpa ?? null,
       disclaimers: ensureStringArray(disclaimers),
     },
   }
@@ -577,6 +695,52 @@ const extractErrorMessage = (err: unknown) => {
   return "Something went wrong while loading the payment details."
 }
 
+const formatReference = (value?: string | null) => {
+  if (!value) return undefined
+  const compact = value.replace(/[^a-zA-Z0-9]/g, "")
+  if (!compact) return undefined
+  const tail = compact.slice(-8).toUpperCase()
+  return `#${tail}`
+}
+
+const buildInitials = (value?: string | null) => {
+  if (!value) return "OP"
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+  if (!parts.length) return "OP"
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("")
+}
+
+const buildHeroMessage = ({
+  note,
+  contextTitle,
+  requesterName,
+  t,
+}: {
+  note?: string | null
+  contextTitle?: string | null
+  requesterName?: string | null
+  t: (key: string, options?: Record<string, unknown>) => string
+}) => {
+  if (contextTitle) {
+    return t("payment:pay.contextHeroBody", { task: contextTitle })
+  }
+
+  const cleanedNote = note
+    ?.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+
+  if (cleanedNote && cleanedNote.length >= 12) return cleanedNote
+  if (requesterName) {
+    return t("payment:pay.requesterHeroBody", { name: requesterName })
+  }
+  return t("payment:pay.defaultHeroBody")
+}
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     content: {
@@ -588,12 +752,29 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.palette.primary500,
       borderRadius: 24,
       padding: theme.spacing.xl,
-      gap: theme.spacing.xs,
+      gap: theme.spacing.md,
       shadowColor: theme.isDark ? "#00000080" : "#00000040",
       shadowOpacity: theme.isDark ? 0.25 : 0.18,
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 8 },
       elevation: 6,
+      overflow: "hidden",
+      position: "relative",
+    },
+    heroGlow: {
+      position: "absolute",
+      width: 180,
+      height: 180,
+      borderRadius: 90,
+      backgroundColor: "rgba(255,255,255,0.08)",
+      top: -72,
+      right: -28,
+    },
+    heroHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: theme.spacing.md,
     },
     heroLabel: {
       color: theme.colors.palette.neutral200,
@@ -603,40 +784,142 @@ const createStyles = (theme: Theme) =>
     },
     heroAmount: {
       color: theme.colors.palette.neutral100,
-      fontSize: 34,
-      lineHeight: 40,
+      fontSize: 38,
+      lineHeight: 44,
       fontFamily: theme.typography.primary.bold,
     },
-    heroMetaRow: {
+    heroStatusPill: {
       flexDirection: "row",
       alignItems: "center",
       gap: theme.spacing.xs,
-      marginTop: theme.spacing.xs,
-    },
-    heroChip: {
-      paddingHorizontal: theme.spacing.xs,
-      paddingVertical: 4,
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: theme.spacing.xs,
       borderRadius: 999,
-      backgroundColor: "rgba(255,255,255,0.12)",
+      backgroundColor: "rgba(255,255,255,0.14)",
     },
-    heroChipText: {
+    heroStatusText: {
       color: theme.colors.palette.neutral100,
       fontSize: 12,
       letterSpacing: 0.5,
       fontFamily: theme.typography.primary.medium,
     },
-    heroMetaText: {
+    heroSupportText: {
       color: theme.colors.palette.neutral100,
-      fontSize: 14,
-      opacity: 0.85,
+      fontSize: 16,
+      lineHeight: 24,
+      opacity: 0.96,
       fontFamily: theme.typography.primary.normal,
     },
-    heroNote: {
-      marginTop: theme.spacing.sm,
+    heroMetaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: theme.spacing.xs,
+    },
+    metaChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 7,
+      backgroundColor: "rgba(255,255,255,0.12)",
+    },
+    metaChipText: {
+      color: theme.colors.palette.neutral100,
+      fontSize: 12,
+      lineHeight: 16,
+      opacity: 0.92,
+      fontFamily: theme.typography.primary.normal,
+    },
+    contextCard: {
+      borderRadius: 20,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
+      backgroundColor: "rgba(255,255,255,0.14)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.12)",
+    },
+    contextHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing.sm,
+    },
+    contextIconBadge: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: theme.colors.palette.neutral100,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    contextEyebrow: {
+      color: theme.colors.palette.neutral100,
+      opacity: 0.78,
+      fontSize: 12,
+      letterSpacing: 0.5,
+      fontFamily: theme.typography.primary.medium,
+      textTransform: "uppercase",
+    },
+    contextTitle: {
+      color: theme.colors.palette.neutral100,
+      fontSize: 20,
+      lineHeight: 28,
+      fontFamily: theme.typography.primary.bold,
+    },
+    requesterCard: {
+      borderRadius: 18,
+      padding: theme.spacing.sm,
+      gap: theme.spacing.sm,
+      backgroundColor: "rgba(255,255,255,0.12)",
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+    },
+    requesterAvatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: theme.colors.palette.neutral100,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    requesterAvatarText: {
+      color: theme.colors.palette.primary500,
+      fontSize: 15,
+      fontFamily: theme.typography.primary.bold,
+    },
+    requesterCopy: {
+      flex: 1,
+      minWidth: 120,
+    },
+    requesterLabel: {
+      color: theme.colors.palette.neutral100,
+      opacity: 0.72,
+      fontSize: 11,
+      fontFamily: theme.typography.primary.medium,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+    },
+    requesterName: {
       color: theme.colors.palette.neutral100,
       fontSize: 16,
       lineHeight: 22,
-      fontFamily: theme.typography.primary.normal,
+      fontFamily: theme.typography.primary.semiBold ?? theme.typography.primary.medium,
+    },
+    requesterContactPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 6,
+      backgroundColor: theme.colors.palette.neutral100,
+    },
+    requesterContactText: {
+      color: theme.colors.palette.primary500,
+      fontSize: 12,
+      fontFamily: theme.typography.primary.medium,
     },
     card: {
       backgroundColor: theme.isDark
@@ -651,8 +934,70 @@ const createStyles = (theme: Theme) =>
     cardTitle: {
       fontSize: 18,
       fontFamily: theme.typography.primary.medium,
-      marginBottom: theme.spacing.xs,
+      marginBottom: theme.spacing.sm,
       color: theme.colors.text,
+    },
+    payeeHero: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing.md,
+      marginBottom: theme.spacing.xs,
+    },
+    payeeAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 18,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : theme.colors.palette.accent100,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    payeeHeroCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    payeeEyebrow: {
+      fontSize: 12,
+      color: theme.colors.textDim,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+      fontFamily: theme.typography.primary.medium,
+    },
+    payeeName: {
+      fontSize: 20,
+      lineHeight: 26,
+      color: theme.colors.text,
+      fontFamily: theme.typography.primary.bold,
+    },
+    payeeUpi: {
+      fontSize: 14,
+      color: theme.colors.textDim,
+      fontFamily: theme.typography.primary.medium,
+    },
+    detailGrid: {
+      flexDirection: "row",
+      gap: theme.spacing.sm,
+      marginBottom: theme.spacing.xs,
+    },
+    detailTile: {
+      flex: 1,
+      borderRadius: 16,
+      padding: theme.spacing.sm,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.04)" : theme.colors.palette.neutral200,
+      borderWidth: 1,
+      borderColor: theme.isDark ? theme.colors.palette.neutral700 : theme.colors.palette.neutral200,
+      gap: 4,
+    },
+    detailTileLabel: {
+      fontSize: 11,
+      color: theme.colors.textDim,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+      fontFamily: theme.typography.primary.medium,
+    },
+    detailTileValue: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.primary.semiBold ?? theme.typography.primary.medium,
     },
     row: {
       flexDirection: "row",
@@ -676,6 +1021,11 @@ const createStyles = (theme: Theme) =>
     monoValue: {
       fontFamily: theme.typography.code?.normal ?? theme.typography.primary.medium,
     },
+    monoSubtle: {
+      fontFamily: theme.typography.code?.normal ?? theme.typography.primary.medium,
+      fontSize: 13,
+      color: theme.colors.textDim,
+    },
     totalValue: {
       fontFamily: theme.typography.primary.bold,
       color: theme.colors.palette.primary500,
@@ -698,10 +1048,11 @@ const createStyles = (theme: Theme) =>
       gap: theme.spacing.xs,
     },
     highlightPill: {
-      borderRadius: 999,
-      paddingVertical: 6,
+      borderRadius: 14,
+      paddingVertical: 8,
       paddingHorizontal: theme.spacing.sm,
       backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : theme.colors.palette.accent100,
+      minWidth: 110,
     },
     highlightLabel: {
       fontSize: 11,
@@ -713,6 +1064,13 @@ const createStyles = (theme: Theme) =>
       fontSize: 13,
       color: theme.colors.text,
       fontFamily: theme.typography.primary.medium,
+    },
+    secureNote: {
+      marginTop: theme.spacing.sm,
+      color: theme.colors.textDim,
+      fontSize: 12,
+      lineHeight: 18,
+      fontFamily: theme.typography.primary.normal,
     },
     cardSupport: {
       fontSize: 14,
