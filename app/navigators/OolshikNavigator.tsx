@@ -15,6 +15,7 @@ import BugFeedbackScreen from "@/screens/BugFeedbackScreen"
 import FeatureFeedbackScreen from "@/screens/FeatureFeedbackScreen"
 import RatingFeedbackScreen from "@/screens/RatingFeedbackScreen"
 import SafetyFeedbackScreen from "@/screens/SafetyFeedbackScreen"
+import PaymentProfileScreen from "@/screens/PaymentProfileScreen"
 import { useMMKVString } from "react-native-mmkv"
 import { storage } from "@/utils/storage"
 import { QrScannerScreen } from "@/screens/QrScannerScreen"
@@ -49,6 +50,7 @@ export type OolshikParamList = {
   OolshikFeedbackFeature: { taskId?: string } | undefined
   OolshikFeedbackRating: { taskId?: string } | undefined
   OolshikFeedbackSafety: { taskId?: string } | undefined
+  PaymentProfile: PaymentProfileParams | undefined
   QrScanner: { taskId: string; amount?: number | null }
   PaymentPay: PaymentPayParams
 }
@@ -79,6 +81,11 @@ export type PaymentTaskContext = {
   title?: string | null
   createdByName?: string | null
   createdByPhoneNumber?: string | null
+}
+
+export type PaymentProfileParams = {
+  entryPoint?: "onboarding" | "profile" | "task-payment"
+  required?: boolean
 }
 
 export type PaymentPayParams = {
@@ -133,6 +140,7 @@ export function OolshikNavigator() {
       <Stack.Screen name="OolshikFeedbackFeature" component={FeatureFeedbackScreen} />
       <Stack.Screen name="OolshikFeedbackRating" component={RatingFeedbackScreen} />
       <Stack.Screen name="OolshikFeedbackSafety" component={SafetyFeedbackScreen} />
+      <Stack.Screen name="PaymentProfile" component={PaymentProfileScreen} />
       <Stack.Screen name="QrScanner" component={QrScannerScreen} />
       <Stack.Screen name="PaymentPay" component={PaymentPayScreen} />
     </Stack.Navigator>

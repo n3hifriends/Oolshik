@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { Pressable, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -13,7 +14,10 @@ interface AuthModeToggleProps {
   onModeChange: (mode: AuthMode) => void
 }
 
-export function AuthModeToggle({ authMode, onModeChange }: AuthModeToggleProps) {
+export const AuthModeToggle = memo(function AuthModeToggle({
+  authMode,
+  onModeChange,
+}: AuthModeToggleProps) {
   const { t } = useTranslation()
   const { themed, theme } = useAppTheme()
   const { colors } = theme
@@ -50,4 +54,4 @@ export function AuthModeToggle({ authMode, onModeChange }: AuthModeToggleProps) 
       </Pressable>
     </View>
   )
-}
+})

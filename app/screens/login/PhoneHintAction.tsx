@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { ActivityIndicator, Pressable, View } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useTranslation } from "react-i18next"
@@ -23,7 +24,12 @@ interface PhoneHintActionProps {
   visible: boolean
 }
 
-export function PhoneHintAction({ disabled, loading, onPress, visible }: PhoneHintActionProps) {
+export const PhoneHintAction = memo(function PhoneHintAction({
+  disabled,
+  loading,
+  onPress,
+  visible,
+}: PhoneHintActionProps) {
   const { t } = useTranslation()
   const { themed, theme } = useAppTheme()
   const { colors } = theme
@@ -75,4 +81,4 @@ export function PhoneHintAction({ disabled, loading, onPress, visible }: PhoneHi
       />
     </View>
   )
-}
+})

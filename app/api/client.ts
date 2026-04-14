@@ -84,6 +84,20 @@ function logError(prefix: string, cfg: any, err: any) {
   } catch {}
 }
 
+function isErrorRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function isSpringSecurityForbidden(data: unknown) {
+  if (!isErrorRecord(data)) return false
+  return (
+    data.error === "Forbidden" &&
+    typeof data.path === "string" &&
+    data.status === 403 &&
+    typeof data.timestamp === "string"
+  )
+}
+
 const devHost = Platform.select({ ios: "http://localhost:8080", android: "http://10.0.2.2:8080" })
 const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API_URL : devHost)!
   .trim()
@@ -192,9 +206,17 @@ axiosInstance.interceptors.response.use(
     const original = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
     const status = error.response?.status ?? 0
     const url = original?.url || ""
+    const headers = (original?.headers || {}) as Record<string, unknown>
+    const hadBearerHeader = Boolean(headers.Authorization || headers.authorization || tokens.access)
 
     const isAuthEndpoint = AUTH_WHITELIST.some((p) => url.includes(p))
-    const shouldTryRefresh = (status === 401 || status === 419) && !isAuthEndpoint
+    const shouldTryRefresh =
+      !isAuthEndpoint &&
+      ((status === 401 || status === 419) ||
+        (status === 403 &&
+          hadBearerHeader &&
+          Boolean(tokens.refresh) &&
+          isSpringSecurityForbidden(error.response?.data)))
 
     if (!shouldTryRefresh) {
       // If refresh endpoint itself fails or forbidden → logout hard
@@ -377,6 +399,24 @@ export type AuthMeResponse = {
 }
 
 export type PaymentPayerRole = "REQUESTER" | "HELPER"
+export type PaymentMode = "MERCHANT_QR" | "PAY_HELPER_DIRECT" | "PAY_REQUESTER_DIRECT"
+export type PaymentProfileSourceType = "MANUAL" | "QR_EXTRACTED"
+
+export type PaymentProfileApiResponse = {
+  hasProfile: boolean
+  id?: string
+  maskedUpiId?: string | null
+  payeeLabel?: string | null
+  sourceType?: PaymentProfileSourceType | null
+  isVerified?: boolean
+  isActive?: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export type PaymentProfileEditApiResponse = PaymentProfileApiResponse & {
+  upiId?: string | null
+}
 
 export type OfferUpdateApiResponse = {
   taskId: string
@@ -390,15 +430,18 @@ export type PaymentRequestApiResponse = {
   id: string
   taskId?: string
   status?: string
+  paymentMode?: PaymentMode
   upiIntent?: string
   payerUserId?: string
   requesterUserId?: string
   helperUserId?: string
+  paymentProfileUserId?: string
   payerRole?: PaymentPayerRole
   canPay?: boolean
   snapshot?: {
     taskId?: string
     payeeVpa?: string | null
+    payeeMaskedVpa?: string | null
     payeeName?: string | null
     mcc?: string | null
     merchantId?: string | null
@@ -647,15 +690,42 @@ export const OolshikApi = {
     payerRole?: PaymentPayerRole
   }) => api.post<PaymentRequestApiResponse>("/payments/qr-scan", body),
 
+  createDirectPaymentRequest: (body: {
+    taskId: string
+    amount: number
+    currency?: string
+    note?: string
+    appVersion?: string
+    deviceId?: string
+    payerRole?: PaymentPayerRole
+  }) => api.post<PaymentRequestApiResponse>("/payments/direct", body),
+
   getPaymentRequest: (id: string) => api.get<PaymentRequestApiResponse>(`/payments/${id}`),
 
   getActivePaymentRequest: (taskId: string) =>
     api.get<PaymentRequestApiResponse>(`/payments/task/${taskId}/active`),
 
+  getActivePaymentOptions: (taskId: string) =>
+    api.get<PaymentRequestApiResponse[]>(`/payments/task/${taskId}/active-options`),
+
   initiatePayment: (id: string) => api.post(`/payments/${id}/initiate`, {}),
 
   markPaid: (id: string, payload: { paidAmount?: number; proofUrl?: string }) =>
     api.post(`/payments/${id}/mark-paid`, payload),
+
+  getMyPaymentProfile: () => api.get<PaymentProfileApiResponse>("/payment-profile/me"),
+  getMyPaymentProfileForEdit: () => api.get<PaymentProfileEditApiResponse>("/payment-profile/me/edit"),
+  createPaymentProfile: (body: {
+    upiId: string
+    payeeLabel?: string
+    sourceType: PaymentProfileSourceType
+  }) => api.post<PaymentProfileApiResponse>("/payment-profile", body),
+  updatePaymentProfile: (body: {
+    upiId: string
+    payeeLabel?: string
+    sourceType: PaymentProfileSourceType
+  }) => api.put<PaymentProfileApiResponse>("/payment-profile", body),
+  deletePaymentProfile: () => api.delete("/payment-profile"),
 }
 // Optional helper: call this after successful OTP verify to persist tokens
 export function setLoginTokens(accessToken?: string | null, refreshToken?: string | null) {

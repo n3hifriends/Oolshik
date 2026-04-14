@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Alert, Linking, Modal, Pressable, ScrollView, View } from "react-native"
+import { useFocusEffect } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
 import * as Application from "expo-application"
 
@@ -20,6 +21,7 @@ import {
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
 import { fromLanguageCode, normalizeLocaleTag, toLanguageCode } from "@/i18n/locale"
+import type { PaymentProfileApiResponse } from "@/api/client"
 
 const SUPPORT_EMAIL = "support@oolshik.in"
 
@@ -44,6 +46,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   )
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [showSafetyTips, setShowSafetyTips] = useState(false)
+  const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({ hasProfile: false })
 
   useEffect(() => {
     let active = true
@@ -63,6 +66,27 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       active = false
     }
   }, [i18n])
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      OolshikApi.getMyPaymentProfile()
+        .then((response) => {
+          if (!active) return
+          if (response.ok && response.data) {
+            setPaymentProfile(response.data)
+          } else {
+            setPaymentProfile({ hasProfile: false })
+          }
+        })
+        .catch(() => {
+          if (active) setPaymentProfile({ hasProfile: false })
+        })
+      return () => {
+        active = false
+      }
+    }, []),
+  )
 
   const applyExtras = useCallback(async (patch: Partial<ProfileExtras>) => {
     const next = await updateProfileExtras(patch)
@@ -235,6 +259,44 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             />
           </View>
         ) : null}
+      </SectionCard>
+
+      <SectionCard>
+        <Text preset="subheading" text={t("payment:profile.profileCardTitle")} style={{ marginBottom: spacing.sm }} />
+        <Text text={t("payment:profile.profileCardBody")} size="xs" style={{ color: colors.textDim }} />
+        <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
+          <Text text={t("payment:profile.currentUpi")} size="xs" style={{ color: colors.textDim }} />
+          <Text
+            text={
+              paymentProfile.hasProfile
+                ? paymentProfile.maskedUpiId ?? t("payment:profile.notAdded")
+                : t("payment:profile.notAdded")
+            }
+            weight="medium"
+          />
+        </View>
+        <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
+          <Text text={t("payment:profile.currentName")} size="xs" style={{ color: colors.textDim }} />
+          <Text
+            text={
+              paymentProfile.hasProfile
+                ? paymentProfile.payeeLabel ?? t("payment:profile.notAdded")
+                : t("payment:profile.notAdded")
+            }
+            weight="medium"
+          />
+        </View>
+        <View style={{ marginTop: spacing.md }}>
+          <Button
+            text={
+              paymentProfile.hasProfile
+                ? t("payment:profile.manageCta")
+                : t("payment:profile.addCta")
+            }
+            onPress={() => navigation.navigate("PaymentProfile", { entryPoint: "profile" })}
+            style={{ borderRadius: 10, minHeight: 44 }}
+          />
+        </View>
       </SectionCard>
 
       <SectionCard>

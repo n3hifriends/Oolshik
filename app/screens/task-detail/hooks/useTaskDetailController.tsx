@@ -22,7 +22,13 @@ import type {
   PaymentTaskContext,
   OolshikStackScreenProps,
 } from "@/navigators/OolshikNavigator"
-import type { PaymentRequestApiResponse, Task } from "@/api/client"
+import { OolshikApi } from "@/api"
+import type {
+  PaymentProfileApiResponse,
+  PaymentPayerRole,
+  PaymentRequestApiResponse,
+  Task,
+} from "@/api/client"
 import type { TextFieldAccessoryProps } from "@/components/TextField"
 import { canEditOfferForTask, parseOfferInput } from "@/utils/offerRules"
 import {
@@ -51,7 +57,7 @@ import {
   cancelTask,
   completeTask,
   confirmTaskCompletion,
-  fetchActivePaymentRequest,
+  fetchActivePaymentRequests,
   fetchTaskById,
   markTaskDone,
   rateTask,
@@ -83,6 +89,43 @@ function getTaskPhoneNumber(task: TaskDetailTask | null, isRequester: boolean) {
     task?.requesterPhoneNumber || task?.createdByPhoneNumber || task?.phoneNumber
   const helperPhone = task?.helperPhoneNumber || task?.helperPhone
   return isRequester ? helperPhone : requesterPhone
+}
+
+function resolveDirectPaymentErrorCopy(
+  payerRole: PaymentPayerRole,
+  rawMessage: string | null | undefined,
+  t: TranslateFn,
+) {
+  const message = (rawMessage || "").trim()
+  const normalized = message.toLowerCase()
+  const missingProfile =
+    normalized === "errors.paymentprofile.missing" ||
+    normalized.includes("add your payment profile before using direct payments")
+  const targetUnavailable =
+    normalized === "errors.paymentprofile.targetunavailable" ||
+    normalized.includes("targetunavailable")
+
+  if (payerRole === "HELPER" && (missingProfile || targetUnavailable)) {
+    return {
+      title: t("payment:direct.requesterProfileMissingTitle"),
+      body: t("payment:direct.requesterProfileMissingBody"),
+      showAddProfileCta: false,
+    }
+  }
+
+  if (payerRole === "REQUESTER" && (missingProfile || targetUnavailable)) {
+    return {
+      title: t("payment:direct.profileRequiredTitle"),
+      body: t("payment:direct.profileRequiredBody"),
+      showAddProfileCta: true,
+    }
+  }
+
+  return {
+    title: t("payment:direct.createFailedTitle"),
+    body: message || t("payment:direct.createFailed"),
+    showAddProfileCta: false,
+  }
 }
 
 export function useTaskDetailController({
@@ -123,6 +166,7 @@ export function useTaskDetailController({
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
 
   const [actionLoading, setActionLoading] = useState(false)
+  const [actionKind, setActionKind] = useState<null | "confirmCompletion" | "completeTask">(null)
   const [refreshing, setRefreshing] = useState(false)
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null)
@@ -144,13 +188,16 @@ export function useTaskDetailController({
   const [revealLoading, setRevealLoading] = useState(false)
 
   const [reasonModal, setReasonModal] = useState<ReasonModalState>({ visible: false })
-  const [activePayment, setActivePayment] = useState<PaymentRequestApiResponse | null>(null)
+  const [activePayments, setActivePayments] = useState<PaymentRequestApiResponse[]>([])
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [offerInput, setOfferInput] = useState("")
   const [offerSaving, setOfferSaving] = useState(false)
   const [offerNotice, setOfferNotice] = useState<string | null>(null)
   const [helperPaymentAmountInput, setHelperPaymentAmountInput] = useState("")
   const [helperPaymentAmountError, setHelperPaymentAmountError] = useState<string | null>(null)
+  const [myPaymentProfile, setMyPaymentProfile] = useState<PaymentProfileApiResponse>({
+    hasProfile: false,
+  })
 
   const primary = colors.palette.primary500
   const primarySoft = colors.palette.primary200
@@ -245,6 +292,56 @@ export function useTaskDetailController({
     }
   }, [taskId, taskFromStore])
 
+  const statusChip = statusMap[normalizedStatus] ?? statusMap.PENDING
+
+  const isRequester = isRequesterForTask(current?.requesterId, userId)
+  const isHelper = isHelperForTask(current?.helperId, userId)
+  const isPendingHelper = isPendingHelperForTask(current?.pendingHelperId, userId)
+
+  const loadActivePayment = useCallback(async () => {
+    if (!taskId || (!isRequester && !isHelper)) {
+      setActivePayments([])
+      return
+    }
+
+    setPaymentLoading(true)
+    try {
+      const res = await fetchActivePaymentRequests(taskId)
+      if (res.ok && res.data) {
+        setActivePayments(res.data)
+        return
+      }
+      if (res.status === 404) {
+        setActivePayments([])
+        return
+      }
+      setActivePayments([])
+    } catch {
+      setActivePayments([])
+    } finally {
+      setPaymentLoading(false)
+    }
+  }, [isHelper, isRequester, taskId])
+
+  const loadMyPaymentProfile = useCallback(async () => {
+    if (!isHelper) {
+      setMyPaymentProfile({ hasProfile: false })
+      return
+    }
+
+    try {
+      const res = await OolshikApi.getMyPaymentProfile()
+      if (res.ok && res.data) {
+        setMyPaymentProfile(res.data)
+        return
+      }
+    } catch {
+      // best-effort
+    }
+
+    setMyPaymentProfile({ hasProfile: false })
+  }, [isHelper])
+
   const refreshTask = useCallback(async () => {
     if (!taskId || refreshInFlightRef.current) return
     refreshInFlightRef.current = true
@@ -255,54 +352,24 @@ export function useTaskDetailController({
         const nextTask = toTaskDetailTask(res.data)
         setTask(nextTask)
         if (nextTask) upsertTask(nextTask)
-        return
+      } else {
+        Alert.alert(
+          t("oolshik:taskDetailScreen.refreshFailedTitle"),
+          res.message || t("oolshik:taskDetailScreen.refreshFailedBody"),
+        )
       }
-      Alert.alert(
-        t("oolshik:taskDetailScreen.refreshFailedTitle"),
-        res.message || t("oolshik:taskDetailScreen.refreshFailedBody"),
-      )
+
+      await Promise.all([loadActivePayment(), loadMyPaymentProfile()])
     } finally {
       refreshInFlightRef.current = false
       setRefreshing(false)
     }
-  }, [taskId, t, upsertTask])
-
-  const statusChip = statusMap[normalizedStatus] ?? statusMap.PENDING
-
-  const isRequester = isRequesterForTask(current?.requesterId, userId)
-  const isHelper = isHelperForTask(current?.helperId, userId)
-  const isPendingHelper = isPendingHelperForTask(current?.pendingHelperId, userId)
-
-  const loadActivePayment = useCallback(async () => {
-    if (!taskId || (!isRequester && !isHelper)) {
-      setActivePayment(null)
-      return
-    }
-
-    setPaymentLoading(true)
-    try {
-      const res = await fetchActivePaymentRequest(taskId)
-      if (res.ok && res.data) {
-        setActivePayment(res.data)
-        return
-      }
-      if (res.status === 404) {
-        setActivePayment(null)
-        return
-      }
-      setActivePayment(null)
-    } catch {
-      setActivePayment(null)
-    } finally {
-      setPaymentLoading(false)
-    }
-  }, [isHelper, isRequester, taskId])
+  }, [loadActivePayment, loadMyPaymentProfile, taskId, t, upsertTask])
 
   useFocusEffect(
     useCallback(() => {
       void refreshTask()
-      void loadActivePayment()
-    }, [loadActivePayment, refreshTask]),
+    }, [refreshTask]),
   )
 
   const contactLabel = isRequester
@@ -420,18 +487,18 @@ export function useTaskDetailController({
 
   useEffect(() => {
     if (!isHelper) return
-    const amount = activePayment?.snapshot?.amountRequested
+    const amount = activePayments[0]?.snapshot?.amountRequested
     if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) return
     setHelperPaymentAmountInput((prev) => (prev.trim().length ? prev : amount.toFixed(2)))
-  }, [activePayment?.id, activePayment?.snapshot?.amountRequested, isHelper])
+  }, [activePayments, isHelper])
 
   useEffect(() => {
     if (!current?.id) {
-      setActivePayment(null)
+      setActivePayments([])
       return
     }
     if (rawStatus === "CANCELLED" || rawStatus === "COMPLETED" || rawStatus === "OPEN") {
-      setActivePayment(null)
+      setActivePayments([])
       return
     }
     void loadActivePayment()
@@ -443,14 +510,34 @@ export function useTaskDetailController({
     msUntilReassign === 0 &&
     (current?.reassignedCount ?? 0) < MAX_REASSIGN
 
-  const activePaymentStatus = (
-    activePayment?.status ??
-    activePayment?.snapshot?.status ??
-    ""
-  ).toUpperCase()
-  const paymentAwaitingUser =
-    activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"
-  const paymentCanAct = !!activePayment?.canPay && paymentAwaitingUser
+  const payablePayments = useMemo(
+    () =>
+      activePayments.filter((payment) => {
+        const statusValue = (payment.status ?? payment.snapshot?.status ?? "").toUpperCase()
+        const awaitingUser = statusValue === "PENDING" || statusValue === "INITIATED"
+        return !!payment.canPay && awaitingUser
+      }),
+    [activePayments],
+  )
+
+  const activePayment = useMemo(() => {
+    if (isRequester) {
+      return payablePayments[0] ?? activePayments[0] ?? null
+    }
+    if (isHelper) {
+      return (
+        activePayments.find((payment) => payment.payerRole === "REQUESTER") ??
+        payablePayments[0] ??
+        activePayments[0] ??
+        null
+      )
+    }
+    return activePayments[0] ?? null
+  }, [activePayments, isHelper, isRequester, payablePayments])
+
+  const activePaymentStatus = (activePayment?.status ?? activePayment?.snapshot?.status ?? "").toUpperCase()
+  const paymentAwaitingUser = activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"
+  const paymentCanAct = payablePayments.length > 0
   const paymentStatusText = paymentStatusLabel(activePaymentStatus, t)
   const paymentExpiresText = paymentExpiryText(activePayment?.snapshot?.expiresAt, t)
   const canOpenPaymentsScanner = isHelper && !!current?.id && rawStatus === "ASSIGNED"
@@ -555,49 +642,37 @@ ${t("payment:notice.line2")}`,
   )
 
   const openPaymentFlow = useCallback(() => {
-    if (!current || !activePayment?.id) return
+    if (!current || payablePayments.length === 0) return
 
-    withPaymentNoticeGate(() => {
-      const paymentScanPayload: PaymentScanPayload = {
-        rawPayload: activePayment.upiIntent ?? "",
-        format: "upi-uri",
-        payeeVpa: activePayment.snapshot?.payeeVpa ?? null,
-        payeeName: activePayment.snapshot?.payeeName ?? null,
-        txnRef: activePayment.snapshot?.txnRef ?? null,
-        mcc: activePayment.snapshot?.mcc ?? null,
-        merchantId: activePayment.snapshot?.merchantId ?? null,
-        amount:
-          typeof activePayment.snapshot?.amountRequested === "number"
-            ? activePayment.snapshot.amountRequested
-            : null,
-        currency: activePayment.snapshot?.currency ?? "INR",
-        note: activePayment.snapshot?.note ?? null,
-        scanLocation: null,
-        scannedAt: activePayment.snapshot?.createdAt ?? new Date().toISOString(),
-        guidelines: [
-          t("oolshik:taskDetailScreen.verifyRecipientGuideline"),
-          t("oolshik:taskDetailScreen.markPaidGuideline"),
-        ],
-      }
-
-      const taskContext: PaymentTaskContext = {
-        id: String(current.id),
-        title: current.title ?? current.description ?? null,
-        createdByName: current.createdByName ?? null,
-        createdByPhoneNumber: current.createdByPhoneNumber
-          ? String(current.createdByPhoneNumber)
-          : null,
-      }
-
+    const navigateToPayment = (paymentRequest: PaymentRequestApiResponse) => {
       navigation.navigate("PaymentPay", {
         taskId: String(current.id),
-        paymentRequestId: activePayment.id,
-        scanPayload: paymentScanPayload,
-        taskContext,
-        upiIntentOverride: activePayment.upiIntent,
+        paymentRequestId: paymentRequest.id,
+        scanPayload: buildPaymentScanPayload(paymentRequest),
+        taskContext: buildPaymentTaskContext(current),
+        upiIntentOverride: paymentRequest.upiIntent,
       })
+    }
+
+    withPaymentNoticeGate(() => {
+      if (payablePayments.length === 1) {
+        navigateToPayment(payablePayments[0])
+        return
+      }
+
+      Alert.alert(
+        t("payment:pay.chooseOptionTitle"),
+        t("payment:pay.chooseOptionBody"),
+        [
+          ...payablePayments.slice(0, 2).map((paymentRequest) => ({
+            text: buildPaymentOptionLabel(paymentRequest),
+            onPress: () => navigateToPayment(paymentRequest),
+          })),
+          { text: t("common:cancel"), style: "cancel" },
+        ],
+      )
     })
-  }, [activePayment, current, navigation, t, withPaymentNoticeGate])
+  }, [current, navigation, payablePayments, t, withPaymentNoticeGate])
 
   const openPaymentsScanner = useCallback(() => {
     if (rawStatus !== "ASSIGNED") return
@@ -628,6 +703,134 @@ ${t("payment:notice.line2")}`,
       })
     })
   }, [current?.id, helperPaymentAmountInput, navigation, rawStatus, t, withPaymentNoticeGate])
+
+  const openDirectPaymentFlow = useCallback(() => {
+    if (rawStatus !== "ASSIGNED" || !current?.id) return
+
+    const trimmed = helperPaymentAmountInput.trim()
+    if (!trimmed) {
+      setHelperPaymentAmountError(t("payment:qr.enterAmount"))
+      return
+    }
+
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setHelperPaymentAmountError(t("payment:qr.invalidAmount"))
+      return
+    }
+
+    if (parsed > 1000000) {
+      setHelperPaymentAmountError(t("payment:qr.amountTooHigh"))
+      return
+    }
+
+    const amount = Number(parsed.toFixed(2))
+    setHelperPaymentAmountError(null)
+
+    const startDirectPayment = async (payerRole: PaymentPayerRole) => {
+      try {
+        const response = await OolshikApi.createDirectPaymentRequest({
+          taskId: String(current.id),
+          amount,
+          currency: "INR",
+          payerRole,
+        })
+
+        if (!response.ok || !response.data) {
+          const message =
+            (response.data as { message?: string } | undefined)?.message ??
+            t("payment:direct.createFailed")
+          throw new Error(message)
+        }
+
+        const createdPayment = response.data
+        if (!createdPayment) {
+          throw new Error(t("payment:direct.createFailed"))
+        }
+        setActivePayments((prev) => mergeActivePayments(prev, createdPayment))
+
+        if (payerRole === "HELPER") {
+          navigation.navigate("PaymentPay", {
+            taskId: String(current.id),
+            paymentRequestId: createdPayment.id,
+            scanPayload: buildPaymentScanPayload(createdPayment),
+            taskContext: buildPaymentTaskContext(current),
+            upiIntentOverride: createdPayment.upiIntent,
+          })
+          return
+        }
+
+        Alert.alert(t("payment:direct.requestedTitle"), t("payment:direct.requestedBody"))
+      } catch (err) {
+        const message = err instanceof Error ? err.message : t("payment:direct.createFailed")
+        const alertCopy = resolveDirectPaymentErrorCopy(payerRole, message, t)
+        if (alertCopy.showAddProfileCta) {
+          Alert.alert(alertCopy.title, alertCopy.body, [
+            { text: t("common:cancel"), style: "cancel" },
+            {
+              text: t("payment:direct.addProfileCta"),
+              onPress: () =>
+                navigation.navigate("PaymentProfile", {
+                  entryPoint: "task-payment",
+                  required: true,
+                }),
+            },
+          ])
+          return
+        }
+        Alert.alert(alertCopy.title, alertCopy.body)
+      }
+    }
+
+    withPaymentNoticeGate(() => {
+      Alert.alert(
+        t("payment:direct.choiceTitle"),
+        t("payment:direct.choiceBody"),
+        [
+          {
+            text: t("payment:direct.requestToMe"),
+            onPress: () => {
+              if (!myPaymentProfile.hasProfile) {
+                Alert.alert(
+                  t("payment:direct.profileRequiredTitle"),
+                  t("payment:direct.profileRequiredBody"),
+                  [
+                    { text: t("common:cancel"), style: "cancel" },
+                    {
+                      text: t("payment:direct.addProfileCta"),
+                      onPress: () =>
+                        navigation.navigate("PaymentProfile", {
+                          entryPoint: "task-payment",
+                          required: true,
+                        }),
+                    },
+                  ],
+                )
+                return
+              }
+
+              void startDirectPayment("REQUESTER")
+            },
+          },
+          {
+            text: t("payment:direct.payRequester"),
+            onPress: () => {
+              void startDirectPayment("HELPER")
+            },
+          },
+          { text: t("common:cancel"), style: "cancel" },
+        ],
+      )
+    })
+  }, [
+    current,
+    helperPaymentAmountInput,
+    myPaymentProfile.hasProfile,
+    navigation,
+    rawStatus,
+    t,
+    withPaymentNoticeGate,
+  ])
 
   const onRevealPhone = useCallback(async () => {
     if (!current?.id) return
@@ -803,43 +1006,54 @@ ${t("payment:notice.line2")}`,
     } catch {
       Alert.alert(t("oolshik:taskDetailScreen.markDoneFailed"))
     } finally {
+      setActionKind(null)
       setActionLoading(false)
     }
   }, [actionLoading, current?.id, t])
 
   const onComplete = useCallback(async () => {
-    if (!current?.id) return
+    if (!current?.id || actionLoading) return
 
-    const res =
-      rawStatus === "WORK_DONE_PENDING_CONFIRMATION"
-        ? await confirmTaskCompletion(String(current.id))
-        : await completeTask(String(current.id))
+    const nextActionKind =
+      rawStatus === "WORK_DONE_PENDING_CONFIRMATION" ? "confirmCompletion" : "completeTask"
 
-    if (res.ok) {
-      if (res.data) {
-        setTask((prev) => (prev ? { ...prev, ...res.data } : (res.data as TaskDetailTask)))
-      } else {
-        setTask((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+    setActionKind(nextActionKind)
+    setActionLoading(true)
+    try {
+      const res =
+        rawStatus === "WORK_DONE_PENDING_CONFIRMATION"
+          ? await confirmTaskCompletion(String(current.id))
+          : await completeTask(String(current.id))
+
+      if (res.ok) {
+        if (res.data) {
+          setTask((prev) => (prev ? { ...prev, ...res.data } : (res.data as TaskDetailTask)))
+        } else {
+          setTask((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
+        }
+        return
       }
-      return
-    }
 
-    if (rawStatus === "WORK_DONE_PENDING_CONFIRMATION") {
-      Alert.alert(t("oolshik:taskDetailScreen.confirmCompletionFailed"))
-      return
-    }
+      if (rawStatus === "WORK_DONE_PENDING_CONFIRMATION") {
+        Alert.alert(t("oolshik:taskDetailScreen.confirmCompletionFailed"))
+        return
+      }
 
-    if (
-      res.status === 403 ||
-      res.status === 409 ||
-      String(res.data || "").includes("Only requester can complete")
-    ) {
-      Alert.alert(t("oolshik:taskDetailScreen.onlyRequesterCanComplete"))
-      return
-    }
+      if (
+        res.status === 403 ||
+        res.status === 409 ||
+        String(res.data || "").includes("Only requester can complete")
+      ) {
+        Alert.alert(t("oolshik:taskDetailScreen.onlyRequesterCanComplete"))
+        return
+      }
 
-    Alert.alert(t("oolshik:taskDetailScreen.errorCompletingTask"))
-  }, [current?.id, rawStatus, t])
+      Alert.alert(t("oolshik:taskDetailScreen.errorCompletingTask"))
+    } finally {
+      setActionKind(null)
+      setActionLoading(false)
+    }
+  }, [actionLoading, current?.id, rawStatus, t])
 
   const onSubmitRating = useCallback(async () => {
     if (!current?.id) return
@@ -1167,6 +1381,64 @@ ${t("payment:notice.line2")}`,
         })
       : null
 
+  function buildPaymentTaskContext(task: TaskDetailTask): PaymentTaskContext {
+    return {
+      id: String(task.id),
+      title: task.title ?? task.description ?? null,
+      createdByName: task.createdByName ?? null,
+      createdByPhoneNumber: task.createdByPhoneNumber ? String(task.createdByPhoneNumber) : null,
+    }
+  }
+
+  function buildPaymentScanPayload(paymentRequest: PaymentRequestApiResponse): PaymentScanPayload {
+    return {
+      rawPayload: paymentRequest.upiIntent ?? "",
+      format: "upi-uri",
+      payeeVpa:
+        paymentRequest.snapshot?.payeeMaskedVpa ??
+        paymentRequest.snapshot?.payeeVpa ??
+        null,
+      payeeName: paymentRequest.snapshot?.payeeName ?? null,
+      txnRef: paymentRequest.snapshot?.txnRef ?? null,
+      mcc: paymentRequest.snapshot?.mcc ?? null,
+      merchantId: paymentRequest.snapshot?.merchantId ?? null,
+      amount:
+        typeof paymentRequest.snapshot?.amountRequested === "number"
+          ? paymentRequest.snapshot.amountRequested
+          : null,
+      currency: paymentRequest.snapshot?.currency ?? "INR",
+      note: paymentRequest.snapshot?.note ?? null,
+      scanLocation: null,
+      scannedAt: paymentRequest.snapshot?.createdAt ?? new Date().toISOString(),
+      guidelines: [
+        t("oolshik:taskDetailScreen.verifyRecipientGuideline"),
+        t("oolshik:taskDetailScreen.markPaidGuideline"),
+      ],
+    }
+  }
+
+  function buildPaymentOptionLabel(paymentRequest: PaymentRequestApiResponse) {
+    const amount =
+      typeof paymentRequest.snapshot?.amountRequested === "number"
+        ? ` • ₹${paymentRequest.snapshot.amountRequested.toFixed(2)}`
+        : ""
+    const modeLabel =
+      paymentRequest.paymentMode === "MERCHANT_QR"
+        ? t("payment:pay.optionMerchant")
+        : paymentRequest.paymentMode === "PAY_REQUESTER_DIRECT"
+          ? t("payment:pay.optionDirectToRequester")
+          : t("payment:pay.optionDirectToHelper")
+    return `${modeLabel}${amount}`
+  }
+
+  function mergeActivePayments(
+    currentPayments: PaymentRequestApiResponse[],
+    nextPayment: PaymentRequestApiResponse,
+  ) {
+    const remaining = currentPayments.filter((payment) => payment.id !== nextPayment.id)
+    return [nextPayment, ...remaining]
+  }
+
   const tags = [
     t("oolshik:taskDetailScreen.tagSmooth"),
     t("oolshik:taskDetailScreen.tagHelpful"),
@@ -1188,6 +1460,7 @@ ${t("payment:notice.line2")}`,
       loading,
       refreshing,
       actionLoading,
+      actionKind,
       ratingSubmitting,
       recoveryNotice,
       authDecision,
@@ -1201,6 +1474,7 @@ ${t("payment:notice.line2")}`,
       revealLoading,
       reasonModal,
       activePayment,
+      activePayments,
       paymentLoading,
       offerInput,
       offerSaving,
@@ -1273,7 +1547,8 @@ ${t("payment:notice.line2")}`,
       distanceAwayText: t("oolshik:taskCard.distanceAway", { distance: distanceLabel ?? "" }),
       canOpenMap: typeof current?.latitude === "number" && typeof current?.longitude === "number",
       reassignLimitReached: (current?.reassignedCount ?? 0) >= MAX_REASSIGN,
-      paymentRequesterNotified: isHelper && activePayment?.payerRole === "REQUESTER",
+      paymentRequesterNotified:
+        isHelper && activePayments.some((payment) => payment.payerRole === "REQUESTER"),
       tagStrings: tags,
       ratingTexts: {
         youRated:
@@ -1336,6 +1611,7 @@ ${t("payment:notice.line2")}`,
       onConfirmReason,
       onReassign,
       openPaymentFlow,
+      openDirectPaymentFlow,
       openPaymentsScanner,
       loadActivePayment,
       onHelperPaymentAmountChange: (value: string) => {

@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { Pressable, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -59,7 +60,7 @@ interface PhoneOtpFlowProps {
   triedContinue: boolean
 }
 
-export function PhoneOtpFlow(props: PhoneOtpFlowProps) {
+export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps) {
   const { t } = useTranslation()
   const { themed, theme } = useAppTheme()
   const { spacing, colors, isDark } = theme
@@ -283,4 +284,4 @@ export function PhoneOtpFlow(props: PhoneOtpFlowProps) {
       </View>
     </>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from "react"
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, Platform } from "react-native"
 import { useTranslation } from "react-i18next"
 import * as Google from "expo-auth-session/providers/google"
@@ -53,6 +53,10 @@ function alertWithBody(title: string, message: string) {
   Alert.alert(title, message)
 }
 
+// Keep the redirect-uri options reference stable. The Expo Google auth hook
+// memoizes against this object identity and can recreate the request when it changes.
+const GOOGLE_REDIRECT_URI_OPTIONS = Object.freeze({})
+
 export function useLoginScreenController() {
   const { t } = useTranslation()
 
@@ -87,6 +91,10 @@ export function useLoginScreenController() {
   const [googleServerMessage, setGoogleServerMessage] = useState<string | null>(null)
   const [googlePhoneTouched, setGooglePhoneTouched] = useState(false)
   const [phoneHintLoading, setPhoneHintLoading] = useState(false)
+  const googleAttemptSeqRef = useRef(0)
+  const activeGoogleAttemptRef = useRef<number | null>(null)
+  const lastHandledGoogleResponseRef = useRef<unknown>(null)
+  const pendingGooglePhoneHintRef = useRef<string | undefined>(undefined)
 
   const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, validationError } =
     useAuth()
@@ -109,7 +117,7 @@ export function useLoginScreenController() {
 
   const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest(
     googleAuthConfig,
-    {},
+    GOOGLE_REDIRECT_URI_OPTIONS,
   )
 
   useEffect(() => {
@@ -158,40 +166,6 @@ export function useLoginScreenController() {
     return () => clearInterval(id)
   }, [resendIn])
 
-  useEffect(() => {
-    if (!googleResponse) return
-    const response = googleResponse as {
-      type: string
-      authentication?: { idToken?: string | null } | null
-      params?: Record<string, string | undefined>
-    }
-
-    if (response.type === "cancel" || response.type === "dismiss") {
-      setGoogleFlowState("user-cancelled")
-      setLoading(null)
-      return
-    }
-    if (response.type !== "success") {
-      setGoogleFlowState("token-exchange-failed")
-      setLoading(null)
-      return
-    }
-
-    const idToken =
-      response.authentication?.idToken ??
-      (typeof response.params?.id_token === "string" ? response.params.id_token : undefined)
-
-    if (!idToken) {
-      setGoogleFlowState("token-exchange-failed")
-      setLoading(null)
-      return
-    }
-
-    startTransition(() => {
-      void exchangeGoogleToken(idToken)
-    })
-  }, [googleResponse])
-
   const phoneError = useMemo(() => {
     const digits = phone.replace(/\D/g, "")
     if (digits.length === 0) return "phone_required"
@@ -222,17 +196,28 @@ export function useLoginScreenController() {
     !optionalEmailError &&
     (otpVerified || (otpSent && otp.length === 6))
 
-  function handlePhoneChange(value: string) {
+  const handlePhoneChange = useCallback((value: string) => {
     const nextPhone = value.replace(/\D/g, "").slice(0, 10)
-    if (nextPhone !== phone && otpSent) {
+    if (nextPhone === phone) return
+
+    if (authMode === "google") {
+      activeGoogleAttemptRef.current = null
+      pendingGooglePhoneHintRef.current = undefined
+      setGoogleServerMessage(null)
+      setGoogleFlowState("idle")
+      setLoading((current) => (current === "google" ? null : current))
+    }
+
+    if (otpSent) {
       setOtpSent(false)
       setOtp("")
       setOtpVerified(false)
       setPendingTokens(null)
       setResendIn(0)
     }
+
     setPhone(nextPhone)
-  }
+  }, [authMode, otpSent, phone])
 
   function showPhoneHintFeedback(result: Exclude<PhoneNumberHintResult, { status: "success" }>) {
     const title = t("oolshik:login.phoneHintAlertTitle")
@@ -261,7 +246,7 @@ export function useLoginScreenController() {
     )
   }
 
-  async function onUseMyPhoneNumberPress() {
+  const onUseMyPhoneNumberPress = useCallback(async () => {
     setPhoneHintLoading(true)
     const result = await getPhoneNumberHint()
     setPhoneHintLoading(false)
@@ -272,9 +257,9 @@ export function useLoginScreenController() {
     }
 
     showPhoneHintFeedback(result)
-  }
+  }, [handlePhoneChange, t])
 
-  async function hydrateProfile(fallbackDisplayName?: string) {
+  const hydrateProfile = useCallback(async (fallbackDisplayName?: string) => {
     try {
       const me = await OolshikApi.me()
       if (me?.ok && me.data) {
@@ -317,12 +302,12 @@ export function useLoginScreenController() {
     } catch {
       // best-effort
     }
-  }
+  }, [setAuthEmail, setUserId, setUserName])
 
-  async function finalizeBackendSession(
+  const finalizeBackendSession = useCallback(async (
     session: { accessToken: string; refreshToken?: string | null },
     options?: { displayName?: string; email?: string; shouldCompleteProfile?: boolean },
-  ) {
+  ) => {
     setAuthToken(session.accessToken)
     setLoginTokens(session.accessToken, session.refreshToken)
 
@@ -331,9 +316,9 @@ export function useLoginScreenController() {
     }
 
     await hydrateProfile(options?.displayName)
-  }
+  }, [hydrateProfile, setAuthToken])
 
-  async function sendOtp() {
+  const sendOtp = useCallback(async () => {
     setLoading("send")
     const response = await OolshikApi.requestOtp(toIndianE164(phone))
     setLoading(null)
@@ -345,9 +330,9 @@ export function useLoginScreenController() {
       return
     }
     Alert.alert(t("oolshik:login.otpSendFailed"))
-  }
+  }, [phone, t])
 
-  async function verifyOtp(code?: string) {
+  const verifyOtp = useCallback(async (code?: string) => {
     const entered = (code ?? otp).trim()
     if (!/^\d{6}$/.test(entered)) return null
 
@@ -378,13 +363,19 @@ export function useLoginScreenController() {
       ),
     )
     return null
-  }
+  }, [authEmail, displayName, otp, phone, t])
 
-  async function exchangeGoogleToken(idToken: string) {
+  const exchangeGoogleToken = useCallback(async (
+    idToken: string,
+    phoneHint: string | undefined,
+    attemptId: number,
+  ) => {
+    if (activeGoogleAttemptRef.current !== attemptId) return
+
     setLoading("google")
-    const phoneHint =
-      googlePhoneRequired && phone.replace(/\D/g, "").length === 10 ? toIndianE164(phone) : undefined
     const response = await OolshikApi.googleSignIn({ idToken, phone: phoneHint })
+    if (activeGoogleAttemptRef.current !== attemptId) return
+
     if (!(response?.ok && response.data?.accessToken)) {
       setLoading(null)
       const backendMessage =
@@ -395,21 +386,70 @@ export function useLoginScreenController() {
       setGoogleFlowState(
         isNetworkFailure(response?.problem) ? "network-failure" : "backend-auth-failed",
       )
+      activeGoogleAttemptRef.current = null
       return
     }
 
     try {
       await finalizeBackendSession(response.data)
+      if (activeGoogleAttemptRef.current !== attemptId) return
       setGoogleServerMessage(null)
       setGoogleFlowState("success")
     } catch {
+      if (activeGoogleAttemptRef.current !== attemptId) return
       setGoogleFlowState("token-exchange-failed")
     } finally {
-      setLoading(null)
+      if (activeGoogleAttemptRef.current === attemptId) {
+        activeGoogleAttemptRef.current = null
+        setLoading(null)
+      }
     }
-  }
+  }, [finalizeBackendSession])
 
-  async function onContinue() {
+  useEffect(() => {
+    if (!googleResponse) return
+    if (lastHandledGoogleResponseRef.current === googleResponse) return
+    lastHandledGoogleResponseRef.current = googleResponse
+    const attemptId = activeGoogleAttemptRef.current
+    if (attemptId == null) return
+
+    const response = googleResponse as {
+      type: string
+      authentication?: { idToken?: string | null } | null
+      params?: Record<string, string | undefined>
+    }
+
+    if (response.type === "cancel" || response.type === "dismiss") {
+      activeGoogleAttemptRef.current = null
+      setGoogleFlowState("user-cancelled")
+      setLoading(null)
+      return
+    }
+    if (response.type !== "success") {
+      activeGoogleAttemptRef.current = null
+      setGoogleFlowState("token-exchange-failed")
+      setLoading(null)
+      return
+    }
+
+    const idToken =
+      response.authentication?.idToken ??
+      (typeof response.params?.id_token === "string" ? response.params.id_token : undefined)
+
+    if (!idToken) {
+      activeGoogleAttemptRef.current = null
+      setGoogleFlowState("token-exchange-failed")
+      setLoading(null)
+      return
+    }
+
+    const phoneHint = pendingGooglePhoneHintRef.current
+    startTransition(() => {
+      void exchangeGoogleToken(idToken, phoneHint, attemptId)
+    })
+  }, [exchangeGoogleToken, googleResponse])
+
+  const onContinue = useCallback(async () => {
     setTriedContinue(true)
     if (phoneError || displayName.trim().length === 0 || optionalEmailError) return
 
@@ -436,9 +476,21 @@ export function useLoginScreenController() {
     } catch {
       Alert.alert(t("oolshik:login.backendProfileSyncFailed"))
     }
-  }
+  }, [
+    authEmail,
+    displayName,
+    optionalEmailError,
+    otp,
+    otpSent,
+    otpVerified,
+    pendingTokens,
+    phoneError,
+    t,
+    finalizeBackendSession,
+    verifyOtp,
+  ])
 
-  async function onGooglePress() {
+  const onGooglePress = useCallback(async () => {
     if (!googleConfigured) {
       setGoogleServerMessage(null)
       setGoogleFlowState("backend-auth-failed")
@@ -447,6 +499,12 @@ export function useLoginScreenController() {
     setGoogleServerMessage(null)
     setGoogleFlowState("idle")
     setGooglePhoneTouched(true)
+    lastHandledGoogleResponseRef.current = null
+    const attemptId = googleAttemptSeqRef.current + 1
+    googleAttemptSeqRef.current = attemptId
+    activeGoogleAttemptRef.current = attemptId
+    pendingGooglePhoneHintRef.current =
+      googlePhoneRequired && phone.replace(/\D/g, "").length === 10 ? toIndianE164(phone) : undefined
     setLoading("google")
     try {
       const result = await promptGoogleAsync()
@@ -458,7 +516,35 @@ export function useLoginScreenController() {
       setLoading(null)
       setGoogleFlowState("token-exchange-failed")
     }
-  }
+  }, [googleConfigured, googlePhoneRequired, phone, promptGoogleAsync])
+
+  const handleContinuePress = useCallback(() => {
+    void onContinue()
+  }, [onContinue])
+
+  const handleGooglePress = useCallback(() => {
+    void onGooglePress()
+  }, [onGooglePress])
+
+  const handleUseMyPhoneNumberPress = useCallback(() => {
+    void onUseMyPhoneNumberPress()
+  }, [onUseMyPhoneNumberPress])
+
+  const handleVerifyOtpPress = useCallback(() => {
+    void verifyOtp()
+  }, [verifyOtp])
+
+  const handleSendOtpPress = useCallback(() => {
+    void sendOtp()
+  }, [sendOtp])
+
+  const handleEmailToggle = useCallback(() => {
+    setShowEmail((value) => !value)
+  }, [])
+
+  const handleGooglePhoneBlur = useCallback(() => {
+    setGooglePhoneTouched(true)
+  }, [])
 
   const googleFlowMessage = googleFlowMessageKey(googleFlowState)
   const googleStatusMessage =
@@ -484,25 +570,17 @@ export function useLoginScreenController() {
     isOtpVerifying: loading === "verify",
     loading,
     nameError,
-    onContinue: () => {
-      void onContinue()
-    },
+    onContinue: handleContinuePress,
     onDisplayNameChange: setDisplayName,
-    onEmailToggle: () => setShowEmail((value) => !value),
-    onGooglePhoneBlur: () => setGooglePhoneTouched(true),
-    onGooglePress: () => {
-      void onGooglePress()
-    },
+    onEmailToggle: handleEmailToggle,
+    onGooglePhoneBlur: handleGooglePhoneBlur,
+    onGooglePress: handleGooglePress,
     onModeChange: setAuthMode,
     onOtpChange: setOtp,
     onPhoneChange: handlePhoneChange,
     onSetAuthEmail: setAuthEmail,
-    onUseMyPhoneNumberPress: () => {
-      void onUseMyPhoneNumberPress()
-    },
-    onVerifyOtp: () => {
-      void verifyOtp()
-    },
+    onUseMyPhoneNumberPress: handleUseMyPhoneNumberPress,
+    onVerifyOtp: handleVerifyOtpPress,
     optionalEmailError,
     otp,
     otpSent,
@@ -514,9 +592,7 @@ export function useLoginScreenController() {
     phoneProgress,
     phoneShouldShowError,
     resendIn,
-    sendOtp: () => {
-      void sendOtp()
-    },
+    sendOtp: handleSendOtpPress,
     shouldShowGooglePhoneError,
     triedContinue,
   }

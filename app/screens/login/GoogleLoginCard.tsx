@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -38,7 +39,7 @@ interface GoogleLoginCardProps {
   googlePhoneError: string
 }
 
-export function GoogleLoginCard(props: GoogleLoginCardProps) {
+export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginCardProps) {
   const { t } = useTranslation()
   const { themed, theme } = useAppTheme()
   const { spacing, colors, isDark } = theme
@@ -172,4 +173,4 @@ export function GoogleLoginCard(props: GoogleLoginCardProps) {
       />
     </View>
   )
-}
+})

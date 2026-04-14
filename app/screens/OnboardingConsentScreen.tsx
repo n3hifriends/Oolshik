@@ -1,9 +1,11 @@
 import React, { useMemo, useState, useEffect } from "react"
 import { View, Pressable, Modal, ScrollView } from "react-native"
+import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { RadioGroup } from "@/components/RadioGroup"
+import { SectionCard } from "@/components/SectionCard"
 import { useAppTheme } from "@/theme/context"
 import { useTranslation } from "react-i18next"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
@@ -19,6 +21,7 @@ import {
   getProfileExtras,
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
+import { OolshikApi, type PaymentProfileApiResponse } from "@/api"
 
 const CONSENT_VERSION = "v1"
 
@@ -41,6 +44,8 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   const [accepted, setAccepted] = useState(false)
   const [lang, setLang] = useState<"mr" | "en">(toLanguageCode(i18n.language))
   const [showConsent, setShowConsent] = useState(false)
+  const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({ hasProfile: false })
+  const [showPaymentPrompt, setShowPaymentPrompt] = useState(true)
 
   useEffect(() => {
     let active = true
@@ -74,6 +79,28 @@ export default function OnboardingConsentScreen({ navigation }: any) {
       active = false
     }
   }, [i18n])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true
+      ;(async () => {
+        try {
+          const response = await OolshikApi.getMyPaymentProfile()
+          if (!active) return
+          if (response.ok && response.data) {
+            setPaymentProfile(response.data)
+          } else {
+            setPaymentProfile({ hasProfile: false })
+          }
+        } catch {
+          if (active) setPaymentProfile({ hasProfile: false })
+        }
+      })()
+      return () => {
+        active = false
+      }
+    }, []),
+  )
 
   const onLanguageChange = async (next: "mr" | "en") => {
     setLang(next)
@@ -219,6 +246,35 @@ export default function OnboardingConsentScreen({ navigation }: any) {
               style={{ color: colors.palette.neutral600 }}
             />
           )
+        ) : null}
+
+        {showPaymentPrompt || paymentProfile.hasProfile ? (
+          <SectionCard>
+            <Text weight="medium" text={t("payment:profile.onboardingCardTitle")} />
+            <View style={{ height: spacing.xs }} />
+            <Text text={t("payment:profile.onboardingCardBody")} size="xs" style={{ color: colors.textDim }} />
+            <View style={{ height: spacing.sm }} />
+            {paymentProfile.hasProfile ? (
+              <Text
+                text={t("payment:profile.onboardingAdded", { upiId: paymentProfile.maskedUpiId ?? "—" })}
+                size="xs"
+                style={{ color: colors.palette.primary600 }}
+              />
+            ) : (
+              <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                <Button
+                  text={t("payment:profile.addNowCta")}
+                  onPress={() => navigation.navigate("PaymentProfile", { entryPoint: "onboarding" })}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  text={t("payment:profile.skipForNowCta")}
+                  onPress={() => setShowPaymentPrompt(false)}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            )}
+          </SectionCard>
         ) : null}
       </View>
 

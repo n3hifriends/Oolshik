@@ -14,6 +14,7 @@ type PaymentSectionProps = {
   onHelperAmountChange: (value: string) => void
   onOpenScanner: () => void
   paymentButtonLabel: string
+  directPaymentLabel: string
   PaymentAmountPrefix: (props: TextFieldAccessoryProps) => React.ReactNode
   showActivePayment: boolean
   paymentUpdateTitle: string
@@ -26,6 +27,7 @@ type PaymentSectionProps = {
   payWithUpiLabel: string
   refreshLabel: string
   onOpenPaymentFlow: () => void
+  onOpenDirectPaymentFlow: () => void
   onRefreshPayment: () => void
   showHelperWaitingText: boolean
   helperWaitingText: string
@@ -77,6 +79,11 @@ export function PaymentSection(props: PaymentSectionProps) {
               style={{ minWidth: 120, minHeight: 48, justifyContent: "center" }}
             />
           </View>
+          <Button
+            text={props.directPaymentLabel}
+            onPress={props.onOpenDirectPaymentFlow}
+            style={{ minHeight: 46, justifyContent: "center" }}
+          />
           {props.helperAmountError ? (
             <Text text={props.helperAmountError} size="xs" style={{ color: "#b91c1c" }} />
           ) : null}

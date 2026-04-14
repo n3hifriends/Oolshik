@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -6,7 +7,7 @@ import { useAppTheme } from "@/theme/context"
 
 import { $heroCard, $heroCopy, $heroHighlights, $heroPill, $title } from "./loginStyles"
 
-export function LoginHero() {
+export const LoginHero = memo(function LoginHero() {
   const { t } = useTranslation()
   const { themed } = useAppTheme()
 
@@ -28,4 +29,4 @@ export function LoginHero() {
       </View>
     </View>
   )
-}
+})

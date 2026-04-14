@@ -37,6 +37,17 @@ export async function fetchActivePaymentRequest(taskId: string) {
   }
 }
 
+export async function fetchActivePaymentRequests(taskId: string) {
+  const res = (await OolshikApi.getActivePaymentOptions(taskId)) as ApiLikeResponse<
+    PaymentRequestApiResponse[]
+  >
+  return {
+    ok: !!res?.ok,
+    status: res?.status,
+    data: res?.ok && Array.isArray(res?.data) ? res.data : [],
+  }
+}
+
 export async function updateTaskOffer(
   taskId: string,
   payload: { offerAmount?: number | null; offerCurrency?: string },
