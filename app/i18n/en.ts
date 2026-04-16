@@ -496,6 +496,9 @@ const en = {
       statusLabel: "Status",
       openRequest: "Open details",
     },
+    chatScreen: {
+      heading: "Chat (MVP: text only)",
+    },
     login: {
       heading: "Log in",
       subheading:
@@ -572,6 +575,49 @@ const en = {
       backendProfileSyncFailed: "Signed in, but we couldn't sync your profile. Please try again.",
       firebaseOtpBlocked:
         "Firebase has temporarily blocked OTP on this device. Use a test number or try again on a different device/emulator.",
+    },
+    consent: {
+      title: "User Consent",
+      agree: "I have read and agree to the consent terms",
+      allowLocation: "Allow location access",
+      locationGranted: "Location access granted",
+      continue: "Continue",
+      ok: "OK",
+      close: "Close",
+      languageLabel: "Language",
+      preface: "By continuing, you consent to the following:",
+      declarationTitle: "User Declaration",
+      declarationBody:
+        'I have read and understood this consent. By tapping "OK", I voluntarily agree to the terms stated above.',
+      section1Title: "1. Purpose of use",
+      section1Item1:
+        "I voluntarily provide my location, voice recording, and phone number in the Oolshik app for:",
+      section1Item2: "location-based help/task matching.",
+      section1Item3: "voice-first task creation and communication.",
+      section1Item4: "contact masking, complaint reporting, and coordination.",
+      section1Item5:
+        'dynamically using "Requester" and "Helper" roles in the same app based on my actions.',
+      section2Title: "2. Data collection and retention",
+      section2Item1: "Location is collected only while the app is active in the foreground.",
+      section2Item2:
+        "Voice clips (<=30 seconds) may be securely uploaded and used for playback or moderation.",
+      section2Item3:
+        "Device indicators like network status and historical interactions may be processed to improve trust and reliability.",
+      section2Item4: "Data is retained only as needed for legal or service requirements.",
+      section3Title: "3. Consent and withdrawal",
+      section3Item1: "These permissions are required for the app to function.",
+      section3Item2:
+        "I can withdraw consent at any time by uninstalling the app or contacting support@oolshik.in.",
+      section3Item3:
+        "After consent is withdrawn, personal data will be deleted or anonymized unless retention is required by law.",
+      section4Title: "4. Data security and privacy",
+      section4Item1: "Data is protected with AES-256 at rest and HTTPS in transit.",
+      section4Item2:
+        "Oolshik acts as a Data Fiduciary under the Digital Personal Data Protection Act, 2023.",
+      section4Item3: "Access is limited through permissions and authorized personnel only.",
+      section5Title: "5. Legal compliance",
+      section5Item1: "Oolshik complies with applicable Indian IT laws.",
+      section5Item2: "Jurisdiction: Pune, Maharashtra, India.",
     },
   },
   common: {
