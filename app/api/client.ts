@@ -120,6 +120,7 @@ const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API
   .replace(/\/+$/, "")
 const BASE_URL = /\/api$/i.test(rawHost) ? rawHost : `${rawHost}/api`
 const REQUEST_TIMEOUT_MS = 10_000
+const AUTH_REQUEST_TIMEOUT_MS = 30_000
 
 const createHttpClientConfig = () => ({
   baseURL: BASE_URL,
@@ -723,7 +724,9 @@ export const OolshikApi = {
   verifyOtp: (payload: { phone: string; code: string; displayName?: string; email?: string }) =>
     api.post<{ accessToken: string; refreshToken: string }>("/auth/otp/verify", payload),
   googleSignIn: (payload: { idToken: string; phone?: string }) =>
-    api.post<{ accessToken: string; refreshToken: string }>("/auth/google", payload),
+    api.post<{ accessToken: string; refreshToken: string }>("/auth/google", payload, {
+      timeout: AUTH_REQUEST_TIMEOUT_MS,
+    }),
   complete: (displayName: string, email: string) =>
     api.post("/auth/complete", { displayName, email }),
   me: () => api.get<AuthMeResponse>("/auth/me"),

@@ -6,7 +6,7 @@
  * https://reactnative.dev/docs/security#storing-sensitive-info
  */
 export default {
-  API_URL: "",
+  API_URL: process.env.EXPO_PUBLIC_API_URL || "https://www.oolshik.in",
   AUTH_PHONE_OTP_ENABLED:
     (process.env.EXPO_PUBLIC_AUTH_PHONE_OTP_ENABLED || "false").toLowerCase() === "true",
   AUTH_GOOGLE_ENABLED:
