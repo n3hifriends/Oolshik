@@ -11,6 +11,7 @@ import { kmDistance } from "@/utils/haversine"
 import { TaskCard } from "@/components/TaskCard"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
+import type { AppApiError } from "@/api/apiResult"
 import {
   getInitials,
   normalizeRadius,
@@ -44,6 +45,14 @@ type SortableFeedItem = {
   createdAtMs: number | null
 }
 
+type FeedServiceState = {
+  title: string
+  body: string
+  supportText?: string | null
+  staleLabel?: string | null
+  variant: "full" | "inline"
+}
+
 const DEFAULT_HOME_FEED_SORT: HomeFeedSortState = {
   key: "distance",
   direction: "asc",
@@ -75,6 +84,104 @@ const compareNullableNumber = (
   return direction === "asc" ? left - right : right - left
 }
 
+function buildFeedServiceState(
+  error: AppApiError | null,
+  hasVisibleTasks: boolean,
+  lastNearbyLoadedAt: string | null,
+): FeedServiceState | null {
+  if (!error) return null
+
+  const loadedAt = formatLoadedAt(lastNearbyLoadedAt)
+  const staleLabel = hasVisibleTasks
+    ? `Showing saved results${loadedAt ? ` from ${loadedAt}` : ""}`
+    : null
+  const supportText = error.requestId ? `Reference ID: ${error.requestId}` : null
+  const variant = hasVisibleTasks ? "inline" : "full"
+
+  switch (error.kind) {
+    case "network":
+    case "timeout":
+      return {
+        title: hasVisibleTasks ? "Connection interrupted" : "Unable to reach nearby requests",
+        body: hasVisibleTasks
+          ? "Your last loaded requests are still visible. Pull to refresh or try again once the connection stabilizes."
+          : "Check your internet connection and try again. We could not reach the live nearby feed.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+    case "upstream":
+    case "server":
+      return {
+        title: "Live feed temporarily unavailable",
+        body: hasVisibleTasks
+          ? "Showing the last loaded requests while the service recovers. Try again in a moment."
+          : "Nearby requests are temporarily unavailable right now. Please try again in a moment.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+    case "rate-limited":
+      return {
+        title: "Too many refresh attempts",
+        body: hasVisibleTasks
+          ? "Showing the last loaded requests for now. Please wait a bit before trying again."
+          : "Please wait a moment before refreshing nearby requests again.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+    case "unauthorized":
+    case "forbidden":
+      return {
+        title: "Session needs attention",
+        body: hasVisibleTasks
+          ? "Your last loaded requests are still visible, but we could not refresh them with the current session."
+          : "We could not refresh nearby requests with the current session. Please sign in again if this continues.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+    case "validation":
+    case "conflict":
+    case "rejected":
+      return {
+        title: "Unable to load nearby requests",
+        body: error.message || "The request could not be completed with the current parameters.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+    case "not-found":
+      return {
+        title: "Nearby feed not available",
+        body: "The nearby requests endpoint could not be found. Please try again later.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+    case "bad-data":
+    case "unknown":
+    default:
+      return {
+        title: "Something went wrong while loading the feed",
+        body: hasVisibleTasks
+          ? "Showing the last loaded requests for now. Try refreshing again in a moment."
+          : "Please try again in a moment.",
+        supportText,
+        staleLabel,
+        variant,
+      }
+  }
+}
+
+function formatLoadedAt(value: string | null) {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+}
+
 export function useHomeFeedController({
   navigation,
   t,
@@ -87,7 +194,17 @@ export function useHomeFeedController({
   const activeCapGuard = useActiveRequestCapGuard(navigation)
 
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
-  const { tasks, fetchNearby, loading, radiusMeters, setRadius, accept } = useTaskStore()
+  const {
+    tasks,
+    fetchNearby,
+    loading,
+    radiusMeters,
+    setRadius,
+    accept,
+    nearbyError,
+    isNearbyStale,
+    lastNearbyLoadedAt,
+  } = useTaskStore()
   const { logout, userId, userName, authEmail } = useAuth()
 
   const taskItems = tasks as HomeFeedTask[]
@@ -130,10 +247,12 @@ export function useHomeFeedController({
   const [rawSearch, setRawSearch] = useState("")
   const searchInputRef = useRef<TextInput>(null)
 
-  const selectedStatuses = viewMode === "forYou" ? forYouSelectedStatuses : myRequestSelectedStatuses
+  const selectedStatuses =
+    viewMode === "forYou" ? forYouSelectedStatuses : myRequestSelectedStatuses
   const sortState = viewMode === "forYou" ? forYouSortState : myRequestsSortState
   const sortedStatuses = useMemo(() => Array.from(selectedStatuses).sort(), [selectedStatuses])
   const statusesKey = useMemo(() => sortedStatuses.join(","), [sortedStatuses])
+  const hasVisibleTasks = taskItems.length > 0
 
   const { filtered } = useTaskFiltering(taskItems, {
     selectedStatuses,
@@ -227,53 +346,64 @@ export function useHomeFeedController({
     return STATUS_ORDER.filter((statusValue) => activeStatuses.has(statusValue))
   }, [taskItems, userId, viewMode])
 
-  const toggleStatus = useCallback((nextStatus: HomeFeedStatus) => {
-    const setSelectedStatusesForView =
-      viewMode === "forYou" ? setForYouSelectedStatuses : setMyRequestSelectedStatuses
-    const touchedRef = viewMode === "forYou" ? forYouTouchedStatusesRef : myRequestsTouchedStatusesRef
-    setSelectedStatusesForView((previous) => {
-      touchedRef.current = true
-      const next =
-        previous.size === 0 && availableStatuses.length > 0
-          ? new Set(availableStatuses)
-          : new Set(previous)
-      if (next.has(nextStatus)) {
-        next.delete(nextStatus)
-      } else {
-        next.add(nextStatus)
+  const toggleStatus = useCallback(
+    (nextStatus: HomeFeedStatus) => {
+      const setSelectedStatusesForView =
+        viewMode === "forYou" ? setForYouSelectedStatuses : setMyRequestSelectedStatuses
+      const touchedRef =
+        viewMode === "forYou" ? forYouTouchedStatusesRef : myRequestsTouchedStatusesRef
+      setSelectedStatusesForView((previous) => {
+        touchedRef.current = true
+        const next =
+          previous.size === 0 && availableStatuses.length > 0
+            ? new Set(availableStatuses)
+            : new Set(previous)
+        if (next.has(nextStatus)) {
+          next.delete(nextStatus)
+        } else {
+          next.add(nextStatus)
+        }
+        return next
+      })
+    },
+    [availableStatuses, viewMode],
+  )
+
+  const selectAllStatuses = useCallback(
+    (statuses: HomeFeedStatus[]) => {
+      const next = new Set(statuses)
+      if (viewMode === "forYou") {
+        forYouTouchedStatusesRef.current = true
+        setForYouSelectedStatuses(next)
+        return
       }
-      return next
-    })
-  }, [availableStatuses, viewMode])
+      myRequestsTouchedStatusesRef.current = true
+      setMyRequestSelectedStatuses(next)
+    },
+    [viewMode],
+  )
 
-  const selectAllStatuses = useCallback((statuses: HomeFeedStatus[]) => {
-    const next = new Set(statuses)
-    if (viewMode === "forYou") {
-      forYouTouchedStatusesRef.current = true
-      setForYouSelectedStatuses(next)
-      return
-    }
-    myRequestsTouchedStatusesRef.current = true
-    setMyRequestSelectedStatuses(next)
-  }, [viewMode])
+  const toggleSort = useCallback(
+    (key: HomeFeedSortKey) => {
+      if (viewMode === "mine" && key === "distance") return
+      const setSortStateForView =
+        viewMode === "forYou" ? setForYouSortState : setMyRequestsSortState
+      setSortStateForView((previous) => {
+        if (previous.key === key) {
+          return {
+            key,
+            direction: previous.direction === "asc" ? "desc" : "asc",
+          }
+        }
 
-  const toggleSort = useCallback((key: HomeFeedSortKey) => {
-    if (viewMode === "mine" && key === "distance") return
-    const setSortStateForView = viewMode === "forYou" ? setForYouSortState : setMyRequestsSortState
-    setSortStateForView((previous) => {
-      if (previous.key === key) {
         return {
           key,
-          direction: previous.direction === "asc" ? "desc" : "asc",
+          direction: "asc",
         }
-      }
-
-      return {
-        key,
-        direction: "asc",
-      }
-    })
-  }, [viewMode])
+      })
+    },
+    [viewMode],
+  )
 
   const setNextViewMode = useCallback((nextViewMode: HomeFeedViewMode) => {
     setViewMode(nextViewMode)
@@ -359,7 +489,8 @@ export function useHomeFeedController({
   )
 
   useEffect(() => {
-    const touchedRef = viewMode === "forYou" ? forYouTouchedStatusesRef : myRequestsTouchedStatusesRef
+    const touchedRef =
+      viewMode === "forYou" ? forYouTouchedStatusesRef : myRequestsTouchedStatusesRef
     const setSelectedStatusesForView =
       viewMode === "forYou" ? setForYouSelectedStatuses : setMyRequestSelectedStatuses
     const matchesAvailableStatuses =
@@ -540,20 +671,20 @@ export function useHomeFeedController({
 
       setCreatingTask(true)
       try {
-        let voiceUrl: string | undefined
+        let audioFileId: string | undefined
 
         if (voiceNote) {
           const uploaded = await uploadVoiceNote(voiceNote)
           if (!uploaded.ok) {
             throw new Error(t("oolshik:homeScreen.uploadFailed"))
           }
-          voiceUrl = uploaded.url
+          audioFileId = uploaded.audioFileId
         }
 
         const result = await createTask({
           title,
           description: undefined,
-          voiceUrl,
+          audioFileId,
           latitude: coords.latitude,
           longitude: coords.longitude,
           radiusMeters: effectiveRadiusKm * 1000,
@@ -653,6 +784,13 @@ export function useHomeFeedController({
     [controlsCondensed, filtersExpanded, loading, titleRefreshCooldowns, viewMode],
   )
 
+  const serviceState = useMemo(
+    () => buildFeedServiceState(nearbyError, hasVisibleTasks, lastNearbyLoadedAt),
+    [hasVisibleTasks, lastNearbyLoadedAt, nearbyError],
+  )
+
+  const showInitialLoader = loading && !hasVisibleTasks
+
   const setFeedRadius = useCallback(
     (radius: Radius) => {
       setRadius(radius)
@@ -688,6 +826,12 @@ export function useHomeFeedController({
     },
     feed: {
       loading,
+      showInitialLoader,
+      hasVisibleTasks,
+      nearbyError,
+      isNearbyStale,
+      lastNearbyLoadedAt,
+      serviceState,
       filtered: sortedFiltered as HomeFeedTask[],
       viewMode,
       radiusMeters: radiusMeters as Radius,

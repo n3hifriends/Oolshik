@@ -5,6 +5,7 @@ export interface ConfigBaseProps {
   AUTH_PHONE_OTP_ENABLED: boolean
   AUTH_GOOGLE_ENABLED: boolean
   AUTH_GOOGLE_REQUIRE_PHONE: boolean
+  REQUIRE_PRESIGNED_AUDIO_UPLOAD: boolean
 }
 
 export type PersistNavigationConfig = ConfigBaseProps["persistNavigation"]
@@ -27,6 +28,7 @@ const BaseConfig: ConfigBaseProps = {
   AUTH_PHONE_OTP_ENABLED: false,
   AUTH_GOOGLE_ENABLED: true,
   AUTH_GOOGLE_REQUIRE_PHONE: true,
+  REQUIRE_PRESIGNED_AUDIO_UPLOAD: false,
 }
 
 export default BaseConfig

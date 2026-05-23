@@ -11,9 +11,7 @@
   },
   "newArchEnabled": true,
   "jsEngine": "hermes",
-  "assetBundlePatterns": [
-    "**/*"
-  ],
+  "assetBundlePatterns": ["**/*"],
   "android": {
     "icon": "./assets/images/app-icon-android-legacy.png",
     "scheme": "com.oolshik.aan",
@@ -27,7 +25,8 @@
       "color": "#191015"
     },
     "allowBackup": false,
-    "edgeToEdgeEnabled": true
+    "edgeToEdgeEnabled": true,
+    "permissions": ["android.permission.POST_NOTIFICATIONS"]
   },
   "ios": {
     "icon": "./assets/images/app-icon-ios.png",
@@ -44,10 +43,10 @@
     [
       "expo-splash-screen",
       {
-        "image": "./assets/images/app-icon-android-adaptive-foreground.png",
+        "image": "./android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png",
         "imageWidth": 300,
         "resizeMode": "contain",
-        "backgroundColor": "#191015"
+        "backgroundColor": "#FF6B2C"
       }
     ],
     [

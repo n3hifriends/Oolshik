@@ -6,13 +6,16 @@
  * https://reactnative.dev/docs/security#storing-sensitive-info
  */
 export default {
-  API_URL: process.env.EXPO_PUBLIC_API_URL || "http://10.0.2.2:8080/api",
+  API_URL: process.env.EXPO_PUBLIC_API_URL || "https://www.oolshik.in",
   AUTH_PHONE_OTP_ENABLED:
     (process.env.EXPO_PUBLIC_AUTH_PHONE_OTP_ENABLED || "false").toLowerCase() === "true",
   AUTH_GOOGLE_ENABLED:
     (process.env.EXPO_PUBLIC_AUTH_GOOGLE_ENABLED || "true").toLowerCase() === "true",
   AUTH_GOOGLE_REQUIRE_PHONE:
     (process.env.EXPO_PUBLIC_AUTH_GOOGLE_REQUIRE_PHONE || "true").toLowerCase() === "true",
+  REQUIRE_PRESIGNED_AUDIO_UPLOAD:
+    (process.env.EXPO_PUBLIC_REQUIRE_PRESIGNED_AUDIO_UPLOAD || "false").toLowerCase() ===
+    "true",
   GOOGLE_WEB_CLIENT_ID:
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
     "263296903071-l80n6ccefcn05s5apnobtlpl1cc0fd5t.apps.googleusercontent.com",

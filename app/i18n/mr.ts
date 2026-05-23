@@ -1,13 +1,12 @@
-const mr = {
+import { demoEn } from "./demo-en"
+import { Translations } from "./en"
+
+const mr: Translations = {
   common: {
     ok: "ठीक आहे",
     cancel: "रद्द करा",
     back: "मागे",
     logOut: "लॉगआउट",
-    save: "जतन करा",
-    submit: "पाठवा",
-    accept: "स्वीकारा",
-    reject: "नाकार करा",
   },
   oolshik: {
     nearbyTasks: "जवळील कामे",
@@ -876,7 +875,29 @@ const mr = {
       missingRef: "सर्व्हर प्रतिसादात पेमेंट विनंती संदर्भ नाही.",
     },
   },
+  welcomeScreen: {
+    postscript:
+      "psst  — तुमचे ॲप कदाचित असे दिसत नसेल. (जोपर्यंत तुमच्या डिझायनरने तुम्हाला हेच स्क्रीन दिले नसतील, आणि तसे असेल तर तेच शिप करा!)",
+    readyForLaunch: "तुमचे ॲप, जवळपास लॉन्चसाठी तयार आहे!",
+    exciting: "(अरे वा, हे रोमांचक आहे!)",
+    letsGo: "चला सुरुवात करूया!",
+  },
+  errorScreen: {
+    title: "काहीतरी चुकले!",
+    friendlySubtitle:
+      "प्रॉडक्शनमध्ये एरर आल्यावर वापरकर्त्यांना ही स्क्रीन दिसेल. हा संदेश (`app/i18n/mr.ts`) आणि कदाचित लेआउट (`app/screens/ErrorScreen`) तुम्ही सानुकूलित कराल. हे पूर्णपणे काढायचे असल्यास `app/app.tsx` मधील <ErrorBoundary> तपासा.",
+    reset: "ॲप रीसेट करा",
+    traceTitle: "%{name} स्टॅकमधील त्रुटी",
+  },
+  emptyStateComponent: {
+    generic: {
+      heading: "खूपच रिकामे... आणि थोडे उदास",
+      content: "अजून कोणताही डेटा सापडलेला नाही. रीफ्रेश करा किंवा ॲप पुन्हा लोड करून पाहा.",
+      button: "पुन्हा प्रयत्न करूया",
+    },
+  },
   errors: {
+    invalidEmail: "अवैध ईमेल पत्ता.",
     fallback: "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा.",
   },
   validation: {
@@ -888,6 +909,96 @@ const mr = {
     enabled: "सूचना सुरू आहेत",
     disabled: "सूचना बंद आहेत",
   },
+  loginScreen: {
+    logIn: "लॉग इन",
+    enterDetails:
+      "खाली तुमची माहिती भरा आणि आत काय आहे ते उघडा. काय मिळणार आहे याचा अंदाज लावणे कठीण आहे. किंवा कदाचित तुम्ही लावालही; इथे काही रॉकेट सायन्स नाही.",
+    emailFieldLabel: "ईमेल",
+    passwordFieldLabel: "पासवर्ड",
+    emailFieldPlaceholder: "तुमचा ईमेल पत्ता भरा",
+    passwordFieldPlaceholder: "इथे तुमचा गुप्त पासवर्ड",
+    tapToLogIn: "लॉग इन करण्यासाठी टॅप करा!",
+    hint: "सूचना: तुम्ही कोणताही ईमेल पत्ता आणि तुमचा आवडता पासवर्ड वापरू शकता :)",
+  },
+  demoNavigator: {
+    componentsTab: "घटक",
+    debugTab: "डीबग",
+    communityTab: "समुदाय",
+    podcastListTab: "पॉडकास्ट",
+  },
+  demoCommunityScreen: {
+    title: "समुदायाशी जोडा",
+    tagLine:
+      "Infinite Red च्या React Native अभियंत्यांच्या समुदायाशी जोडा आणि आमच्यासोबत तुमचे ॲप डेव्हलपमेंट पुढे न्या!",
+    joinUsOnSlackTitle: "Slack वर सामील व्हा",
+    joinUsOnSlack:
+      "जगभरातील React Native अभियंत्यांशी जोडण्यासाठी जागा हवी आहे का? Infinite Red Community Slack मध्ये सामील व्हा. आमचा वाढता समुदाय प्रश्न विचारण्यासाठी, इतरांकडून शिकण्यासाठी आणि तुमचे नेटवर्क वाढवण्यासाठी सुरक्षित जागा आहे.",
+    joinSlackLink: "Slack समुदायात सामील व्हा",
+    makeIgniteEvenBetterTitle: "Ignite आणखी चांगले करा",
+    makeIgniteEvenBetter:
+      "Ignite आणखी चांगले करण्याची कल्पना आहे का? आम्हाला नक्की कळवा. सर्वोत्तम React Native टूलिंग तयार करण्यात मदत करणारे लोक आम्ही नेहमी शोधत असतो. भविष्यातील Ignite घडवण्यासाठी GitHub वर सामील व्हा.",
+    contributeToIgniteLink: "Ignite मध्ये योगदान द्या",
+    theLatestInReactNativeTitle: "React Native मधील नवे काय",
+    theLatestInReactNative: "React Native मधील नवीन गोष्टींबद्दल तुम्हाला अपडेट ठेवण्यासाठी आम्ही आहोत.",
+    reactNativeRadioLink: "React Native Radio",
+    reactNativeNewsletterLink: "React Native Newsletter",
+    reactNativeLiveLink: "React Native Live",
+    chainReactConferenceLink: "Chain React Conference",
+    hireUsTitle: "तुमच्या पुढील प्रोजेक्टसाठी Infinite Red ला जोडा",
+    hireUs:
+      "पूर्ण प्रोजेक्ट चालवायचा असो किंवा टीमला प्रत्यक्ष प्रशिक्षणाने वेग द्यायचा असो, Infinite Red जवळपास कोणत्याही React Native प्रोजेक्टमध्ये मदत करू शकते.",
+    hireUsLink: "आम्हाला संदेश पाठवा",
+  },
+  demoShowroomScreen: {
+    jumpStart: "तुमच्या प्रोजेक्टला गती देणारे घटक!",
+    lorem2Sentences:
+      "Nulla cupidatat deserunt amet quis aliquip nostrud do adipisicing. Adipisicing excepteur elit laborum Lorem adipisicing do duis.",
+    demoHeaderTxExample: "वा!",
+    demoViaTxProp: "`tx` prop द्वारे",
+    demoViaSpecifiedTxProp: "`{{prop}}Tx` prop द्वारे",
+  },
+  demoDebugScreen: {
+    howTo: "कसे करावे",
+    title: "डीबग",
+    tagLine:
+      "अभिनंदन, तुमच्याकडे इथे खूप प्रगत React Native ॲप टेम्पलेट आहे. या boilerplate चा फायदा घ्या!",
+    reactotron: "Reactotron ला पाठवा",
+    reportBugs: "बग कळवा",
+    demoList: "डेमो यादी",
+    demoPodcastList: "डेमो पॉडकास्ट यादी",
+    androidReactotronHint:
+      "हे काम करत नसेल तर Reactotron desktop app चालू आहे याची खात्री करा, terminal मधून adb reverse tcp:9090 tcp:9090 चालवा आणि ॲप रीलोड करा.",
+    iosReactotronHint:
+      "हे काम करत नसेल तर Reactotron desktop app चालू आहे याची खात्री करा आणि ॲप रीलोड करा.",
+    macosReactotronHint:
+      "हे काम करत नसेल तर Reactotron desktop app चालू आहे याची खात्री करा आणि ॲप रीलोड करा.",
+    webReactotronHint:
+      "हे काम करत नसेल तर Reactotron desktop app चालू आहे याची खात्री करा आणि ॲप रीलोड करा.",
+    windowsReactotronHint:
+      "हे काम करत नसेल तर Reactotron desktop app चालू आहे याची खात्री करा आणि ॲप रीलोड करा.",
+  },
+  demoPodcastListScreen: {
+    title: "React Native Radio भाग",
+    onlyFavorites: "फक्त आवडीचे दाखवा",
+    favoriteButton: "आवडीचे",
+    unfavoriteButton: "आवड काढा",
+    accessibility: {
+      cardHint:
+        "एपिसोड ऐकण्यासाठी डबल टॅप करा. हा एपिसोड {{action}} करण्यासाठी डबल टॅप करून धरून ठेवा.",
+      switch: "फक्त आवडीचे दाखवण्यासाठी स्विच चालू करा",
+      favoriteAction: "आवड टॉगल करा",
+      favoriteIcon: "एपिसोड आवडीचा नाही",
+      unfavoriteIcon: "एपिसोड आवडीचा आहे",
+      publishLabel: "{{date}} रोजी प्रकाशित",
+      durationLabel: "कालावधी: {{hours}} तास {{minutes}} मिनिटे {{seconds}} सेकंद",
+    },
+    noFavoritesEmptyState: {
+      heading: "हे थोडे रिकामे दिसते",
+      content:
+        "अजून कोणतेही आवडीचे भाग जोडलेले नाहीत. एपिसोडवरील heart वर टॅप करून तो आवडीमध्ये जोडा!",
+    },
+  },
+  ...demoEn,
 }
 
 export default mr

@@ -1,4 +1,5 @@
 import { Platform } from "react-native"
+import Constants from "expo-constants"
 import * as Notifications from "expo-notifications"
 
 import { OolshikApi } from "@/api/client"
@@ -8,6 +9,7 @@ import { loadString, saveString, remove } from "@/utils/storage"
 const PUSH_TOKEN_KEY = "push.token"
 const PUSH_PERMISSION_REQUESTED_KEY = "push.permission.requested"
 const ONBOARDING_COMPLETE_KEY = "onboarding.v1.completed"
+const EXPO_PROJECT_ID = "86345f55-b151-453a-aa0e-5357b9aaddf7"
 const NAV_READY_RETRY_DELAY_MS = 150
 const NAV_READY_MAX_RETRIES = 40
 
@@ -49,13 +51,18 @@ export async function getExpoPushTokenAsync(): Promise<string | null> {
   if (finalStatus !== "granted") return null
 
   try {
-    const token = (await Notifications.getExpoPushTokenAsync()).data
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId: getExpoProjectId() }))
+      .data
     if (__DEV__) {
       // eslint-disable-next-line no-console
       console.log("expo push token acquired")
     }
     return token
   } catch {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn("expo push token acquisition failed")
+    }
     return null
   }
 }
@@ -72,6 +79,10 @@ export async function registerDeviceTokenWithRetry(token: string, maxAttempts = 
       return
     } catch (err) {
       lastError = err
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(`push token registration failed; retrying (${attempt}/${maxAttempts})`, err)
+      }
       await delay(500 * attempt)
     }
   }
@@ -283,8 +294,6 @@ export function clearCachedPushToken() {
 export async function enablePushNotifications() {
   const token = await getExpoPushTokenAsync()
   if (!token) return null
-  const cached = getCachedPushToken()
-  if (token === cached) return token
   await registerDeviceTokenWithRetry(token)
   setCachedPushToken(token)
   return token
@@ -312,4 +321,14 @@ async function ensureAndroidChannel() {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function getExpoProjectId(): string {
+  const constants = Constants as typeof Constants & {
+    easConfig?: { projectId?: string }
+    expoConfig?: { extra?: { eas?: { projectId?: string } } }
+  }
+  return (
+    constants.easConfig?.projectId ?? constants.expoConfig?.extra?.eas?.projectId ?? EXPO_PROJECT_ID
+  )
 }

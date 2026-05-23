@@ -12,6 +12,7 @@ import { HomeFeedFilters } from "@/screens/home-feed/components/HomeFeedFilters"
 import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLocationState"
 import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
 import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
+import { HomeFeedServiceState } from "@/screens/home-feed/components/HomeFeedServiceState"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 
 type Props = OolshikStackScreenProps<"OolshikHome">
@@ -90,23 +91,49 @@ export default function HomeFeedScreen({ navigation }: Props) {
             onOpenSettings={handlers.onOpenSettings}
             onRetry={handlers.onRefresh}
           />
-        ) : feed.loading ? (
+        ) : feed.showInitialLoader ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator />
           </View>
         ) : (
           <>
-            <HomeFeedList
-              data={feed.filtered}
-              loading={feed.loading}
-              renderItem={handlers.renderItem}
-              onRefresh={handlers.onRefresh}
-              onScrollOffsetChange={handlers.onListScrollOffsetChange}
-              emptyMineText={t("oolshik:emptyMine")}
-              emptyForYouText={t("oolshik:emptyForYou")}
-              viewMode={feed.viewMode}
-              extraData={feed.extraData}
-            />
+            {feed.serviceState?.variant === "full" ? (
+              <HomeFeedServiceState
+                title={feed.serviceState.title}
+                body={feed.serviceState.body}
+                retryLabel={t("common:retry")}
+                onRetry={handlers.onRefresh}
+                supportText={feed.serviceState.supportText}
+                staleLabel={feed.serviceState.staleLabel}
+                variant="full"
+              />
+            ) : null}
+
+            {feed.serviceState?.variant === "inline" ? (
+              <HomeFeedServiceState
+                title={feed.serviceState.title}
+                body={feed.serviceState.body}
+                retryLabel={t("common:retry")}
+                onRetry={handlers.onRefresh}
+                supportText={feed.serviceState.supportText}
+                staleLabel={feed.serviceState.staleLabel}
+                variant="inline"
+              />
+            ) : null}
+
+            {feed.serviceState?.variant !== "full" ? (
+              <HomeFeedList
+                data={feed.filtered}
+                loading={feed.loading}
+                renderItem={handlers.renderItem}
+                onRefresh={handlers.onRefresh}
+                onScrollOffsetChange={handlers.onListScrollOffsetChange}
+                emptyMineText={t("oolshik:emptyMine")}
+                emptyForYouText={t("oolshik:emptyForYou")}
+                viewMode={feed.viewMode}
+                extraData={feed.extraData}
+              />
+            ) : null}
           </>
         )}
       </View>

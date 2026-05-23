@@ -10390,6 +10390,7 @@ __metadata:
     expo-av: "npm:~15.1.7"
     expo-build-properties: "npm:~0.14.6"
     expo-camera: "npm:~16.1.11"
+    expo-constants: "npm:~17.1.7"
     expo-dev-client: "npm:~5.2.1"
     expo-file-system: "npm:~18.1.11"
     expo-font: "npm:~13.3.0"
