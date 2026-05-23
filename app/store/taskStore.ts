@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { FLAGS } from "@/config/flags"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
 import { OolshikApi } from "@/api"
+import type { AppApiError } from "@/api/apiResult"
 
 type Task = {
   id: string
@@ -92,6 +93,9 @@ type State = {
   tasks: Task[]
   myTasks: Task[]
   loading: boolean
+  nearbyError: AppApiError | null
+  isNearbyStale: boolean
+  lastNearbyLoadedAt: string | null
   tab: TaskTab
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
@@ -106,6 +110,9 @@ export const useTaskStore = create<State>((set, get) => ({
   tasks: [],
   myTasks: [],
   loading: false,
+  nearbyError: null,
+  isNearbyStale: false,
+  lastNearbyLoadedAt: null,
   tab: "ALL",
   setRadius: (r) => set({ radiusMeters: r }),
   setTab: (t) => set({ tab: t }),
@@ -119,9 +126,6 @@ export const useTaskStore = create<State>((set, get) => ({
     }),
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
-    console.log("🚀 ~ statuses:", statuses)
-    console.log("🚀 ~ lon:", lon)
-    console.log("🚀 ~ lat:", lat)
     set({ loading: true })
     try {
       if (FLAGS.USE_MOCK_NEARBY) {
@@ -143,12 +147,30 @@ export const useTaskStore = create<State>((set, get) => ({
         const filtered = normalizeTasks(MOCK_NEARBY_TASKS)
           .filter((t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status))
           .sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
-        set({ tasks: filtered })
+        set({
+          tasks: filtered,
+          nearbyError: null,
+          isNearbyStale: false,
+          lastNearbyLoadedAt: new Date().toISOString(),
+        })
       } else {
         const r = get().radiusMeters
         const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
-        if (res.ok) set({ tasks: normalizeTasks(res.data as Task[]) })
-        console.log("🚀 ~ res.data:", res.data)
+        if (res.ok) {
+          set({
+            tasks: normalizeTasks(res.data as Task[]),
+            nearbyError: null,
+            isNearbyStale: false,
+            lastNearbyLoadedAt: new Date().toISOString(),
+          })
+          return
+        }
+
+        const hasVisibleTasks = get().tasks.length > 0
+        set({
+          nearbyError: res.error,
+          isNearbyStale: hasVisibleTasks,
+        })
       }
     } finally {
       set({ loading: false })

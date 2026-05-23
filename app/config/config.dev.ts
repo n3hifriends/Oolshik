@@ -13,6 +13,9 @@ export default {
     (process.env.EXPO_PUBLIC_AUTH_GOOGLE_ENABLED || "true").toLowerCase() === "true",
   AUTH_GOOGLE_REQUIRE_PHONE:
     (process.env.EXPO_PUBLIC_AUTH_GOOGLE_REQUIRE_PHONE || "true").toLowerCase() === "true",
+  REQUIRE_PRESIGNED_AUDIO_UPLOAD:
+    (process.env.EXPO_PUBLIC_REQUIRE_PRESIGNED_AUDIO_UPLOAD || "false").toLowerCase() ===
+    "true",
   GOOGLE_WEB_CLIENT_ID:
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
     "263296903071-l80n6ccefcn05s5apnobtlpl1cc0fd5t.apps.googleusercontent.com",

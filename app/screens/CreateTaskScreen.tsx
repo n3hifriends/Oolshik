@@ -152,7 +152,7 @@ export default function CreateTaskScreen({ navigation }: any) {
     if (!res.ok) {
       throw new Error("Upload failed. Please try again.")
     }
-    return res.url
+    return res.audioFileId
   }
 
   const resetAudioPreview = async () => {
@@ -177,7 +177,10 @@ export default function CreateTaskScreen({ navigation }: any) {
     }
     const trimmedTitle = title.trim()
     if (!trimmedTitle) {
-      Alert.alert(t("task:create.alerts.missingTitleTitle"), t("task:create.alerts.missingTitleBody"))
+      Alert.alert(
+        t("task:create.alerts.missingTitleTitle"),
+        t("task:create.alerts.missingTitleBody"),
+      )
       return
     }
 
@@ -198,11 +201,11 @@ export default function CreateTaskScreen({ navigation }: any) {
 
     setSubmitting(true)
     try {
-      const voiceUrl = await uploadVoiceIfNeeded()
+      const audioFileId = await uploadVoiceIfNeeded()
       const payload = {
         title: trimmedTitle,
         description: description.trim() || undefined,
-        voiceUrl,
+        audioFileId,
         latitude: coords.latitude,
         longitude: coords.longitude,
         radiusMeters: radiusKm * 1000,
@@ -236,7 +239,10 @@ export default function CreateTaskScreen({ navigation }: any) {
         { text: t("common:ok"), onPress: () => navigation.goBack() },
       ])
     } catch (e: any) {
-      Alert.alert(t("task:create.alerts.createFailedTitle"), e?.message ?? t("task:create.alerts.createFailedBody"))
+      Alert.alert(
+        t("task:create.alerts.createFailedTitle"),
+        e?.message ?? t("task:create.alerts.createFailedBody"),
+      )
     } finally {
       setSubmitting(false)
     }
@@ -260,147 +266,152 @@ export default function CreateTaskScreen({ navigation }: any) {
         safeAreaEdges={["top", "bottom"]}
         contentContainerStyle={{ padding: 16, gap: 12 }}
       >
-      <Text preset="heading" text={t("task:create.heading")} />
+        <Text preset="heading" text={t("task:create.heading")} />
 
-      {status !== "ready" && (
-        <View style={{ gap: 10 }}>
-          {status === "loading" || status === "idle" ? (
-            <View style={{ alignItems: "center", gap: 8 }}>
-              <ActivityIndicator />
-              <Text text={t("task:create.gettingLocation")} />
-            </View>
-          ) : status === "denied" ? (
-            <>
-              <Text preset="heading" text={t("task:create.locationDeniedTitle")} />
-              <Text text={t("task:create.locationDeniedBody")} />
-              <Button text={t("task:create.openSettings")} onPress={() => Linking.openSettings()} />
-            </>
-          ) : (
-            <>
-              <Text preset="heading" text={t("task:create.locationErrorTitle")} />
-              <Text text={locationError ?? t("errors:fallback")} />
-              <Button text={t("task:create.retry")} onPress={refresh} />
-            </>
-          )}
-        </View>
-      )}
-
-      {/* Title */}
-      <View style={{ gap: 6 }}>
-        <Text text={t("task:create.titleLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
-        <TextField
-          value={title}
-          onChangeText={setTitle}
-          placeholder={t("task:create.titlePlaceholder")}
-          maxLength={80}
-          autoCapitalize="sentences"
-          autoCorrect
-          returnKeyType="next"
-        />
-      </View>
-
-      {/* Description */}
-      <View style={{ gap: 6 }}>
-        <Text text={t("task:create.descriptionLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
-        <TextField
-          value={description}
-          onChangeText={(t) => setDescription(t.slice(0, MAX_DESC))}
-          placeholder={t("task:create.descriptionPlaceholder")}
-          multiline
-          numberOfLines={5}
-          style={{ minHeight: 120, textAlignVertical: "top" }}
-          autoCapitalize="sentences"
-          autoCorrect
-        />
-        <Text
-          style={{ alignSelf: "flex-end" }}
-          preset="default"
-          text={`${description.length}/${MAX_DESC}`}
-        />
-      </View>
-
-      {/* Offer */}
-      <View style={{ gap: 6 }}>
-        <Text text={t("task:create.offerLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
-        <TextField
-          value={offerInput}
-          onChangeText={setOfferInput}
-          placeholder={t("task:create.offerPlaceholder")}
-          keyboardType="decimal-pad"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      {/* Radius */}
-      <View style={{ gap: 6 }}>
-        <Text
-          text={t("task:create.radiusLabel")}
-          style={{ fontWeight: "600", opacity: 0.9 }}
-        />
-        <RadioGroup
-          value={radiusKm}
-          onChange={(v) => setRadiusKm(v as Radius)}
-          options={[
-            { label: "1 km", value: 1 },
-            { label: "2 km", value: 2 },
-            { label: "5 km", value: 5 },
-          ]}
-          size="md"
-          gap={8}
-        />
-      </View>
-      {/* Recorder */}
-      <View style={{ flexDirection: "column", gap: 10, marginTop: 12, marginBottom: 24 }}>
-        <Text text={t("task:create.recordLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
-        {!recording && !uri && <Button text={t("task:create.recordCta")} onPress={onStartPress} />}
-        {recording && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <ActivityIndicator />
-            <Button text={t("task:create.stopCta", { seconds: durationSec })} onPress={stop} />
-          </View>
-        )}
-        {!recording && uri && (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: "#e5e7eb",
-              borderRadius: 12,
-              padding: 12,
-              backgroundColor: "#fafafa",
-              gap: 10,
-            }}
-          >
-            <Text preset="subheading" text={t("task:create.previewHeading")} />
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Button text={isPlaying ? t("task:create.pause") : t("task:create.play")} onPress={togglePlay} />
-              <Text
-                text={`${playbackSecs}s / ${Math.max(durationSec, Math.ceil(playbackSecs))}s`}
-              />
-            </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {!audioAccepted && (
-                <Button text={t("task:create.useAudio")} onPress={() => setAudioAccepted(true)} />
-              )}
-              {audioAccepted && (
-                <Text
-                  text={t("task:create.audioSelected")}
-                  style={{ color: "#16a34a", fontWeight: "600", paddingVertical: 10 }}
+        {status !== "ready" && (
+          <View style={{ gap: 10 }}>
+            {status === "loading" || status === "idle" ? (
+              <View style={{ alignItems: "center", gap: 8 }}>
+                <ActivityIndicator />
+                <Text text={t("task:create.gettingLocation")} />
+              </View>
+            ) : status === "denied" ? (
+              <>
+                <Text preset="heading" text={t("task:create.locationDeniedTitle")} />
+                <Text text={t("task:create.locationDeniedBody")} />
+                <Button
+                  text={t("task:create.openSettings")}
+                  onPress={() => Linking.openSettings()}
                 />
-              )}
-              <Button text={t("task:create.discardAudio")} onPress={discardRecording} />
-            </View>
-            {!audioAccepted && (
-              <Text
-                text={t("task:create.audioHint")}
-                style={{ opacity: 0.7 }}
-              />
+              </>
+            ) : (
+              <>
+                <Text preset="heading" text={t("task:create.locationErrorTitle")} />
+                <Text text={locationError ?? t("errors:fallback")} />
+                <Button text={t("task:create.retry")} onPress={refresh} />
+              </>
             )}
           </View>
         )}
-      </View>
 
-      {/* Submit */}
+        {/* Title */}
+        <View style={{ gap: 6 }}>
+          <Text text={t("task:create.titleLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
+          <TextField
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t("task:create.titlePlaceholder")}
+            maxLength={80}
+            autoCapitalize="sentences"
+            autoCorrect
+            returnKeyType="next"
+          />
+        </View>
+
+        {/* Description */}
+        <View style={{ gap: 6 }}>
+          <Text
+            text={t("task:create.descriptionLabel")}
+            style={{ fontWeight: "600", opacity: 0.9 }}
+          />
+          <TextField
+            value={description}
+            onChangeText={(t) => setDescription(t.slice(0, MAX_DESC))}
+            placeholder={t("task:create.descriptionPlaceholder")}
+            multiline
+            numberOfLines={5}
+            style={{ minHeight: 120, textAlignVertical: "top" }}
+            autoCapitalize="sentences"
+            autoCorrect
+          />
+          <Text
+            style={{ alignSelf: "flex-end" }}
+            preset="default"
+            text={`${description.length}/${MAX_DESC}`}
+          />
+        </View>
+
+        {/* Offer */}
+        <View style={{ gap: 6 }}>
+          <Text text={t("task:create.offerLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
+          <TextField
+            value={offerInput}
+            onChangeText={setOfferInput}
+            placeholder={t("task:create.offerPlaceholder")}
+            keyboardType="decimal-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        {/* Radius */}
+        <View style={{ gap: 6 }}>
+          <Text text={t("task:create.radiusLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
+          <RadioGroup
+            value={radiusKm}
+            onChange={(v) => setRadiusKm(v as Radius)}
+            options={[
+              { label: "1 km", value: 1 },
+              { label: "2 km", value: 2 },
+              { label: "5 km", value: 5 },
+            ]}
+            size="md"
+            gap={8}
+          />
+        </View>
+        {/* Recorder */}
+        <View style={{ flexDirection: "column", gap: 10, marginTop: 12, marginBottom: 24 }}>
+          <Text text={t("task:create.recordLabel")} style={{ fontWeight: "600", opacity: 0.9 }} />
+          {!recording && !uri && (
+            <Button text={t("task:create.recordCta")} onPress={onStartPress} />
+          )}
+          {recording && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator />
+              <Button text={t("task:create.stopCta", { seconds: durationSec })} onPress={stop} />
+            </View>
+          )}
+          {!recording && uri && (
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: "#e5e7eb",
+                borderRadius: 12,
+                padding: 12,
+                backgroundColor: "#fafafa",
+                gap: 10,
+              }}
+            >
+              <Text preset="subheading" text={t("task:create.previewHeading")} />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <Button
+                  text={isPlaying ? t("task:create.pause") : t("task:create.play")}
+                  onPress={togglePlay}
+                />
+                <Text
+                  text={`${playbackSecs}s / ${Math.max(durationSec, Math.ceil(playbackSecs))}s`}
+                />
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {!audioAccepted && (
+                  <Button text={t("task:create.useAudio")} onPress={() => setAudioAccepted(true)} />
+                )}
+                {audioAccepted && (
+                  <Text
+                    text={t("task:create.audioSelected")}
+                    style={{ color: "#16a34a", fontWeight: "600", paddingVertical: 10 }}
+                  />
+                )}
+                <Button text={t("task:create.discardAudio")} onPress={discardRecording} />
+              </View>
+              {!audioAccepted && (
+                <Text text={t("task:create.audioHint")} style={{ opacity: 0.7 }} />
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Submit */}
         <Button
           text={submitting ? t("task:create.posting") : t("task:create.post")}
           onPress={handleSubmitTask}

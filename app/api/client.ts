@@ -7,6 +7,7 @@ import { authEvents } from "@/auth/events"
 import Config from "@/config"
 import i18n from "i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
+import { ApiResult, normalizeApiError, requestWithRetry } from "@/api/apiResult"
 
 // ---------- Toggleable API logs (default: true) ----------
 export let API_LOGS_ENABLED = true
@@ -29,9 +30,24 @@ function isAuthPath(url?: string | null) {
   return AUTH_WHITELIST.some((p) => url.includes(p))
 }
 
-function redactBody(url?: string | null, data?: any) {
+function getContentType(headers?: any) {
+  const contentType = headers?.["Content-Type"] ?? headers?.["content-type"]
+  return typeof contentType === "string" ? contentType.toLowerCase() : ""
+}
+
+function isBinaryUpload(url?: string | null, headers?: any) {
+  const contentType = getContentType(headers)
+  if (contentType.includes("application/octet-stream")) return true
+  return typeof url === "string" && /\/media\/audio\/[^/]+\/chunk\b/i.test(url)
+}
+
+function redactBody(url?: string | null, data?: any, headers?: any) {
   // Do not log OTP codes or passwords for auth endpoints
   if (isAuthPath(url)) return "[REDACTED_FOR_AUTH_ENDPOINT]"
+  if (isBinaryUpload(url, headers)) return "[REDACTED_BINARY_UPLOAD]"
+  if (typeof data === "string" && data.length > 2000)
+    return `[REDACTED_LARGE_STRING length=${data.length}]`
+  if (ArrayBuffer.isView(data)) return `[REDACTED_TYPED_ARRAY length=${data.byteLength}]`
   return data
 }
 
@@ -41,8 +57,8 @@ function logRequest(prefix: string, cfg: any) {
     const method = (cfg?.method || "GET").toUpperCase()
     const url = cfg?.baseURL ? `${cfg.baseURL}${cfg.url || ""}` : cfg?.url
     const params = cfg?.params
-    const data = redactBody(cfg?.url, cfg?.data)
     const headers = maskHeaders(cfg?.headers)
+    const data = redactBody(cfg?.url, cfg?.data, cfg?.headers)
     console.log(`⬆️  ${prefix} REQUEST: ${method} ${url}`, { params, data, headers })
   } catch {}
 }
@@ -212,7 +228,8 @@ axiosInstance.interceptors.response.use(
     const isAuthEndpoint = AUTH_WHITELIST.some((p) => url.includes(p))
     const shouldTryRefresh =
       !isAuthEndpoint &&
-      ((status === 401 || status === 419) ||
+      (status === 401 ||
+        status === 419 ||
         (status === 403 &&
           hadBearerHeader &&
           Boolean(tokens.refresh) &&
@@ -499,7 +516,8 @@ export function toActiveRequestCapPayload(input: unknown): ActiveRequestCapReach
     : []
   if (activeRequestIds.length === 0) return null
 
-  const message = typeof input.message === "string" ? input.message : "Active request limit reached."
+  const message =
+    typeof input.message === "string" ? input.message : "Active request limit reached."
   const suggestedRequestId =
     typeof input.suggestedRequestId === "string" ? input.suggestedRequestId : null
 
@@ -515,6 +533,7 @@ export function toActiveRequestCapPayload(input: unknown): ActiveRequestCapReach
 
 type CreateTaskPayload = {
   voiceUrl?: string
+  audioFileId?: string
   description?: string
   radiusMeters: number
   createdById?: string
@@ -527,12 +546,46 @@ type CreateTaskPayload = {
   offerCurrency?: string
 }
 
+function normalizeCreateTaskPayload(payload: CreateTaskPayload): CreateTaskPayload {
+  const normalized: CreateTaskPayload = { ...payload }
+  const audioFileId = normalized.audioFileId?.trim()
+  const voiceUrl = normalized.voiceUrl?.trim()
+
+  if (audioFileId) {
+    normalized.audioFileId = audioFileId
+    delete normalized.voiceUrl
+    return normalized
+  }
+
+  delete normalized.audioFileId
+
+  if (!voiceUrl) {
+    delete normalized.voiceUrl
+    return normalized
+  }
+
+  if (!isAbsoluteHttpsUrl(voiceUrl)) {
+    throw new Error("Voice upload must use audioFileId or an absolute HTTPS voiceUrl.")
+  }
+
+  normalized.voiceUrl = voiceUrl
+  return normalized
+}
+
+function isAbsoluteHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 const toClientTask = (t: ServerTask): Task => ({ ...t })
 
 export const OolshikApi = {
   // Create Request
   createTask: async (payload: CreateTaskPayload) => {
-    const response = await api.post("/requests", payload)
+    const response = await api.post("/requests", normalizeCreateTaskPayload(payload))
     return {
       ...response,
       activeCap: toActiveRequestCapPayload(response.data),
@@ -552,7 +605,7 @@ export const OolshikApi = {
     statuses?: string[], // ✅ optional filter
     page = 0,
     size = 50,
-  ) {
+  ): Promise<ApiResult<ServerTask[]>> {
     const qs = new URLSearchParams()
     qs.set("lat", String(lat))
     qs.set("lng", String(lng))
@@ -564,16 +617,38 @@ export const OolshikApi = {
     }
 
     const url = `/requests/nearby?${qs.toString()}`
-    const res = await api.get<Page<ServerTask>>(url)
+    const res = await requestWithRetry(() => api.get<Page<ServerTask>>(url), {
+      attempts: 3,
+      baseDelayMs: 250,
+      maxDelayMs: 1200,
+    })
     if (res.ok) {
-      const page = res.data
-      if (page && Array.isArray(page.content)) {
-        return { ok: res.ok, data: page.content }
+      const payload = res.data
+      if (payload && Array.isArray(payload.content)) {
+        return {
+          ok: true,
+          data: payload.content,
+          meta: {
+            requestId:
+              typeof res.headers?.["x-correlation-id"] === "string"
+                ? res.headers["x-correlation-id"]
+                : undefined,
+          },
+        }
+      }
+      return {
+        ok: false,
+        error: {
+          kind: "bad-data",
+          temporary: false,
+          message: "Nearby tasks response is missing page content.",
+        },
       }
     } else {
-      console.log("❌ nearbyTasks error:", res.problem, res.status)
+      const error = normalizeApiError(res)
+      console.log("❌ nearbyTasks error:", error.kind, error.status, error.requestId)
+      return { ok: false, error }
     }
-    return { ok: false }
   },
 
   // Accept
@@ -714,7 +789,8 @@ export const OolshikApi = {
     api.post(`/payments/${id}/mark-paid`, payload),
 
   getMyPaymentProfile: () => api.get<PaymentProfileApiResponse>("/payment-profile/me"),
-  getMyPaymentProfileForEdit: () => api.get<PaymentProfileEditApiResponse>("/payment-profile/me/edit"),
+  getMyPaymentProfileForEdit: () =>
+    api.get<PaymentProfileEditApiResponse>("/payment-profile/me/edit"),
   createPaymentProfile: (body: {
     upiId: string
     payeeLabel?: string

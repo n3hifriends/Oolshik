@@ -32,7 +32,10 @@ export async function loadPreferredRadiusKm(): Promise<number | null> {
 }
 
 export async function syncHelperLocation(latitude: number, longitude: number): Promise<boolean> {
-  const res = (await OolshikApi.updateHelperLocation(latitude, longitude)) as ApiLikeResponse<unknown>
+  const res = (await OolshikApi.updateHelperLocation(
+    latitude,
+    longitude,
+  )) as ApiLikeResponse<unknown>
   return !!res?.ok
 }
 
@@ -49,6 +52,7 @@ export type CreateTaskPayload = {
   title: string
   description?: string
   voiceUrl?: string
+  audioFileId?: string
   latitude: number
   longitude: number
   radiusMeters: number
