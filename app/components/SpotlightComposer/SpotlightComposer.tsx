@@ -28,7 +28,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
-import { Button } from "@/components/Button"
 import { Icon } from "@/components/Icon"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
@@ -87,6 +86,11 @@ const PILL_HEIGHT = 66
 const PILL_RADIUS = 26
 const TOP_SPACING = 32
 const SUBMIT_LOADER_MIN_MS = 500
+
+const BRAND_ORANGE = "#FF6B2C"
+const BRAND_RED = "#BF360C"
+const CHIP_BG_SELECTED = "rgba(255,107,44,0.10)"
+const CHIP_BG_STOP = "rgba(191,54,12,0.08)"
 
 let BlurComponent: React.ComponentType<any> | null = null
 try {
@@ -510,7 +514,6 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
     transform: [{ scale: pulse.value }],
   }))
 
-  const pillActiveBackground = theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"
   const canSubmit = text.trim().length > 0 || (mode === "voice" && !!voiceNote)
   const submitDisabled =
     !canSubmit || state === "opening" || state === "closing" || state === "transcribing" || state === "submitting"
@@ -531,17 +534,21 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
           accessibilityLabel={t("oolshik:composer.typeTaskA11y")}
           hitSlop={theme.spacing.sm}
           onPress={() => handleOpen("type")}
-          style={[
+          style={({ pressed }) => [
             styles.fabInner,
+            pressed && styles.fabPressed,
             {
-              backgroundColor: theme.isDark
-                ? "rgba(255,255,255,0.2)"
-                : theme.colors.palette.neutral300,
-              shadowColor: theme.colors.palette.neutral900,
+              backgroundColor: theme.isDark ? "rgba(30,30,34,0.96)" : "#FFFFFF",
+              borderWidth: 1,
+              borderColor: theme.isDark ? "rgba(255,107,44,0.25)" : "#E5E7EB",
+              shadowColor: "#000",
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 4 },
             },
           ]}
         >
-          <MaterialCommunityIcons name="pencil" size={24} color="#a78e8eff" />
+          <MaterialCommunityIcons name="pencil" size={22} color={BRAND_ORANGE} />
         </Pressable>
       </Animated.View>
       <Animated.View style={[styles.fab, micFabStyle]}>
@@ -549,11 +556,15 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
           accessibilityLabel={t("oolshik:composer.recordTaskA11y")}
           hitSlop={theme.spacing.sm}
           onPress={() => handleOpen("voice")}
-          style={[
+          style={({ pressed }) => [
             styles.fabInner,
+            pressed && styles.fabPressed,
             {
-              backgroundColor: theme.colors.tint,
-              shadowColor: theme.colors.palette.neutral900,
+              backgroundColor: BRAND_ORANGE,
+              shadowColor: BRAND_ORANGE,
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
             },
           ]}
         >
@@ -570,86 +581,71 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
           styles.iconBubble,
           pulseStyle,
           {
-            borderColor: theme.colors.tint,
-            backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+            borderColor: BRAND_ORANGE,
+            backgroundColor: "rgba(255,107,44,0.12)",
           },
         ]}
       >
-        <MaterialCommunityIcons name="microphone" size={22} color={theme.colors.tint} />
+        <MaterialCommunityIcons name="microphone" size={22} color={BRAND_ORANGE} />
       </Animated.View>
       <Animated.View
         style={[
           styles.wave,
           pulseStyle,
-          {
-            backgroundColor: theme.isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.08)",
-          },
+          { backgroundColor: "rgba(255,107,44,0.30)" },
         ]}
       />
-      <Text
-        text={formatTime(durationSec)}
-        style={[styles.timerText, { color: theme.colors.text }]}
-      />
-      <Button
-        text={t("oolshik:composer.stop")}
+      <Text text={formatTime(durationSec)} style={[styles.timerText, { color: BRAND_ORANGE }]} />
+      <TouchableOpacity
         accessibilityLabel={t("oolshik:composer.stopRecordingA11y")}
         onPress={() => handleStopRecording(true)}
-        style={[styles.smallButton, { marginLeft: 12, alignSelf: "flex-end" }]}
-        textStyle={{ fontSize: 14 }}
-        preset="default"
-      />
+        style={styles.stopChip}
+        activeOpacity={0.75}
+      >
+        <View style={styles.stopChipDot} />
+        <Text text={t("oolshik:composer.stop")} style={styles.stopChipText} />
+      </TouchableOpacity>
     </View>
   )
 
   const renderTranscribing = () => (
     <View style={styles.contentRow}>
-      <MaterialCommunityIcons name="microphone" size={20} color={theme.colors.text} />
-      <Text text={t("oolshik:composer.transcribing")} style={styles.helperText} />
-      <ActivityIndicator
-        size="small"
-        color={theme.colors.tint}
-        style={{ marginLeft: theme.spacing.sm }}
-      />
+      <View style={styles.statusDot} />
+      <Text text={t("oolshik:composer.transcribing")} style={[styles.statusText, { color: theme.colors.text }]} />
+      <ActivityIndicator size="small" color={BRAND_ORANGE} style={{ marginLeft: "auto" as any }} />
     </View>
   )
 
   const renderSubmitting = () => (
     <View style={styles.contentRow}>
-      <MaterialCommunityIcons name="send-circle-outline" size={20} color={theme.colors.text} />
-      <View style={styles.submitStatusTextWrap}>
-        <Text
-          text={t("oolshik:composer.submittingStatus")}
-          style={[styles.helperText, styles.submitStatusTitle, { color: theme.colors.text }]}
-        />
-        <Text
-          text={t("oolshik:composer.pleaseWait")}
-          size="xs"
-          style={{ color: theme.colors.textDim, marginLeft: 10 }}
-        />
-      </View>
-      <ActivityIndicator
-        size="small"
-        color={theme.colors.tint}
-        style={{ marginLeft: theme.spacing.sm }}
-      />
+      <View style={styles.statusDot} />
+      <Text text={t("oolshik:composer.submittingStatus")} style={[styles.statusText, { color: theme.colors.text }]} />
+      <ActivityIndicator size="small" color={BRAND_ORANGE} style={{ marginLeft: "auto" as any }} />
     </View>
   )
 
   const renderTypeEditing = () => (
     <View style={styles.editRow}>
-      <MaterialCommunityIcons
-        name="microphone"
-        size={20}
-        color={theme.colors.text}
-        style={{ marginRight: 10 }}
+      <Pressable
+        accessibilityLabel={t("oolshik:composer.recordTaskA11y")}
+        hitSlop={8}
         onPress={() => {
-          // optional affordance to switch into live recording
           if (state === "editing") {
             setMode("voice")
             handleVoiceStart()
           }
         }}
-      />
+        style={({ pressed }) => [
+          styles.modeSwitchBtn,
+          pressed && styles.fabPressed,
+          {
+            borderColor: theme.isDark ? "rgba(255,107,44,0.25)" : "#E5E7EB",
+            backgroundColor: theme.isDark ? "rgba(30,30,34,0.9)" : "#FFFFFF",
+          },
+        ]}
+      >
+        <MaterialCommunityIcons name="microphone" size={18} color={BRAND_ORANGE} />
+      </Pressable>
       <TextInput
         ref={textInputRef}
         value={text}
@@ -667,44 +663,35 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
         accessibilityLabel={t("oolshik:composer.submitTaskA11y")}
         disabled={submitDisabled}
         onPress={handleSubmit}
-        style={[
-          styles.submitPill,
-          submitDisabled ? styles.submitPillDisabled : null,
-          { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
-        ]}
+        activeOpacity={0.75}
+        style={[styles.submitChip, submitDisabled && styles.submitChipDisabled]}
       >
-        <Text text={t("oolshik:composer.submit")} style={styles.submitText} />
+        <View style={styles.submitChipDot} />
+        <Text text={t("oolshik:composer.submit")} style={styles.submitChipText} />
       </TouchableOpacity>
     </View>
   )
 
   const renderVoiceReady = () => (
     <View style={styles.editRow}>
-      <MaterialCommunityIcons
-        name="microphone"
-        size={20}
-        color={theme.colors.text}
-        style={{ marginRight: 10 }}
-      />
+      <View style={styles.statusDot} />
       <Text
         text={
           voiceNote
             ? t("oolshik:composer.voiceReadyWithDuration", { seconds: voiceNote.durationSec })
             : t("oolshik:composer.voiceReady")
         }
-        style={{ color: theme.colors.text, flex: 1 }}
+        style={[styles.statusText, { color: theme.colors.text }]}
       />
       <TouchableOpacity
         accessibilityLabel={t("oolshik:composer.submitTaskA11y")}
         disabled={submitDisabled}
         onPress={handleSubmit}
-        style={[
-          styles.submitPill,
-          submitDisabled ? styles.submitPillDisabled : null,
-          { backgroundColor: pillActiveBackground, borderColor: theme.colors.border },
-        ]}
+        activeOpacity={0.75}
+        style={[styles.submitChip, submitDisabled && styles.submitChipDisabled]}
       >
-        <Text text={t("oolshik:composer.submit")} style={styles.submitText} />
+        <View style={styles.submitChipDot} />
+        <Text text={t("oolshik:composer.submit")} style={styles.submitChipText} />
       </TouchableOpacity>
     </View>
   )
@@ -784,8 +771,8 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
               style={[
                 styles.pillInner,
                 {
-                  borderColor: theme.isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-                  backgroundColor: theme.isDark ? "rgba(24,24,28,0.9)" : "rgba(255,255,255,0.96)",
+                  borderColor: theme.isDark ? "rgba(255,107,44,0.20)" : "rgba(191,54,12,0.18)",
+                  backgroundColor: theme.isDark ? "rgba(20,20,24,0.96)" : "rgba(255,107,44,0.04)",
                 },
               ]}
             >
@@ -886,37 +873,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 6,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
   },
   fabPen: {
     left: FAB_OFFSET_X + 30,
     top: -FAB_OFFSET_Y + 30,
+  },
+  fabPressed: {
+    transform: [{ scale: 0.96 }],
   },
   fabStack: {
     position: "absolute",
     zIndex: 50,
     elevation: 20,
   },
-  helperText: {
-    marginLeft: 10,
-  },
   iconBubble: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "transparent",
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
   },
   input: {
     flex: 1,
-    color: "#fff",
     fontSize: 16,
     paddingVertical: 0,
+  },
+  modeSwitchBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
   },
   pillContainer: {
     position: "absolute",
@@ -929,7 +920,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   pillPressShield: {
     flex: 1,
@@ -938,27 +929,74 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.35)",
   },
-  smallButton: {
-    height: 34,
-    paddingHorizontal: 14,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: BRAND_ORANGE,
+    marginRight: 10,
   },
-  submitPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  submitPillDisabled: {
-    opacity: 0.55,
-  },
-  submitText: {
-    fontSize: 14,
-  },
-  submitStatusTextWrap: {
+  statusText: {
+    fontSize: 15,
+    fontWeight: "500",
     flex: 1,
   },
-  submitStatusTitle: {
-    marginBottom: 2,
+  stopChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: BRAND_RED,
+    backgroundColor: CHIP_BG_STOP,
+    marginLeft: 12,
+  },
+  stopChipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: BRAND_RED,
+  },
+  stopChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: BRAND_RED,
+  },
+  submitChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: BRAND_RED,
+    backgroundColor: CHIP_BG_SELECTED,
+    ...Platform.select({
+      ios: {
+        shadowColor: BRAND_ORANGE,
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+      },
+      android: { elevation: 1 },
+    }),
+  },
+  submitChipDisabled: {
+    opacity: 0.5,
+  },
+  submitChipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: BRAND_ORANGE,
+  },
+  submitChipText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: BRAND_RED,
   },
   suggestionContainer: {
     position: "absolute",
