@@ -1,13 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react"
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Modal,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native"
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, StyleSheet, View } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
@@ -24,14 +16,22 @@ import {
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { useTranslation } from "react-i18next"
+import { useAuth } from "@/context/AuthContext"
 import { parseUpiQr } from "@/utils/upiQr"
 import { isValidUpiId, maskUpiId, normalizeUpiId } from "@/utils/paymentProfile"
 
 type Props = OolshikStackScreenProps<"PaymentProfile">
 
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "").slice(-10)
+  if (digits.length < 5) return phone
+  return `+91 ${"•".repeat(digits.length - 5)}${digits.slice(-5)}`
+}
+
 export default function PaymentProfileScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
+  const { userPhone } = useAuth()
   const styles = useMemo(() => createStyles(theme), [theme])
   const entryPoint = route.params?.entryPoint ?? "profile"
   const required = route.params?.required ?? false
@@ -77,6 +77,11 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
     const normalizedUpiId = normalizeUpiId(upiId)
     if (!isValidUpiId(normalizedUpiId)) {
       setError(t("payment:profile.invalidUpi"))
+      return
+    }
+
+    if (!userPhone) {
+      setError(t("payment:profile.mobileRequiredToSave"))
       return
     }
 
@@ -207,7 +212,11 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
         : t("payment:profile.body")
 
   return (
-    <Screen preset="scroll" safeAreaEdges={["top", "bottom"]} contentContainerStyle={styles.content}>
+    <Screen
+      preset="scroll"
+      safeAreaEdges={["top", "bottom"]}
+      contentContainerStyle={styles.content}
+    >
       <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backLink}>
         <Text text={`← ${t("common:back")}`} />
       </Pressable>
@@ -250,8 +259,18 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
       ) : null}
 
       <SectionCard style={styles.card}>
-        <Text preset="subheading" text={profile.hasProfile ? t("payment:profile.editTitle") : t("payment:profile.addTitle")} />
+        <Text
+          preset="subheading"
+          text={profile.hasProfile ? t("payment:profile.editTitle") : t("payment:profile.addTitle")}
+        />
         <Text style={styles.helperText}>{t("payment:profile.helper")}</Text>
+
+        {userPhone ? (
+          <View style={[styles.summaryRow, styles.fieldWrap]}>
+            <Text style={styles.label} text={t("payment:profile.registeredMobileLabel")} />
+            <Text style={styles.value} text={maskPhone(userPhone)} />
+          </View>
+        ) : null}
 
         <View style={styles.fieldWrap}>
           <TextField
@@ -268,6 +287,9 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
             helper={error ?? t("payment:profile.upiHint")}
             status={error ? "error" : undefined}
           />
+          {userPhone ? (
+            <Text style={styles.bindingNote}>{t("payment:profile.registeredMobileNote")}</Text>
+          ) : null}
         </View>
 
         <View style={styles.fieldWrap}>
@@ -324,7 +346,11 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
         />
       ) : null}
 
-      <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
+      <Modal
+        visible={scannerOpen}
+        animationType="slide"
+        onRequestClose={() => setScannerOpen(false)}
+      >
         <View style={styles.scannerRoot}>
           <CameraView
             style={StyleSheet.absoluteFill}
@@ -336,7 +362,11 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
             <View style={styles.scannerWindow} />
           </View>
           <View style={styles.scannerCard}>
-            <Text preset="heading" text={t("payment:profile.scanTitle")} style={styles.scannerTitle} />
+            <Text
+              preset="heading"
+              text={t("payment:profile.scanTitle")}
+              style={styles.scannerTitle}
+            />
             <Text style={styles.scannerBody}>{t("payment:profile.scanBody")}</Text>
             {scannerError ? <Text style={styles.scannerError}>{scannerError}</Text> : null}
             <View style={styles.actions}>
@@ -392,6 +422,12 @@ const createStyles = (theme: Theme) =>
     helperText: {
       color: theme.colors.textDim,
       lineHeight: 20,
+    },
+    bindingNote: {
+      color: theme.colors.textDim,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: theme.spacing.xs,
     },
     inlineNote: {
       color: theme.colors.textDim,

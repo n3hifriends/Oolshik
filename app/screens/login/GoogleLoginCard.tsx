@@ -9,9 +9,6 @@ import { useAppTheme } from "@/theme/context"
 
 import { PhoneHintAction } from "./PhoneHintAction"
 import {
-  $benefitDot,
-  $benefitRow,
-  $benefitsList,
   $ccBadge,
   $inputWrapperDense,
   $stepBadge,
@@ -32,6 +29,7 @@ interface GoogleLoginCardProps {
   onGooglePhoneBlur: () => void
   onGooglePress: () => void
   onPhoneChange: (value: string) => void
+  onPhoneFocus: () => void
   onUseMyPhoneNumberPress: () => void
   phone: string
   phoneHintLoading: boolean
@@ -56,7 +54,6 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
         </View>
         <View style={{ flex: 1 }}>
           <Text text={t("oolshik:login.googleHeading")} weight="bold" />
-          <Text text={t("oolshik:login.googleHint")} size="xs" style={themed($supportingText)} />
         </View>
       </View>
 
@@ -85,6 +82,7 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
                 value={props.phone}
                 onChangeText={props.onPhoneChange}
                 onBlur={props.onGooglePhoneBlur}
+                onFocus={props.onPhoneFocus}
                 containerStyle={{ marginBottom: 0 }}
                 keyboardType="phone-pad"
                 placeholder={t("oolshik:login.phonePlaceholder")}
@@ -109,7 +107,7 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
               />
             ) : (
               <Text
-                text={t("oolshik:login.googlePhoneRequiredNote")}
+                text={t("oolshik:login.phonePaymentBindingNote")}
                 size="xs"
                 style={themed($supportingText)}
               />
@@ -117,21 +115,6 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
           </View>
         </>
       ) : null}
-
-      <View style={themed($benefitsList)}>
-        <View style={themed($benefitRow)}>
-          <View style={themed($benefitDot)} />
-          <Text text={t("oolshik:login.googleBenefitFast")} size="xs" style={{ flex: 1 }} />
-        </View>
-        <View style={themed($benefitRow)}>
-          <View style={themed($benefitDot)} />
-          <Text text={t("oolshik:login.googleBenefitTrusted")} size="xs" style={{ flex: 1 }} />
-        </View>
-        <View style={themed($benefitRow)}>
-          <View style={themed($benefitDot)} />
-          <Text text={t("oolshik:login.googleBenefitProfile")} size="xs" style={{ flex: 1 }} />
-        </View>
-      </View>
 
       {!props.googleConfigured ? (
         <Text

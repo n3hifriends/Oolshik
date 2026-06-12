@@ -51,6 +51,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
           onGooglePhoneBlur={controller.onGooglePhoneBlur}
           onGooglePress={controller.onGooglePress}
           onPhoneChange={controller.onPhoneChange}
+          onPhoneFocus={controller.onPhoneFocus}
           onUseMyPhoneNumberPress={controller.onUseMyPhoneNumberPress}
           phone={controller.phone}
           phoneHintLoading={controller.phoneHintLoading}
@@ -74,6 +75,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
           onEmailToggle={controller.onEmailToggle}
           onOtpChange={controller.onOtpChange}
           onPhoneChange={controller.onPhoneChange}
+          onPhoneFocus={controller.onPhoneFocus}
           onSetAuthEmail={controller.onSetAuthEmail}
           onUseMyPhoneNumberPress={controller.onUseMyPhoneNumberPress}
           onVerifyOtp={controller.onVerifyOtp}

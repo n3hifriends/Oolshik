@@ -95,8 +95,9 @@ export function useLoginScreenController() {
   const activeGoogleAttemptRef = useRef<number | null>(null)
   const lastHandledGoogleResponseRef = useRef<unknown>(null)
   const pendingGooglePhoneHintRef = useRef<string | undefined>(undefined)
+  const phoneAlertShownRef = useRef(false)
 
-  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, validationError } =
+  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, setUserPhone, validationError } =
     useAuth()
 
   const googleScopes = useMemo(() => ["openid", "profile", "email"], [])
@@ -132,6 +133,10 @@ export function useLoginScreenController() {
       setAuthMode("phone")
     }
   }, [authMode, googleEnabled, phoneOtpEnabled])
+
+  useEffect(() => {
+    phoneAlertShownRef.current = false
+  }, [authMode])
 
   useEffect(() => {
     let active = true
@@ -267,6 +272,7 @@ export function useLoginScreenController() {
         setUserName(profile.displayName ?? fallbackDisplayName ?? "You")
         setAuthEmail(profile.email ?? "")
         if (profile.id != null) setUserId(String(profile.id))
+        setUserPhone(profile.phone ?? undefined)
 
         let localPreference: string | null = null
         try {
@@ -542,6 +548,16 @@ export function useLoginScreenController() {
     setShowEmail((value) => !value)
   }, [])
 
+  const onPhoneFocus = useCallback(() => {
+    if (phoneAlertShownRef.current) return
+    phoneAlertShownRef.current = true
+    Alert.alert(
+      t("oolshik:login.phoneAlertTitle"),
+      t("oolshik:login.phoneAlertBody"),
+      [{ text: t("oolshik:login.phoneAlertDismiss") }],
+    )
+  }, [t])
+
   const handleGooglePhoneBlur = useCallback(() => {
     setGooglePhoneTouched(true)
   }, [])
@@ -578,6 +594,7 @@ export function useLoginScreenController() {
     onModeChange: setAuthMode,
     onOtpChange: setOtp,
     onPhoneChange: handlePhoneChange,
+    onPhoneFocus,
     onSetAuthEmail: setAuthEmail,
     onUseMyPhoneNumberPress: handleUseMyPhoneNumberPress,
     onVerifyOtp: handleVerifyOtpPress,

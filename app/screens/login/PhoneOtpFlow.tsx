@@ -43,6 +43,7 @@ interface PhoneOtpFlowProps {
   onEmailToggle: () => void
   onOtpChange: (value: string) => void
   onPhoneChange: (value: string) => void
+  onPhoneFocus: () => void
   onSetAuthEmail: (value?: string) => void
   onUseMyPhoneNumberPress: () => void
   onVerifyOtp: () => void
@@ -139,6 +140,7 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
             <TextField
               value={props.phone}
               onChangeText={props.onPhoneChange}
+              onFocus={props.onPhoneFocus}
               containerStyle={{ marginBottom: 0 }}
               keyboardType="phone-pad"
               placeholder={t("oolshik:login.phonePlaceholder")}
@@ -163,6 +165,12 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
             style={{ color: colors.palette.angry500, marginTop: spacing.xs }}
           />
         ) : null}
+
+        <Text
+          text={t("oolshik:login.phonePaymentBindingNote")}
+          size="xs"
+          style={[themed($supportingText), { marginTop: spacing.xs }]}
+        />
 
         <Button
           text={
@@ -273,13 +281,11 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
       </View>
 
       <View style={themed($footerCard)}>
-        <Text text={t("oolshik:login.readyToContinue")} size="xs" style={themed($supportingText)} />
         <Button
           text={t("oolshik:login.continue")}
           preset="filled"
           onPress={props.onContinue}
           disabled={!props.canContinue}
-          style={{ marginTop: spacing.sm }}
         />
       </View>
     </>
