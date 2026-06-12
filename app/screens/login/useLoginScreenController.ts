@@ -11,7 +11,13 @@ import {
   getProfileExtras,
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
-import { pickDeviceLocaleTag, resolvePreferredLocale } from "@/i18n/locale"
+import {
+  fromLanguageCode,
+  pickDeviceLocaleTag,
+  resolvePreferredLocale,
+  type SupportedLocaleTag,
+  toLanguageCode,
+} from "@/i18n/locale"
 import { getPhoneNumberHint, type PhoneNumberHintResult } from "@/services/phoneNumberHint"
 import { toIndianE164 } from "@/utils/phoneNumber"
 import i18n from "i18next"
@@ -548,6 +554,27 @@ export function useLoginScreenController() {
     setShowEmail((value) => !value)
   }, [])
 
+  // Derived from i18n.language — stays in sync automatically because useTranslation()
+  // above subscribes to language changes and triggers a re-render.
+  const currentLanguage = fromLanguageCode(i18n.language)
+
+  const handleLanguageChange = useCallback(async (tag: SupportedLocaleTag) => {
+    const code = toLanguageCode(tag)
+    await i18n.changeLanguage(code)
+    try {
+      await updateProfileExtras({ preferredLanguage: tag, language: code })
+    } catch {
+      // best-effort
+    }
+  }, [])
+
+  const onLanguageChange = useCallback(
+    (tag: SupportedLocaleTag) => {
+      void handleLanguageChange(tag)
+    },
+    [handleLanguageChange],
+  )
+
   const onPhoneFocus = useCallback(() => {
     if (phoneAlertShownRef.current) return
     phoneAlertShownRef.current = true
@@ -570,6 +597,7 @@ export function useLoginScreenController() {
     activePhoneStep,
     authEmail,
     authMode,
+    currentLanguage,
     canContinue,
     canUsePhoneNumberHint,
     displayName,
@@ -589,6 +617,7 @@ export function useLoginScreenController() {
     onContinue: handleContinuePress,
     onDisplayNameChange: setDisplayName,
     onEmailToggle: handleEmailToggle,
+    onLanguageChange,
     onGooglePhoneBlur: handleGooglePhoneBlur,
     onGooglePress: handleGooglePress,
     onModeChange: setAuthMode,

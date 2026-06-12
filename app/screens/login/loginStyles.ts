@@ -16,6 +16,13 @@ export const $heroCard: ThemedStyle<ViewStyle> = ({ colors, spacing, isDark }) =
   marginBottom: spacing.md,
 })
 
+export const $heroRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: spacing.sm,
+})
+
 export const $title: ThemedStyle<TextStyle> = ({ spacing }) => ({
   marginBottom: spacing.md,
 })

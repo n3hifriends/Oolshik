@@ -31,7 +31,10 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={themed($container)}
     >
-      <LoginHero />
+      <LoginHero
+        currentLanguage={controller.currentLanguage}
+        onLanguageChange={controller.onLanguageChange}
+      />
 
       {controller.googleEnabled && controller.phoneOtpEnabled ? (
         <AuthModeToggle authMode={controller.authMode} onModeChange={controller.onModeChange} />
