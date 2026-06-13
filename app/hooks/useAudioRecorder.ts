@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react"
 import { Platform, PermissionsAndroid } from "react-native"
 
 type State = "idle" | "recording" | "stopped"
-export function useAudioRecorder(maxSeconds = 30) {
+export function useAudioRecorder(maxSeconds = 10) {
   const [state, setState] = useState<State>("idle")
   const [uri, setUri] = useState<string | null>(null)
   const [durationSec, setDurationSec] = useState(0)
   const recRef = useRef<Audio.Recording | null>(null)
-  const tickRef = useRef<NodeJS.Timeout | null>(null)
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // request mic permission (Android 12/13 emulator can be picky)
   const askPermission = async () => {
@@ -119,7 +119,7 @@ export function useAudioRecorder(maxSeconds = 30) {
 
   useEffect(
     () => () => {
-      if (tickRef.current) clearInterval(tickRef.current as any)
+      if (tickRef.current) clearInterval(tickRef.current)
       try {
         recRef.current?.stopAndUnloadAsync()
       } catch {}
@@ -127,5 +127,11 @@ export function useAudioRecorder(maxSeconds = 30) {
     [],
   )
 
-  return { uri, start, stop, recording: state === "recording", durationSec, reset }
+  const countdown = state === "recording"
+    ? Math.max(0, maxSeconds - durationSec)
+    : state === "stopped"
+      ? 0
+      : maxSeconds
+
+  return { uri, start, stop, recording: state === "recording", durationSec, countdown, maxSeconds, reset }
 }

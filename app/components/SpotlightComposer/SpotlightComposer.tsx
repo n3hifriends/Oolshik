@@ -82,8 +82,8 @@ export interface SpotlightComposerProps {
 const FAB_SIZE = 56
 const FAB_OFFSET_X = 14
 const FAB_OFFSET_Y = 10
-const PILL_HEIGHT = 66
-const PILL_RADIUS = 26
+const PILL_HEIGHT = 72
+const PILL_RADIUS = 36
 const TOP_SPACING = 32
 const SUBMIT_LOADER_MIN_MS = 500
 
@@ -138,11 +138,12 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
   const submitInFlightRef = useRef(false)
   const setEditingState = useCallback(() => setState("editing"), [])
 
-  const { uri, start, stop, reset, recording, durationSec } = useAudioRecorder(30)
+  const { uri, start, stop, reset, durationSec, countdown, recording } = useAudioRecorder(10)
   const latestRecording = useRef<{ uri: string | null; durationSec: number }>({
     uri: null,
     durationSec: 0,
   })
+  const prevRecordingRef = useRef(false)
 
   const selectedMode = useSharedValue<ComposerMode>("voice")
   const openProgress = useSharedValue(0)
@@ -392,6 +393,17 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
     [closeComposer, focusInput, mode, state, stop],
   )
 
+  // When the hook auto-stops (countdown reached 0), drive the composer through
+  // the same stop → transcribe flow as a manual press.
+  // Guard with prevRecordingRef so this only fires on true→false transition,
+  // not on the initial render when recording is already false.
+  useEffect(() => {
+    if (prevRecordingRef.current && !recording && state === "voice_recording") {
+      void handleStopRecording(true)
+    }
+    prevRecordingRef.current = recording
+  }, [recording, state, handleStopRecording])
+
   const handleSubmit = useCallback(async () => {
     if (submitInFlightRef.current || closingRef.current || stateRef.current === "closing") return
     const trimmed = text.trim()
@@ -576,26 +588,38 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
 
   const renderVoiceContent = () => (
     <View style={styles.contentRow}>
-      <Animated.View
-        style={[
-          styles.iconBubble,
-          pulseStyle,
-          {
-            borderColor: BRAND_ORANGE,
-            backgroundColor: "rgba(255,107,44,0.12)",
-          },
-        ]}
-      >
-        <MaterialCommunityIcons name="microphone" size={22} color={BRAND_ORANGE} />
+      {/* Pulsing record indicator */}
+      <Animated.View style={[styles.recDot, pulseStyle]}>
+        <MaterialCommunityIcons name="microphone" size={18} color="#fff" />
       </Animated.View>
-      <Animated.View
+
+      {/* Countdown */}
+      <Text
+        text={formatTime(countdown)}
         style={[
-          styles.wave,
-          pulseStyle,
-          { backgroundColor: "rgba(255,107,44,0.30)" },
+          styles.timerText,
+          { color: countdown <= 3 ? "#dc2626" : BRAND_ORANGE },
         ]}
       />
-      <Text text={formatTime(durationSec)} style={[styles.timerText, { color: BRAND_ORANGE }]} />
+
+      {/* Waveform bars */}
+      <Animated.View style={[styles.waveRow, pulseStyle]}>
+        {[10, 22, 16, 28, 12, 24, 10, 20, 14].map((h, i) => (
+          <View
+            key={i}
+            style={[
+              styles.waveBar,
+              {
+                height: h,
+                opacity: countdown <= 3 ? 0.9 : 0.65,
+                backgroundColor: countdown <= 3 ? "#dc2626" : BRAND_ORANGE,
+              },
+            ]}
+          />
+        ))}
+      </Animated.View>
+
+      {/* Stop button */}
       <TouchableOpacity
         accessibilityLabel={t("oolshik:composer.stopRecordingA11y")}
         onPress={() => handleStopRecording(true)}
@@ -912,15 +936,15 @@ const styles = StyleSheet.create({
   pillContainer: {
     position: "absolute",
     overflow: "hidden",
-    alignSelf: "center",
-    paddingHorizontal: 4,
   },
   pillInner: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderWidth: 1,
+    borderRadius: PILL_RADIUS,
+    overflow: "hidden",
   },
   pillPressShield: {
     flex: 1,
@@ -1022,8 +1046,32 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
   },
   timerText: {
-    marginLeft: 12,
-    fontWeight: "600",
+    marginLeft: 10,
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    minWidth: 52,
+  },
+  recDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: BRAND_ORANGE,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 6,
+  },
+  waveRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    marginHorizontal: 10,
+  },
+  waveBar: {
+    width: 3,
+    borderRadius: 2,
   },
   wave: {
     height: 10,

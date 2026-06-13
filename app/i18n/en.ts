@@ -602,7 +602,7 @@ const en = {
       section2Title: "2. Data collection and retention",
       section2Item1: "Location is collected only while the app is active in the foreground.",
       section2Item2:
-        "Voice clips (<=30 seconds) may be securely uploaded and used for playback or moderation.",
+        "Voice clips (<=10 seconds) may be securely uploaded and used for playback or moderation.",
       section2Item3:
         "Device indicators like network status and historical interactions may be processed to improve trust and reliability.",
       section2Item4: "Data is retained only as needed for legal or service requirements.",
@@ -644,9 +644,10 @@ const en = {
       offerLabel: "Offer (INR)",
       offerPlaceholder: "Optional amount",
       radiusLabel: "Show my request to helpers within:",
-      recordLabel: "Record a voice note (max 30s):",
-      recordCta: "Record ≤30s",
-      stopCta: "Stop ({{seconds}}s)",
+      recordLabel: "Record a voice note (max 10s):",
+      recordCta: "Record (10s max)",
+      stopCta: "Stop recording",
+      countdownLabel: "seconds left",
       previewHeading: "Preview your recording",
       pause: "Pause",
       play: "Play",

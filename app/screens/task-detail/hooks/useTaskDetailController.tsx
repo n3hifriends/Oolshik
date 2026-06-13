@@ -77,7 +77,7 @@ import type {
 
 const MAX_REASSIGN = 2
 const TRANSCRIPTION_POLL_INTERVAL_MS = 5000
-const TRANSCRIPTION_POLL_MAX_ATTEMPTS = 12
+const TRANSCRIPTION_POLL_MAX_ATTEMPTS = 36
 
 type Navigation = OolshikStackScreenProps<"OolshikDetail">["navigation"]
 
@@ -333,6 +333,7 @@ export function useTaskDetailController({
         if (!cancelled && res.ok && res.data) {
           const nextTask = toTaskDetailTask(res.data)
           setTask(nextTask)
+          if (nextTask) upsertTask(nextTask)
           if (!isWaitingForTranscription(nextTask)) return
         }
       } catch {
@@ -350,7 +351,7 @@ export function useTaskDetailController({
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [current?.description, current?.id, current?.title, current?.voiceUrl, taskId])
+  }, [current?.description, current?.id, current?.title, current?.voiceUrl, taskId, upsertTask])
 
   const statusChip = statusMap[normalizedStatus] ?? statusMap.PENDING
 
