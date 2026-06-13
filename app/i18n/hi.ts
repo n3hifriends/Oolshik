@@ -1,7 +1,7 @@
 import demoHi from "./demo-hi" // @demo remove-current-line
-import { Translations } from "./en"
+import { PartialTranslations } from "./en"
 
-const hi: Translations = {
+const hi: PartialTranslations = {
   common: {
     ok: "ठीक है!",
     cancel: "रद्द करें",

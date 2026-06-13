@@ -1,6 +1,6 @@
 import React from "react"
 import { AppState, AppStateStatus } from "react-native"
-import { Audio } from "expo-av"
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from "expo-av"
 
 type PlaybackState = {
   status: "idle" | "loading" | "playing"
@@ -51,9 +51,9 @@ class AudioPlaybackManager {
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
-        interruptionModeIOS: Audio.InterruptionModeIOS.DuckOthers,
+        interruptionModeIOS: InterruptionModeIOS.DuckOthers,
         shouldDuckAndroid: true,
-        interruptionModeAndroid: Audio.InterruptionModeAndroid.DuckOthers,
+        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
         playThroughEarpieceAndroid: false,
       })
     } catch {

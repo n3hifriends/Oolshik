@@ -48,7 +48,7 @@ function getDeviceInfo(includeDeviceInfo?: boolean): Pick<
   FeedbackPayload,
   "appVersion" | "os" | "deviceModel" | "locale"
 > {
-  const locale = Localization.locale
+  const locale = Localization.getLocales()[0]?.languageTag ?? ""
 
   if (!includeDeviceInfo) {
     return { locale }
@@ -125,7 +125,7 @@ export async function submitFeedback(input: FeedbackCreateInput): Promise<Submit
       return { ok: true, id: (res.data as any)?.id }
     }
     if (!isRetryable(res)) {
-      return { ok: false, error: res?.data?.message || res?.problem || "Submit failed" }
+      return { ok: false, error: (res?.data as any)?.message || res?.problem || "Submit failed" }
     }
   } catch (e: any) {
     // fall through to queue

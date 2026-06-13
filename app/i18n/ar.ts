@@ -1,7 +1,7 @@
 import demoAr from "./demo-ar" // @demo remove-current-line
-import { Translations } from "./en"
+import { PartialTranslations } from "./en"
 
-const ar: Translations = {
+const ar: PartialTranslations = {
   common: {
     ok: "نعم",
     cancel: "حذف",

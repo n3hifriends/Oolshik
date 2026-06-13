@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from "react"
 import { Platform, PermissionsAndroid, Alert } from "react-native"
 import AudioRecorderPlayer, {
   AVEncoderAudioQualityIOSType,
-  AVEncodingOption,
+  AudioSourceAndroidType,
+  type RecordBackType,
 } from "react-native-audio-recorder-player"
 
 export type RecordingState = "idle" | "recording" | "paused" | "stopped"
 export type Recording = { path: string; durationMs: number }
 
 export function useAudioRecorder() {
-  const arpRef = useRef(new AudioRecorderPlayer())
+  const arpRef = useRef(AudioRecorderPlayer)
   const [state, setState] = useState<RecordingState>("idle")
   const [path, setPath] = useState<string | null>(null)
   const [durationMs, setDurationMs] = useState(0)
@@ -45,15 +46,15 @@ export function useAudioRecorder() {
     const fname = `oolshik_${Date.now()}.m4a`
     const uri = Platform.select({ ios: `/${fname}`, android: undefined })
     const result = await arpRef.current.startRecorder(uri, {
-      quality: AVEncoderAudioQualityIOSType.high,
-      audioSource: 6,
+      AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+      AudioSourceAndroid: AudioSourceAndroidType.VOICE_RECOGNITION,
       AVNumberOfChannelsKeyIOS: 1,
-      AVFormatIDKeyIOS: AVEncodingOption.aac,
-      SampleRateIOS: 44100,
+      AVFormatIDKeyIOS: "aac",
+      AVSampleRateKeyIOS: 44100,
     })
     setPath(result)
     setState("recording")
-    arpRef.current.addRecordBackListener((e) => setDurationMs(e.currentPosition))
+    arpRef.current.addRecordBackListener((e: RecordBackType) => setDurationMs(e.currentPosition))
   }
 
   const pause = async () => {

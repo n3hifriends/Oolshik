@@ -2,9 +2,10 @@ import React, { useMemo } from "react"
 import { View, StyleSheet } from "react-native"
 import Slider from "@react-native-community/slider"
 import { Text } from "@/components/Text"
+import type { TxKeyPath } from "@/i18n"
 
 // Map value (0..5) → emoji + label
-function getFace(v: number) {
+function getFace(v: number): { emoji: string; label: TxKeyPath } {
   if (v < 1) return { emoji: "😡", label: "oolshik:ratingBad" }
   if (v < 2) return { emoji: "🙁", label: "oolshik:ratingPoor" }
   if (v < 3) return { emoji: "😐", label: "oolshik:ratingOkay" }

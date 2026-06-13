@@ -798,12 +798,12 @@ export const OolshikApi = {
     upiId: string
     payeeLabel?: string
     sourceType: PaymentProfileSourceType
-  }) => api.post<PaymentProfileApiResponse>("/payment-profile", body),
+  }) => api.post<PaymentProfileEditApiResponse>("/payment-profile", body),
   updatePaymentProfile: (body: {
     upiId: string
     payeeLabel?: string
     sourceType: PaymentProfileSourceType
-  }) => api.put<PaymentProfileApiResponse>("/payment-profile", body),
+  }) => api.put<PaymentProfileEditApiResponse>("/payment-profile", body),
   deletePaymentProfile: () => api.delete("/payment-profile"),
 }
 // Optional helper: call this after successful OTP verify to persist tokens

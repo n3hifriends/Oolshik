@@ -15,8 +15,6 @@ export function useReduceMotion() {
     )
 
     return () => {
-      // RN 0.79 event returns remove method
-      // @ts-expect-error RN types mismatch across versions
       subscription?.remove?.()
     }
   }, [])
