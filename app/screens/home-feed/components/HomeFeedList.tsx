@@ -18,6 +18,7 @@ type HomeFeedListProps = {
     loading: boolean
     titleRefreshCooldowns: Record<string, number>
   }
+  listPaddingBottom?: number
 }
 
 export function HomeFeedList(props: HomeFeedListProps) {
@@ -40,7 +41,7 @@ export function HomeFeedList(props: HomeFeedListProps) {
           ? (event) => props.onScrollOffsetChange?.(event.nativeEvent.contentOffset.y)
           : undefined
       }
-      contentContainerStyle={{ paddingBottom: 140 }}
+      contentContainerStyle={{ paddingBottom: props.listPaddingBottom ?? 140 }}
       ListEmptyComponent={
         <Text
           text={props.viewMode === "mine" ? props.emptyMineText : props.emptyForYouText}

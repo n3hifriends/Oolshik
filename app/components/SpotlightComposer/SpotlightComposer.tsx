@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import {
   Alert,
   KeyboardAvoidingView,
@@ -77,6 +77,16 @@ type ComposerSubmitPayload = {
 export interface SpotlightComposerProps {
   onSubmitTask?: (payload: ComposerSubmitPayload) => Promise<void> | void
   onBeforeOpen?: (mode: ComposerMode) => Promise<boolean> | boolean
+  /** Set false when HomeFeedBottomBar owns the idle mic/pen buttons */
+  showIdleFabs?: boolean
+  /** Override mic animation origin (screen-absolute centre). Used by HomeFeedBottomBar. */
+  micOrigin?: { x: number; y: number }
+  /** Override pen animation origin (screen-absolute centre). Used by HomeFeedBottomBar. */
+  penOrigin?: { x: number; y: number }
+}
+
+export interface SpotlightComposerHandle {
+  open: (mode: ComposerMode) => void
 }
 
 const FAB_SIZE = 56
@@ -119,7 +129,8 @@ const lerp = (a: number, b: number, t: number): number => {
 const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightComposerProps) {
+export const SpotlightComposer = forwardRef<SpotlightComposerHandle, SpotlightComposerProps>(
+function SpotlightComposer({ onSubmitTask, onBeforeOpen, showIdleFabs = true, micOrigin, penOrigin }: SpotlightComposerProps, ref) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
   const reduceMotion = useReduceMotion()
@@ -184,10 +195,12 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
   }, [state])
 
   useEffect(() => {
-    const micCenterX = insets.left + theme.spacing.md + FAB_SIZE / 2
-    const micCenterY = screenHeight - insets.bottom - theme.spacing.md - FAB_SIZE / 2
-    const penCenterX = micCenterX + FAB_OFFSET_X
-    const penCenterY = micCenterY - FAB_OFFSET_Y
+    const defaultMicX = insets.left + theme.spacing.md + FAB_SIZE / 2
+    const defaultMicY = screenHeight - insets.bottom - theme.spacing.md - FAB_SIZE / 2
+    const micCenterX = micOrigin ? micOrigin.x : defaultMicX
+    const micCenterY = micOrigin ? micOrigin.y : defaultMicY
+    const penCenterX = penOrigin ? penOrigin.x : micCenterX + FAB_OFFSET_X
+    const penCenterY = penOrigin ? penOrigin.y : micCenterY - FAB_OFFSET_Y
     const destY = insets.top + TOP_SPACING + PILL_HEIGHT / 2
 
     startVoiceX.value = micCenterX
@@ -201,6 +214,8 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
     insets.bottom,
     insets.left,
     insets.top,
+    micOrigin,
+    penOrigin,
     pillWidth,
     screenHeight,
     screenWidth,
@@ -355,6 +370,10 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
       onBeforeOpen,
     ],
   )
+
+  useImperativeHandle(ref, () => ({
+    open: (nextMode: ComposerMode) => handleOpen(nextMode),
+  }))
 
   const handleStopRecording = useCallback(
     async (shouldTranscribe = true) => {
@@ -827,10 +846,10 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
     </Animated.View>
   )
 
-  // Render: idle FABs always in-place; overlay only when active and rendered into Portal/Modal
+  // Render: idle FABs in-place only when showIdleFabs=true; overlay rendered into Portal/Modal when active
   return (
     <>
-      {renderIdleFabs()}
+      {showIdleFabs && renderIdleFabs()}
 
       {showOverlay &&
         (ResolvedPortal ? (
@@ -850,7 +869,7 @@ export function SpotlightComposer({ onSubmitTask, onBeforeOpen }: SpotlightCompo
         ))}
     </>
   )
-}
+})
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60)

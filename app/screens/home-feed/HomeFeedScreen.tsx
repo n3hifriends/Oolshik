@@ -1,9 +1,10 @@
-import React, { useCallback, useState } from "react"
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native"
+import React, { useCallback, useMemo, useRef, useState } from "react"
+import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from "react-native"
 import { useTranslation } from "react-i18next"
 import { useFocusEffect } from "@react-navigation/native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Screen } from "@/components/Screen"
-import { SpotlightComposer } from "@/components/SpotlightComposer"
+import { SpotlightComposer, type SpotlightComposerHandle } from "@/components/SpotlightComposer"
 import { colors } from "@/theme/colors"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useHomeFeedController } from "@/screens/home-feed/hooks/useHomeFeedController"
@@ -11,7 +12,13 @@ import { HomeFeedHeader } from "@/screens/home-feed/components/HomeFeedHeader"
 import { HomeFeedFilters } from "@/screens/home-feed/components/HomeFeedFilters"
 import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLocationState"
 import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
-import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
+import {
+  HomeFeedBottomBar,
+  BAR_HEIGHT,
+  BAR_BOTTOM_OFFSET,
+  BAR_MIC_CENTER_X,
+  BAR_PEN_CENTER_X,
+} from "@/screens/home-feed/components/HomeFeedBottomBar"
 import { HomeFeedServiceState } from "@/screens/home-feed/components/HomeFeedServiceState"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 import { OolshikApi } from "@/api/client"
@@ -21,6 +28,14 @@ type Props = OolshikStackScreenProps<"OolshikHome">
 export default function HomeFeedScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const [unreadCount, setUnreadCount] = useState(0)
+  const composerRef = useRef<SpotlightComposerHandle>(null)
+  const { height: screenHeight } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+
+  const barCenterY = screenHeight - insets.bottom - BAR_BOTTOM_OFFSET - BAR_HEIGHT / 2
+  const micOrigin = useMemo(() => ({ x: BAR_MIC_CENTER_X, y: barCenterY }), [barCenterY])
+  const penOrigin = useMemo(() => ({ x: BAR_PEN_CENTER_X, y: barCenterY }), [barCenterY])
+  const listPaddingBottom = BAR_HEIGHT + BAR_BOTTOM_OFFSET + insets.bottom + 16
 
   const controller = useHomeFeedController({
     navigation,
@@ -47,8 +62,12 @@ export default function HomeFeedScreen({ navigation }: Props) {
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
       <SpotlightComposer
+        ref={composerRef}
         onSubmitTask={handlers.onSubmitTask}
         onBeforeOpen={handlers.onBeforeComposerOpen}
+        showIdleFabs={false}
+        micOrigin={micOrigin}
+        penOrigin={penOrigin}
       />
 
       <HomeFeedHeader
@@ -161,13 +180,20 @@ export default function HomeFeedScreen({ navigation }: Props) {
                 emptyForYouText={t("oolshik:emptyForYou")}
                 viewMode={feed.viewMode}
                 extraData={feed.extraData}
+                listPaddingBottom={listPaddingBottom}
               />
             ) : null}
           </>
         )}
       </View>
 
-      <HomeFeedCreateBar createLabel={t("oolshik:create")} onPressCreate={handlers.openCreate} />
+      <HomeFeedBottomBar
+        onVoiceCapture={() => composerRef.current?.open("voice")}
+        onTypeCapture={() => composerRef.current?.open("type")}
+        onCreate={handlers.openCreate}
+        visible={!state.searchOpen}
+        condensed={feed.controlsCondensed}
+      />
 
       <ActiveRequestCapDialog {...state.activeCapDialog} />
     </Screen>

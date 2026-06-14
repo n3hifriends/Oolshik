@@ -232,14 +232,17 @@ export default function NotificationInboxScreen({ navigation }: Props) {
 
     try {
       const res = await OolshikApi.getNotifications(page, PAGE_SIZE)
-      if (!res.ok || !res.data) return
+      if (!res.ok || !res.data) {
+        setState((s) => ({ ...s, loading: false, refreshing: false, loadingMore: false }))
+        return
+      }
 
-      const { content, last } = res.data
+      const { content, totalPages } = res.data
       setState((s) => ({
         ...s,
         items: refresh || page === 0 ? content : [...s.items, ...content],
         page,
-        hasMore: !last,
+        hasMore: page + 1 < totalPages,
         loading: false,
         refreshing: false,
         loadingMore: false,
