@@ -16,6 +16,7 @@ import {
   HomeFeedBottomBar,
   BAR_HEIGHT,
   BAR_BOTTOM_OFFSET,
+  BAR_LIST_BOTTOM_EXTRA,
   BAR_MIC_CENTER_X,
   BAR_PEN_CENTER_X,
 } from "@/screens/home-feed/components/HomeFeedBottomBar"
@@ -35,7 +36,7 @@ export default function HomeFeedScreen({ navigation }: Props) {
   const barCenterY = screenHeight - insets.bottom - BAR_BOTTOM_OFFSET - BAR_HEIGHT / 2
   const micOrigin = useMemo(() => ({ x: BAR_MIC_CENTER_X, y: barCenterY }), [barCenterY])
   const penOrigin = useMemo(() => ({ x: BAR_PEN_CENTER_X, y: barCenterY }), [barCenterY])
-  const listPaddingBottom = BAR_HEIGHT + BAR_BOTTOM_OFFSET + insets.bottom + 16
+  const listPaddingBottom = BAR_HEIGHT + insets.bottom + BAR_LIST_BOTTOM_EXTRA
 
   const controller = useHomeFeedController({
     navigation,
@@ -124,7 +125,14 @@ export default function HomeFeedScreen({ navigation }: Props) {
         />
       )}
 
-      <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: state.searchOpen ? 8 : 0, backgroundColor: colors.background }}>
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 16,
+          paddingTop: state.searchOpen ? 8 : 0,
+          backgroundColor: colors.background,
+        }}
+      >
         {location.status !== "ready" ? (
           <HomeFeedLocationState
             status={location.status}

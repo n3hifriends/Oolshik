@@ -7,7 +7,8 @@ import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 
 export const BAR_HEIGHT = 60
-export const BAR_BOTTOM_OFFSET = 12
+export const BAR_BOTTOM_OFFSET = 4
+export const BAR_LIST_BOTTOM_EXTRA = 12
 export const BAR_HORIZONTAL = 16
 const BTN_SIZE = 44
 const BTN_GAP = 4
