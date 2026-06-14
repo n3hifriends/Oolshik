@@ -139,6 +139,21 @@ const en = {
       clear: "Clear search",
       placeholder: "Search title, description, name, phone, distance…",
       cancel: "Cancel",
+      recent: "Recent",
+      clearHistory: "Clear",
+    },
+    notificationInbox: {
+      heading: "Notifications",
+      sectionToday: "Today",
+      sectionYesterday: "Yesterday",
+      sectionEarlier: "Earlier",
+      emptyTitle: "No notifications yet",
+      emptyBody: "You'll see updates here when someone responds to your tasks.",
+      timeJustNow: "Just now",
+      timeMinAgo: "{{count}}m ago",
+      timeHrAgo: "{{count}}h ago",
+      timeDayAgo: "{{count}}d ago",
+      loadMore: "Load more",
     },
     composer: {
       submittedTitle: "Posted",
@@ -512,8 +527,7 @@ const en = {
       googleBenefitFast: "Fastest option when Google is already set up on this device.",
       googleBenefitTrusted: "Your app session is still issued and secured by Oolshik.",
       googleBenefitProfile: "Your name and email can be filled in with fewer steps.",
-      googlePhoneRequiredNote:
-        "Enter your phone number to continue with Google. You can type it manually or use the phone hint option.",
+      googlePhoneRequiredNote: "Enter your phone number to continue.",
       googleUnavailable: "Google sign-in is not configured on this build yet.",
       googleLoading: "Connecting...",
       googleSuccess: "Google sign-in succeeded.",
@@ -530,10 +544,8 @@ const en = {
       phoneHintAlertTitle: "Phone number hint",
       useMyPhoneNumber: "Choose my phone number",
       phoneHintBadge: "Recommended",
-      phoneHintActionHelper:
-        "Faster than typing. Pick a saved number on this phone and review it before continuing.",
-      phoneHintPrefillNote:
-        "Android only. This fills the field with a number you choose on-device. You can edit it before continuing.",
+      phoneHintActionHelper: "Pick a saved number from this device.",
+      phoneHintPrefillNote: "Android only — fills the field with a number you choose.",
       phoneHintPrefilled: "Phone number filled in. Review it before you continue.",
       phoneHintAlreadyFilled: "This phone number is already filled in.",
       phoneHintCancelled: "No phone number was selected.",
@@ -561,7 +573,7 @@ const en = {
       email: "Email",
       emailHint: "Optional. Helpful for receipts, updates, and recovery.",
       emailPlaceholder: "name@example.com",
-      privacyNote: "Your phone number stays private until a task needs direct contact.",
+      privacyNote: "Your number stays private.",
       readyToContinue: "Finish profile setup after the code is verified.",
       continue: "Continue",
       invalidOtp: "Invalid OTP",
@@ -573,6 +585,11 @@ const en = {
       phoneDigits: "Must be 10 digits",
       nameRequired: "This field cannot be empty",
       backendProfileSyncFailed: "Signed in, but we couldn't sync your profile. Please try again.",
+      phonePaymentBindingNote: "Use the same number linked to your UPI / payment account.",
+      phoneAlertTitle: "Mobile number",
+      phoneAlertBody:
+        "Use the same number linked to your UPI payment account. Entering a different number will block payment features.",
+      phoneAlertDismiss: "Got it",
       firebaseOtpBlocked:
         "Firebase has temporarily blocked OTP on this device. Use a test number or try again on a different device/emulator.",
     },
@@ -600,7 +617,7 @@ const en = {
       section2Title: "2. Data collection and retention",
       section2Item1: "Location is collected only while the app is active in the foreground.",
       section2Item2:
-        "Voice clips (<=30 seconds) may be securely uploaded and used for playback or moderation.",
+        "Voice clips (<=10 seconds) may be securely uploaded and used for playback or moderation.",
       section2Item3:
         "Device indicators like network status and historical interactions may be processed to improve trust and reliability.",
       section2Item4: "Data is retained only as needed for legal or service requirements.",
@@ -642,9 +659,10 @@ const en = {
       offerLabel: "Offer (INR)",
       offerPlaceholder: "Optional amount",
       radiusLabel: "Show my request to helpers within:",
-      recordLabel: "Record a voice note (max 30s):",
-      recordCta: "Record ≤30s",
-      stopCta: "Stop ({{seconds}}s)",
+      recordLabel: "Record a voice note (max 10s):",
+      recordCta: "Record (10s max)",
+      stopCta: "Stop recording",
+      countdownLabel: "seconds left",
       previewHeading: "Preview your recording",
       pause: "Pause",
       play: "Play",
@@ -726,6 +744,11 @@ const en = {
       notAdded: "Not added",
       cameraTitle: "Camera permission needed",
       cameraBody: "Enable camera access to scan your own payment QR.",
+      registeredMobileLabel: "Registered mobile",
+      registeredMobileNote: "This UPI account will be linked to your verified mobile number.",
+      registeredMobileNone: "No verified mobile on file",
+      mobileRequiredToSave:
+        "A verified mobile number is required to save a payment profile. Please sign in with your phone number first.",
     },
     direct: {
       helperCta: "Pay or request via UPI",
@@ -1000,3 +1023,5 @@ const en = {
 
 export default en
 export type Translations = typeof en
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T
+export type PartialTranslations = DeepPartial<Translations>

@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"
-import { Animated, Easing, Pressable, TextInput, View } from "react-native"
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import { Animated, BackHandler, Easing, Pressable, TextInput, View } from "react-native"
 import { useTranslation } from "react-i18next"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
 import { typography } from "@/theme/typography"
 import { colors } from "@/theme/colors"
+import { addToSearchHistory, clearSearchHistory, getSearchHistory } from "@/utils/searchHistory"
 
 type Props = {
   open: boolean
@@ -24,116 +26,244 @@ export const ExpandableSearch: React.FC<Props> = ({
   inputRef,
 }) => {
   const { t } = useTranslation()
-  const anim = useRef(new Animated.Value(open ? 1 : 0)).current
-  const [renderOpen, setRenderOpen] = useState(open)
+  const underlineAnim = useRef(new Animated.Value(open ? 1 : 0)).current
+  const suggestionsAnim = useRef(new Animated.Value(0)).current
+  const [history, setHistory] = useState<string[]>([])
+
+  const showSuggestions = open && value.length === 0 && history.length > 0
 
   useEffect(() => {
-    if (open) setRenderOpen(true)
-    Animated.timing(anim, {
+    Animated.timing(underlineAnim, {
       toValue: open ? 1 : 0,
       duration: 280,
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      if (!open) setRenderOpen(false)
-    })
-  }, [open, anim])
+      useNativeDriver: false,
+    }).start()
+  }, [open, underlineAnim])
 
-  const panelStyle = useMemo(
-    () => ({
-      opacity: anim,
-      transform: [
-        {
-          scale: anim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.85, 1],
-          }),
-        },
-        {
-          translateY: anim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [-10, 0],
-          }),
-        },
-      ],
-    }),
-    [anim],
-  )
+  useEffect(() => {
+    Animated.timing(suggestionsAnim, {
+      toValue: showSuggestions ? 1 : 0,
+      duration: 200,
+      easing: showSuggestions ? Easing.out(Easing.quad) : Easing.in(Easing.quad),
+      useNativeDriver: false,
+    }).start()
+  }, [showSuggestions, suggestionsAnim])
+
+  useEffect(() => {
+    if (open) {
+      const h = getSearchHistory()
+      setHistory(h)
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [open, inputRef])
+
+  const handleClose = useCallback(() => {
+    if (value.trim().length >= 2) addToSearchHistory(value.trim())
+    onClear()
+    setOpen(false)
+  }, [value, onClear, setOpen])
+
+  useEffect(() => {
+    if (!open) return
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      handleClose()
+      return true
+    })
+    return () => sub.remove()
+  }, [open, handleClose])
+
+  const underlineWidth = underlineAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  })
+
+  const suggestionsMaxHeight = suggestionsAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 280],
+  })
+
+  if (!open) {
+    return (
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="search"
+        accessibilityLabel={t("oolshik:search.open")}
+        style={({ pressed }) => ({
+          flex: 1,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: colors.palette.neutral200,
+          borderWidth: 1,
+          borderColor: "#E5E1DF",
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 12,
+          gap: 8,
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <MaterialCommunityIcons name="magnify" size={16} color="#AAA" />
+        <Text
+          text={t("oolshik:search.placeholder")}
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            color: "#AAA",
+            fontSize: 13,
+            fontFamily: typography.primary.normal,
+          }}
+        />
+      </Pressable>
+    )
+  }
 
   return (
-    <>
-      {!open && (
+    <View style={{ flex: 1 }}>
+      <View
+        style={{
+          minHeight: 46,
+          borderRadius: 23,
+          backgroundColor: colors.palette.neutral100,
+          borderWidth: 1,
+          borderColor: colors.palette.primary200,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingLeft: 10,
+          paddingRight: 8,
+        }}
+      >
         <Pressable
-          onPress={() => {
-            setOpen(true)
-            setTimeout(() => inputRef.current?.focus(), 50)
-          }}
+          onPress={handleClose}
           accessibilityRole="button"
-          accessibilityLabel={t("oolshik:search.open")}
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 22,
-            backgroundColor: colors.palette.primary500,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          accessibilityLabel={t("oolshik:search.close")}
+          hitSlop={10}
         >
-          <Text text="🔍" style={{ color: "#fff", fontSize: 15, lineHeight: 18 }} />
+          <MaterialCommunityIcons
+            name="arrow-left"
+            size={21}
+            color={colors.palette.neutral700}
+          />
         </Pressable>
-      )}
 
-      {renderOpen && (
-        <Animated.View style={[{ width: "100%", marginTop: 8 }, panelStyle]}>
-          <SectionCard style={{ width: "100%", paddingVertical: 6 }}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8 }}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <TextInput
+            ref={inputRef}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={t("oolshik:search.placeholder")}
+            placeholderTextColor="#AAA"
+            returnKeyType="search"
+            autoCapitalize="none"
+            onSubmitEditing={() => {
+              if (value.trim().length >= 2) {
+                addToSearchHistory(value.trim())
+                setHistory(getSearchHistory())
+              }
+            }}
+            style={{
+              height: 42,
+              paddingVertical: 0,
+              paddingHorizontal: 0,
+              fontSize: 15,
+              lineHeight: 20,
+              fontFamily: typography.primary.medium,
+              color: colors.palette.neutral700,
+              textAlignVertical: "center",
+              includeFontPadding: false,
+            }}
+          />
+          <Animated.View
+            style={{
+              height: 2,
+              width: underlineWidth,
+              backgroundColor: colors.palette.primary500,
+              borderRadius: 1,
+            }}
+          />
+        </View>
+
+        {value.length > 0 && (
+          <Pressable
+            onPress={onClear}
+            accessibilityRole="button"
+            accessibilityLabel={t("oolshik:search.clear")}
+            hitSlop={10}
+          >
+            <MaterialCommunityIcons name="close-circle" size={18} color="#BBB" />
+          </Pressable>
+        )}
+      </View>
+
+      <Animated.View
+        style={{
+          maxHeight: suggestionsMaxHeight,
+          opacity: suggestionsAnim,
+          overflow: "hidden",
+          marginTop: 8,
+        }}
+      >
+        <SectionCard style={{ paddingVertical: 4, paddingHorizontal: 4 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+            }}
+          >
+            <Text
+              text={t("oolshik:search.recent")}
+              size="xxs"
+              weight="semiBold"
+              style={{ color: colors.palette.neutral600 }}
+            />
+            <Pressable
+              onPress={() => {
+                clearSearchHistory()
+                setHistory([])
+              }}
+              accessibilityRole="button"
+              hitSlop={8}
             >
-              <Text text="🔍" style={{ fontSize: 16, lineHeight: 16 }} />
-              <TextInput
-                ref={inputRef}
-                value={value}
-                onChangeText={onChangeText}
-                placeholder={t("oolshik:search.placeholder")}
-                placeholderTextColor="#9CA3AF"
-                returnKeyType="search"
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  fontSize: 16,
-                  fontFamily: typography.primary.normal,
-                }}
+              <Text
+                text={t("oolshik:search.clearHistory")}
+                size="xxs"
+                style={{ color: colors.palette.primary500 }}
               />
-              {value?.length ? (
-                <Pressable
-                  onPress={onClear}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("oolshik:search.clear")}
-                >
-                  <Text text="✕" style={{ fontSize: 16, color: "#6B7280" }} />
-                </Pressable>
-              ) : null}
-              <Pressable
-                onPress={() => {
-                  onClear()
-                  setOpen(false)
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t("oolshik:search.close")}
-                style={{
-                  marginLeft: 2,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                  backgroundColor: "#F3F4F6",
-                }}
-              >
-                <Text text={t("oolshik:search.cancel")} style={{ color: "#111827", fontWeight: "600" }} />
-              </Pressable>
-            </View>
-          </SectionCard>
-        </Animated.View>
-      )}
-    </>
+            </Pressable>
+          </View>
+
+          {history.map((item) => (
+            <Pressable
+              key={item}
+              onPress={() => {
+                onChangeText(item)
+                addToSearchHistory(item)
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 8,
+                paddingVertical: 10,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <MaterialCommunityIcons name="history" size={16} color="#BBB" />
+              <Text
+                text={item}
+                size="xs"
+                numberOfLines={1}
+                style={{ flex: 1, color: colors.palette.neutral700 }}
+              />
+            </Pressable>
+          ))}
+        </SectionCard>
+      </Animated.View>
+    </View>
   )
 }

@@ -76,12 +76,39 @@ import type {
 } from "@/screens/task-detail/types"
 
 const MAX_REASSIGN = 2
+const TRANSCRIPTION_POLL_INTERVAL_MS = 5000
+const TRANSCRIPTION_POLL_MAX_ATTEMPTS = 36
 
 type Navigation = OolshikStackScreenProps<"OolshikDetail">["navigation"]
 
 function toTaskDetailTask(task: Task | null | undefined): TaskDetailTask | null {
   if (!task) return null
   return task as TaskDetailTask
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function isPlaceholderTitle(value: unknown): boolean {
+  const text = normalizeText(value)
+  return !text || text === "..."
+}
+
+function isWaitingForTranscription(task: TaskDetailTask | null): boolean {
+  if (!task) return false
+  const voiceUrl = normalizeText(task.voiceUrl)
+  return !!voiceUrl && isPlaceholderTitle(task.title) && !normalizeText(task.description)
+}
+
+function getTaskDisplayText(task: TaskDetailTask | null, fallback: string): string {
+  const description = normalizeText(task?.description)
+  if (description) return description
+
+  const title = normalizeText(task?.title)
+  if (title && !isPlaceholderTitle(title)) return title
+
+  return fallback
 }
 
 function getTaskPhoneNumber(task: TaskDetailTask | null, isRequester: boolean) {
@@ -291,6 +318,40 @@ export function useTaskDetailController({
       cancelled = true
     }
   }, [taskId, taskFromStore])
+
+  useEffect(() => {
+    if (!isWaitingForTranscription(current)) return
+
+    let cancelled = false
+    let attempts = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const poll = async () => {
+      attempts += 1
+      try {
+        const res = await fetchTaskById(taskId)
+        if (!cancelled && res.ok && res.data) {
+          const nextTask = toTaskDetailTask(res.data)
+          setTask(nextTask)
+          if (nextTask) upsertTask(nextTask)
+          if (!isWaitingForTranscription(nextTask)) return
+        }
+      } catch {
+        // Transcription polling is best-effort; the manual refresh path remains available.
+      }
+
+      if (!cancelled && attempts < TRANSCRIPTION_POLL_MAX_ATTEMPTS) {
+        timer = setTimeout(poll, TRANSCRIPTION_POLL_INTERVAL_MS)
+      }
+    }
+
+    timer = setTimeout(poll, TRANSCRIPTION_POLL_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [current?.description, current?.id, current?.title, current?.voiceUrl, taskId, upsertTask])
 
   const statusChip = statusMap[normalizedStatus] ?? statusMap.PENDING
 
@@ -1541,7 +1602,7 @@ ${t("payment:notice.line2")}`,
     derived: {
       initials: getInitials(current?.createdByName),
       createdAtLabel: minsAgo(current?.createdAt, t),
-      description: current?.description || t("oolshik:taskDetailScreen.voiceTask"),
+      description: getTaskDisplayText(current, t("oolshik:taskDetailScreen.voiceTask")),
       requesterName: current?.createdByName || t("oolshik:taskDetailScreen.requesterFallback"),
       distanceLabel,
       distanceAwayText: t("oolshik:taskCard.distanceAway", { distance: distanceLabel ?? "" }),

@@ -1,7 +1,7 @@
 import demoKo from "./demo-ko" // @demo remove-current-line
-import { Translations } from "./en"
+import { PartialTranslations } from "./en"
 
-const ko: Translations = {
+const ko: PartialTranslations = {
   common: {
     ok: "확인!",
     cancel: "취소",

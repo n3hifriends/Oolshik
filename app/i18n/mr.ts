@@ -146,6 +146,21 @@ const mr: Translations = {
       clear: "शोध साफ करा",
       placeholder: "शीर्षक, वर्णन, नाव, फोन, अंतर शोधा...",
       cancel: "रद्द करा",
+      recent: "अलीकडील",
+      clearHistory: "साफ करा",
+    },
+    notificationInbox: {
+      heading: "सूचना",
+      sectionToday: "आज",
+      sectionYesterday: "काल",
+      sectionEarlier: "आधीचे",
+      emptyTitle: "अद्याप कोणत्याही सूचना नाहीत",
+      emptyBody: "कोणी तुमच्या कामावर प्रतिसाद दिल्यावर येथे दिसेल.",
+      timeJustNow: "आत्ता",
+      timeMinAgo: "{{count}} मि. पूर्वी",
+      timeHrAgo: "{{count}} ता. पूर्वी",
+      timeDayAgo: "{{count}} दि. पूर्वी",
+      loadMore: "आणखी पहा",
     },
     composer: {
       submittedTitle: "पाठवले",
@@ -519,8 +534,7 @@ const mr: Translations = {
       googleBenefitFast: "या डिव्हाइसवर Google तयार असेल तर हा सर्वात जलद पर्याय आहे.",
       googleBenefitTrusted: "तरीही तुमचे ॲप सेशन ऊलशिक कडूनच सुरक्षितपणे जारी केले जाते.",
       googleBenefitProfile: "नाव आणि ईमेल कमी स्टेप्समध्ये भरता येतात.",
-      googlePhoneRequiredNote:
-        "Google ने पुढे जाण्यासाठी तुमचा फोन नंबर टाका. तुम्ही तो हाताने टाकू शकता किंवा फोन हिंट पर्याय वापरू शकता.",
+      googlePhoneRequiredNote: "पुढे जाण्यासाठी फोन नंबर टाका.",
       googleUnavailable: "या बिल्डमध्ये Google लॉगिन अजून कॉन्फिगर केलेले नाही.",
       googleLoading: "जोडत आहोत...",
       googleSuccess: "Google लॉगिन यशस्वी झाले.",
@@ -537,10 +551,8 @@ const mr: Translations = {
       phoneHintAlertTitle: "फोन नंबर हिंट",
       useMyPhoneNumber: "माझा फोन नंबर निवडा",
       phoneHintBadge: "शिफारस केलेले",
-      phoneHintActionHelper:
-        "टाइप करण्यापेक्षा जलद. या फोनमधला सेव्ह केलेला नंबर निवडा आणि पुढे जाण्यापूर्वी तपासा.",
-      phoneHintPrefillNote:
-        "फक्त Android वर. तुम्ही डिव्हाइसवर निवडलेला नंबर या फील्डमध्ये भरला जाईल. पुढे जाण्यापूर्वी तो बदलू शकता.",
+      phoneHintActionHelper: "या डिव्हाइसमधला सेव्ह केलेला नंबर निवडा.",
+      phoneHintPrefillNote: "फक्त Android वर — तुम्ही निवडलेला नंबर फील्डमध्ये भरला जाईल.",
       phoneHintPrefilled: "फोन नंबर भरला गेला आहे. पुढे जाण्यापूर्वी तपासा.",
       phoneHintAlreadyFilled: "हा फोन नंबर आधीच भरलेला आहे.",
       phoneHintCancelled: "कोणताही फोन नंबर निवडला गेला नाही.",
@@ -568,7 +580,7 @@ const mr: Translations = {
       email: "ईमेल",
       emailHint: "ऐच्छिक. पावत्या, अपडेट्स आणि रिकव्हरीसाठी उपयुक्त.",
       emailPlaceholder: "name@example.com",
-      privacyNote: "कामासाठी थेट संपर्काची गरज पडली नाही तर तुमचा नंबर खाजगी ठेवला जातो.",
+      privacyNote: "तुमचा नंबर खाजगी ठेवला जातो.",
       readyToContinue: "कोड पडताळल्यानंतर प्रोफाइल सेटअप पूर्ण करा.",
       continue: "पुढे जा",
       invalidOtp: "अवैध OTP",
@@ -581,6 +593,11 @@ const mr: Translations = {
       nameRequired: "हे फील्ड रिक्त ठेवू नका",
       backendProfileSyncFailed:
         "लॉगिन झाले, पण प्रोफाइल सिंक करता आले नाही. कृपया पुन्हा प्रयत्न करा.",
+      phonePaymentBindingNote: "UPI / पेमेंट खात्याशी जोडलेला तोच नंबर वापरा.",
+      phoneAlertTitle: "मोबाइल नंबर",
+      phoneAlertBody:
+        "तुमच्या UPI पेमेंट खात्याशी जोडलेलाच नंबर वापरा. वेगळा नंबर टाकल्यास पेमेंट सुविधा बंद होईल.",
+      phoneAlertDismiss: "समजले",
       firebaseOtpBlocked:
         "या डिव्हाइसवर Firebase ने OTP तात्पुरते ब्लॉक केले आहे. टेस्ट नंबर वापरा किंवा वेगळे डिव्हाइस/एम्युलेटर वापरून पुन्हा प्रयत्न करा.",
     },
@@ -608,7 +625,7 @@ const mr: Translations = {
       section2Title: "2. डेटा संकलन व जतन",
       section2Item1: "ॲप सक्रिय असताना फक्त फोरग्राउंडमध्ये स्थान घेतले जाते.",
       section2Item2:
-        "व्हॉईस क्लिप्स (<=30 सेकंद) सुरक्षितपणे अपलोड करून प्लेबॅक/मॉडरेशनसाठी वापरल्या जाऊ शकतात.",
+        "व्हॉईस क्लिप्स (<=10 सेकंद) सुरक्षितपणे अपलोड करून प्लेबॅक/मॉडरेशनसाठी वापरल्या जाऊ शकतात.",
       section2Item3:
         "नेटवर्कसारखे डिव्हाइस इंडिकेटर्स आणि ऐतिहासिक परस्परसंवाद विश्वसनीयता वाढवण्यासाठी प्रक्रिया होऊ शकतात.",
       section2Item4: "कायदेशीर/सेवा गरजेनुसारच डेटा जतन केला जातो.",
@@ -644,9 +661,10 @@ const mr: Translations = {
       offerLabel: "ऑफर (INR)",
       offerPlaceholder: "ऐच्छिक रक्कम",
       radiusLabel: "ही विनंती किती अंतरातील कार्यकर्त्यांना दाखवायची:",
-      recordLabel: "व्हॉइस नोट रेकॉर्ड करा (कमाल 30 सेकंद):",
-      recordCta: "रेकॉर्ड ≤30s",
-      stopCta: "थांबा ({{seconds}}s)",
+      recordLabel: "व्हॉइस नोट रेकॉर्ड करा (कमाल 10 सेकंद):",
+      recordCta: "रेकॉर्ड (10s कमाल)",
+      stopCta: "रेकॉर्डिंग थांबवा",
+      countdownLabel: "सेकंद शिल्लक",
       previewHeading: "रेकॉर्डिंगचे पूर्वावलोकन",
       pause: "थांबा",
       play: "प्ले",
@@ -728,6 +746,11 @@ const mr: Translations = {
       notAdded: "जोडलेले नाही",
       cameraTitle: "कॅमेरा परवानगी आवश्यक आहे",
       cameraBody: "तुमचा स्वतःचा पेमेंट QR स्कॅन करण्यासाठी कॅमेरा सुरू करा.",
+      registeredMobileLabel: "नोंदणीकृत मोबाइल",
+      registeredMobileNote: "हे UPI खाते तुमच्या पडताळलेल्या मोबाइल नंबरशी जोडले जाईल.",
+      registeredMobileNone: "पडताळलेला मोबाइल नोंदवलेला नाही",
+      mobileRequiredToSave:
+        "पेमेंट प्रोफाइल जतन करण्यासाठी पडताळलेला मोबाइल नंबर आवश्यक आहे. कृपया आधी फोन नंबरने साइन इन करा.",
     },
     direct: {
       helperCta: "UPI ने पैसे द्या किंवा मागा",

@@ -45,6 +45,8 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
       ...existingPlugins,
       require("./plugins/withSplashScreen").withSplashScreen,
       require("./plugins/withAndroidPhoneNumberHint").withAndroidPhoneNumberHint,
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
     ],
   }
 }

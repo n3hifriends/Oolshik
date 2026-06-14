@@ -5,7 +5,7 @@ import { navigationRef } from "@/navigators/navigationUtilities"
 import {
   attachNotificationListeners,
   disablePushNotifications,
-  getExpoPushTokenAsync,
+  getFcmTokenAsync,
   registerDeviceTokenWithRetry,
   setCachedPushToken,
 } from "@/utils/pushNotifications"
@@ -26,10 +26,12 @@ export type AuthContextType = {
   authEmail?: string
   userId?: string
   userName?: string
+  userPhone?: string
   setAuthToken: (token?: string) => void
   setAuthEmail: (email?: string) => void
   setUserId: (id?: string) => void
   setUserName: (name?: string) => void
+  setUserPhone: (phone?: string) => void
   logout: () => void
   validationError: string
 }
@@ -37,6 +39,7 @@ export const MMKV_AUTH_TOKEN = "auth.token"
 export const MMKV_AUTH_EMAIL = "auth.email"
 export const MMKV_USER_ID = "auth.userId"
 export const MMKV_USER_NAME = "auth.userName"
+export const MMKV_USER_PHONE = "auth.phone"
 
 export const AuthContext = createContext<AuthContextType | null>(null)
 
@@ -47,6 +50,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const [authEmail, setAuthEmailMMKV] = useMMKVString(MMKV_AUTH_EMAIL)
   const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
   const [userName, setUserNameMMKV] = useMMKVString(MMKV_USER_NAME)
+  const [userPhone, setUserPhoneMMKV] = useMMKVString(MMKV_USER_PHONE)
 
   // Defaults for local/dev use
   const effectiveUserId = userId || "U-LOCAL-1"
@@ -70,16 +74,19 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
 
   const setUserName = useCallback((name?: string) => setUserNameMMKV(name ?? ""), [setUserNameMMKV])
 
+  const setUserPhone = useCallback((phone?: string) => setUserPhoneMMKV(phone ?? ""), [setUserPhoneMMKV])
+
   const logout = useCallback(() => {
     // ✅ clear persisted state
     setAuthTokenMMKV("")
     setAuthEmailMMKV("")
     setUserIdMMKV("")
     setUserNameMMKV("")
+    setUserPhoneMMKV("")
     // ✅ clear Authorization header in the HTTP client
     setLoginTokens(undefined, undefined)
     // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
-  }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV])
+  }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV])
 
   useEffect(() => {
     // Legacy-state recovery: older installs can retain `auth.token` while
@@ -112,7 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
           await disablePushNotifications()
           return
         }
-        const token = await getExpoPushTokenAsync()
+        const token = await getFcmTokenAsync()
         if (!active || !token) return
         await registerDeviceTokenWithRetry(token)
         setCachedPushToken(token)
@@ -141,10 +148,12 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       authEmail: authEmail || undefined,
       userId: effectiveUserId,
       userName: effectiveUserName,
+      userPhone: userPhone || undefined,
       setAuthToken,
       setAuthEmail,
       setUserId,
       setUserName,
+      setUserPhone,
       logout,
       validationError,
     }),
@@ -153,10 +162,12 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       authEmail,
       effectiveUserId,
       effectiveUserName,
+      userPhone,
       setAuthToken,
       setAuthEmail,
       setUserId,
       setUserName,
+      setUserPhone,
       logout,
       validationError,
     ],

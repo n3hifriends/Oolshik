@@ -27,6 +27,7 @@ type HomeFeedFiltersProps = {
   onToggleExpanded: () => void
   condensed: boolean
   resultCount: number
+  isSearchActive?: boolean
 }
 
 type SortControlButtonProps = {
@@ -176,6 +177,8 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
         : t("oolshik:homeScreen.sortFarthestFirst")
 
   const compactPadding = props.condensed ? 8 : 10
+
+  if (props.isSearchActive) return null
 
   return (
     <View style={{ paddingHorizontal: 16, marginBottom: props.condensed ? 6 : 10 }}>

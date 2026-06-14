@@ -11,7 +11,13 @@ import {
   getProfileExtras,
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
-import { pickDeviceLocaleTag, resolvePreferredLocale } from "@/i18n/locale"
+import {
+  fromLanguageCode,
+  pickDeviceLocaleTag,
+  resolvePreferredLocale,
+  type SupportedLocaleTag,
+  toLanguageCode,
+} from "@/i18n/locale"
 import { getPhoneNumberHint, type PhoneNumberHintResult } from "@/services/phoneNumberHint"
 import { toIndianE164 } from "@/utils/phoneNumber"
 import i18n from "i18next"
@@ -95,8 +101,9 @@ export function useLoginScreenController() {
   const activeGoogleAttemptRef = useRef<number | null>(null)
   const lastHandledGoogleResponseRef = useRef<unknown>(null)
   const pendingGooglePhoneHintRef = useRef<string | undefined>(undefined)
+  const phoneAlertShownRef = useRef(false)
 
-  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, validationError } =
+  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, setUserPhone, validationError } =
     useAuth()
 
   const googleScopes = useMemo(() => ["openid", "profile", "email"], [])
@@ -132,6 +139,10 @@ export function useLoginScreenController() {
       setAuthMode("phone")
     }
   }, [authMode, googleEnabled, phoneOtpEnabled])
+
+  useEffect(() => {
+    phoneAlertShownRef.current = false
+  }, [authMode])
 
   useEffect(() => {
     let active = true
@@ -267,6 +278,7 @@ export function useLoginScreenController() {
         setUserName(profile.displayName ?? fallbackDisplayName ?? "You")
         setAuthEmail(profile.email ?? "")
         if (profile.id != null) setUserId(String(profile.id))
+        setUserPhone(profile.phone ?? undefined)
 
         let localPreference: string | null = null
         try {
@@ -542,6 +554,37 @@ export function useLoginScreenController() {
     setShowEmail((value) => !value)
   }, [])
 
+  // Derived from i18n.language — stays in sync automatically because useTranslation()
+  // above subscribes to language changes and triggers a re-render.
+  const currentLanguage = fromLanguageCode(i18n.language)
+
+  const handleLanguageChange = useCallback(async (tag: SupportedLocaleTag) => {
+    const code = toLanguageCode(tag)
+    await i18n.changeLanguage(code)
+    try {
+      await updateProfileExtras({ preferredLanguage: tag, language: code })
+    } catch {
+      // best-effort
+    }
+  }, [])
+
+  const onLanguageChange = useCallback(
+    (tag: SupportedLocaleTag) => {
+      void handleLanguageChange(tag)
+    },
+    [handleLanguageChange],
+  )
+
+  const onPhoneFocus = useCallback(() => {
+    if (phoneAlertShownRef.current) return
+    phoneAlertShownRef.current = true
+    Alert.alert(
+      t("oolshik:login.phoneAlertTitle"),
+      t("oolshik:login.phoneAlertBody"),
+      [{ text: t("oolshik:login.phoneAlertDismiss") }],
+    )
+  }, [t])
+
   const handleGooglePhoneBlur = useCallback(() => {
     setGooglePhoneTouched(true)
   }, [])
@@ -554,6 +597,7 @@ export function useLoginScreenController() {
     activePhoneStep,
     authEmail,
     authMode,
+    currentLanguage,
     canContinue,
     canUsePhoneNumberHint,
     displayName,
@@ -573,11 +617,13 @@ export function useLoginScreenController() {
     onContinue: handleContinuePress,
     onDisplayNameChange: setDisplayName,
     onEmailToggle: handleEmailToggle,
+    onLanguageChange,
     onGooglePhoneBlur: handleGooglePhoneBlur,
     onGooglePress: handleGooglePress,
     onModeChange: setAuthMode,
     onOtpChange: setOtp,
     onPhoneChange: handlePhoneChange,
+    onPhoneFocus,
     onSetAuthEmail: setAuthEmail,
     onUseMyPhoneNumberPress: handleUseMyPhoneNumberPress,
     onVerifyOtp: handleVerifyOtpPress,

@@ -45,7 +45,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const [playbackSecs, setPlaybackSecs] = useState(0)
   const MAX_DESC = 500
 
-  const { uri, start, stop, recording, durationSec, reset } = useAudioRecorder(30)
+  const { uri, start, stop, recording, durationSec, countdown, maxSeconds, reset } = useAudioRecorder(10)
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { userId, userName } = useAuth()
   const { fetchNearby } = useTaskStore()
@@ -366,9 +366,46 @@ export default function CreateTaskScreen({ navigation }: any) {
             <Button text={t("task:create.recordCta")} onPress={onStartPress} />
           )}
           {recording && (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <ActivityIndicator />
-              <Button text={t("task:create.stopCta", { seconds: durationSec })} onPress={stop} />
+            <View style={{ gap: 10 }}>
+              {/* Countdown number */}
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  text={String(countdown)}
+                  style={{
+                    fontSize: 56,
+                    fontWeight: "800",
+                    color: countdown <= 3 ? "#dc2626" : countdown <= 6 ? "#ea580c" : "#111827",
+                    lineHeight: 64,
+                  }}
+                />
+                <Text
+                  text={t("task:create.countdownLabel")}
+                  style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}
+                />
+              </View>
+              {/* Progress bar */}
+              <View
+                style={{
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: "#e5e7eb",
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    height: 6,
+                    borderRadius: 3,
+                    width: `${(countdown / maxSeconds) * 100}%`,
+                    backgroundColor: countdown <= 3 ? "#dc2626" : countdown <= 6 ? "#ea580c" : "#FF6B2C",
+                  }}
+                />
+              </View>
+              {/* Stop button */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <ActivityIndicator color="#FF6B2C" />
+                <Button text={t("task:create.stopCta")} onPress={stop} />
+              </View>
             </View>
           )}
           {!recording && uri && (

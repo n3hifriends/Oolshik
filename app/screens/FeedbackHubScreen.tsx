@@ -1,5 +1,6 @@
 import React from "react"
 import { Pressable, View } from "react-native"
+import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
@@ -10,6 +11,7 @@ import type { TxKeyPath } from "@/i18n"
 type Params = { taskId?: string; targetUserId?: string }
 
 export default function FeedbackHubScreen({ navigation }: { navigation: any }) {
+  const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { params } = useRoute<any>() as { params?: Params }
@@ -53,6 +55,10 @@ export default function FeedbackHubScreen({ navigation }: { navigation: any }) {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
     >
+      <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ alignSelf: "flex-start" }} accessibilityRole="button">
+        <Text text={`← ${t("common:back")}`} />
+      </Pressable>
+
       <Text preset="heading" tx="oolshik:feedback.title" />
       <Text tx="oolshik:feedback.subtitle" size="xs" style={{ color: colors.textDim }} />
 

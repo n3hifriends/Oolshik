@@ -1,5 +1,6 @@
 import { Platform } from "react-native"
-import Constants from "expo-constants"
+import messaging from "@react-native-firebase/messaging"
+import type { FirebaseMessagingTypes } from "@react-native-firebase/messaging"
 import * as Notifications from "expo-notifications"
 
 import { OolshikApi } from "@/api/client"
@@ -9,12 +10,16 @@ import { loadString, saveString, remove } from "@/utils/storage"
 const PUSH_TOKEN_KEY = "push.token"
 const PUSH_PERMISSION_REQUESTED_KEY = "push.permission.requested"
 const ONBOARDING_COMPLETE_KEY = "onboarding.v1.completed"
-const EXPO_PROJECT_ID = "86345f55-b151-453a-aa0e-5357b9aaddf7"
 const NAV_READY_RETRY_DELAY_MS = 150
 const NAV_READY_MAX_RETRIES = 40
 
+type NotifRoute = "TaskDetail" | "PaymentPay" | "AdminBroadcast" | "InAppInbox"
+
 type PendingNotificationTarget = {
-  taskId: string
+  route: NotifRoute
+  taskId?: string
+  paymentRequestId?: string
+  broadcastId?: string
 }
 
 type RouteLike = {
@@ -37,31 +42,37 @@ Notifications.setNotificationHandler({
   }),
 })
 
-export async function getExpoPushTokenAsync(): Promise<string | null> {
+export async function getFcmTokenAsync(): Promise<string | null> {
   if (Platform.OS === "web") return null
   await ensureAndroidChannel()
-  const { status: existingStatus } = await Notifications.getPermissionsAsync()
-  let finalStatus = existingStatus
+
   const askedBefore = loadString(PUSH_PERMISSION_REQUESTED_KEY) === "true"
-  if (existingStatus !== "granted" && !askedBefore) {
-    const { status } = await Notifications.requestPermissionsAsync()
-    finalStatus = status
+  if (!askedBefore) {
+    const authStatus = await messaging().requestPermission()
     saveString(PUSH_PERMISSION_REQUESTED_KEY, "true")
+    const granted =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL
+    if (!granted) return null
+  } else {
+    const authStatus = await messaging().hasPermission()
+    const granted =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL
+    if (!granted) return null
   }
-  if (finalStatus !== "granted") return null
 
   try {
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId: getExpoProjectId() }))
-      .data
+    const token = await messaging().getToken()
     if (__DEV__) {
       // eslint-disable-next-line no-console
-      console.log("expo push token acquired")
+      console.log("FCM token acquired")
     }
     return token
   } catch {
     if (__DEV__) {
       // eslint-disable-next-line no-console
-      console.warn("expo push token acquisition failed")
+      console.warn("FCM token acquisition failed")
     }
     return null
   }
@@ -108,6 +119,7 @@ export async function unregisterDeviceTokenWithRetry(token: string, maxAttempts 
 }
 
 export function attachNotificationListeners() {
+  const foregroundFcm = messaging().onMessage(handleForegroundFcmMessage)
   const received = Notifications.addNotificationReceivedListener(() => {
     // no-op for now
   })
@@ -119,10 +131,44 @@ export function attachNotificationListeners() {
   flushPendingTarget()
 
   return () => {
+    foregroundFcm()
     received.remove()
     response.remove()
     clearNavRetryTimer()
   }
+}
+
+async function handleForegroundFcmMessage(remoteMessage: FirebaseMessagingTypes.RemoteMessage) {
+  const title =
+    remoteMessage.notification?.title ||
+    getStringDataValue(remoteMessage.data, "title") ||
+    "Oolshik"
+  const body =
+    remoteMessage.notification?.body ||
+    getStringDataValue(remoteMessage.data, "body") ||
+    getStringDataValue(remoteMessage.data, "message") ||
+    ""
+
+  if (!title && !body) return
+
+  await ensureAndroidChannel()
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      // Carry full FCM data so tap routing works after the local notification is pressed
+      data: (remoteMessage.data as Record<string, unknown>) ?? {},
+    },
+    trigger: null,
+  })
+}
+
+function getStringDataValue(
+  data: FirebaseMessagingTypes.RemoteMessage["data"],
+  key: string,
+): string | null {
+  const value = data?.[key]
+  return typeof value === "string" && value.trim().length > 0 ? value : null
 }
 
 async function handleInitialNotificationResponse() {
@@ -141,19 +187,38 @@ function handleNotificationResponse(resp: Notifications.NotificationResponse) {
       ? resp.notification.request.identifier
       : null
 
-  // Avoid duplicate navigation when both "last response" and listener callbacks fire.
   if (responseIdentifier && responseIdentifier === lastHandledResponseIdentifier) {
     return
   }
   lastHandledResponseIdentifier = responseIdentifier
 
   const data = resp.notification.request.content.data as Record<string, unknown> | undefined
+  const route = typeof data?.route === "string" ? (data.route as string) : ""
   const type = typeof data?.type === "string" ? data.type : ""
   const taskId = typeof data?.taskId === "string" ? data.taskId : ""
+  const paymentRequestId = typeof data?.paymentRequestId === "string" ? data.paymentRequestId : ""
+  const broadcastId = typeof data?.broadcastId === "string" ? data.broadcastId : ""
 
-  if (!type.startsWith("TASK_") || !taskId) return
+  let target: PendingNotificationTarget | null = null
 
-  pendingTarget = { taskId }
+  if (route === "TaskDetail" && taskId) {
+    target = { route: "TaskDetail", taskId }
+  } else if (route === "PaymentPay" && taskId) {
+    // PaymentPay screen requires a QR scan payload — navigate to task detail instead,
+    // which surfaces the payment section and lets the user act from there.
+    target = { route: "TaskDetail", taskId, paymentRequestId: paymentRequestId || undefined }
+  } else if (route === "AdminBroadcast") {
+    target = { route: "AdminBroadcast", broadcastId: broadcastId || undefined }
+  } else if (route === "InAppInbox") {
+    target = { route: "InAppInbox" }
+  } else if (type.startsWith("TASK_") && taskId) {
+    // Fallback for legacy payloads that carry type but no route
+    target = { route: "TaskDetail", taskId }
+  }
+
+  if (!target) return
+
+  pendingTarget = target
   navRetryCount = 0
   flushPendingTarget()
 }
@@ -166,17 +231,24 @@ function flushPendingTarget() {
     return
   }
 
-  const { taskId } = pendingTarget
+  const target = pendingTarget
   pendingTarget = null
   clearNavRetryTimer()
 
-  openTaskDetailFromNotification(taskId)
+  switch (target.route) {
+    case "TaskDetail":
+      if (target.taskId) openTaskDetailFromNotification(target.taskId)
+      break
+    case "AdminBroadcast":
+    case "InAppInbox":
+      openInboxFromNotification()
+      break
+  }
 }
 
 function openTaskDetailFromNotification(taskId: string) {
   const activeRoute = getActiveOolshikRoute()
 
-  // If already on the same detail, ignore the duplicate action.
   if (
     activeRoute?.name === "OolshikDetail" &&
     typeof (activeRoute.params as { id?: unknown } | undefined)?.id === "string" &&
@@ -186,11 +258,23 @@ function openTaskDetailFromNotification(taskId: string) {
   }
 
   if (shouldResetStackForNotification()) {
-    resetToNotificationStack(taskId)
+    resetToTaskDetailStack(taskId)
     return
   }
 
   navigate("Oolshik", { screen: "OolshikDetail", params: { id: taskId } })
+}
+
+function openInboxFromNotification() {
+  const activeRoute = getActiveOolshikRoute()
+  if (activeRoute?.name === "NotificationInbox") return
+
+  if (shouldResetStackForNotification()) {
+    resetToInboxStack()
+    return
+  }
+
+  navigate("Oolshik", { screen: "NotificationInbox", params: undefined })
 }
 
 function shouldResetStackForNotification() {
@@ -205,14 +289,12 @@ function shouldResetStackForNotification() {
   const nestedState = rootRoute.state as { routes?: RouteLike[] } | undefined
   const nestedRoutes = Array.isArray(nestedState?.routes) ? nestedState!.routes! : []
 
-  // Cold-start / minimal stack state should be reset to enforce back behavior.
   return nestedRoutes.length <= 1
 }
 
-function resetToNotificationStack(taskId: string) {
+function resetToTaskDetailStack(taskId: string) {
   const baseRoute = getResetBaseRoute()
 
-  // The navigation ref only knows top-level route types, so nested reset state needs a cast.
   resetRoot({
     index: 0,
     routes: [
@@ -230,10 +312,34 @@ function resetToNotificationStack(taskId: string) {
   } as never)
 }
 
+function resetToInboxStack() {
+  const baseRoute = getResetBaseRoute()
+
+  resetRoot({
+    index: 0,
+    routes: [
+      {
+        name: "Oolshik" as never,
+        state: {
+          index: 1,
+          routes: [
+            { name: baseRoute.name, ...(baseRoute.params ? { params: baseRoute.params } : {}) },
+            { name: "NotificationInbox" },
+          ],
+        } as never,
+      },
+    ],
+  } as never)
+}
+
 function getResetBaseRoute(): { name: string; params?: unknown } {
   const activeRoute = getActiveOolshikRoute()
 
-  if (activeRoute?.name && activeRoute.name !== "OolshikDetail") {
+  if (
+    activeRoute?.name &&
+    activeRoute.name !== "OolshikDetail" &&
+    activeRoute.name !== "NotificationInbox"
+  ) {
     return { name: activeRoute.name, params: activeRoute.params }
   }
 
@@ -292,7 +398,7 @@ export function clearCachedPushToken() {
 }
 
 export async function enablePushNotifications() {
-  const token = await getExpoPushTokenAsync()
+  const token = await getFcmTokenAsync()
   if (!token) return null
   await registerDeviceTokenWithRetry(token)
   setCachedPushToken(token)
@@ -321,14 +427,4 @@ async function ensureAndroidChannel() {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function getExpoProjectId(): string {
-  const constants = Constants as typeof Constants & {
-    easConfig?: { projectId?: string }
-    expoConfig?: { extra?: { eas?: { projectId?: string } } }
-  }
-  return (
-    constants.easConfig?.projectId ?? constants.expoConfig?.extra?.eas?.projectId ?? EXPO_PROJECT_ID
-  )
 }

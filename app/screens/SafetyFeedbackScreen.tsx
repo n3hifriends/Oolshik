@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react"
-import { Alert, View } from "react-native"
+import { Alert, Pressable, View } from "react-native"
 import { useTranslation } from "react-i18next"
 import { useRoute } from "@react-navigation/native"
 
@@ -77,6 +77,10 @@ export default function SafetyFeedbackScreen({ navigation }: { navigation: any }
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
     >
+      <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ alignSelf: "flex-start" }} accessibilityRole="button">
+        <Text text={`← ${t("common:back")}`} />
+      </Pressable>
+
       <Text preset="heading" tx="oolshik:feedback.safetyConcern" />
 
       <View style={{ gap: spacing.xs }}>

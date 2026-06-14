@@ -31,7 +31,10 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={themed($container)}
     >
-      <LoginHero />
+      <LoginHero
+        currentLanguage={controller.currentLanguage}
+        onLanguageChange={controller.onLanguageChange}
+      />
 
       {controller.googleEnabled && controller.phoneOtpEnabled ? (
         <AuthModeToggle authMode={controller.authMode} onModeChange={controller.onModeChange} />
@@ -51,6 +54,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
           onGooglePhoneBlur={controller.onGooglePhoneBlur}
           onGooglePress={controller.onGooglePress}
           onPhoneChange={controller.onPhoneChange}
+          onPhoneFocus={controller.onPhoneFocus}
           onUseMyPhoneNumberPress={controller.onUseMyPhoneNumberPress}
           phone={controller.phone}
           phoneHintLoading={controller.phoneHintLoading}
@@ -74,6 +78,7 @@ export const LoginScreen: FC<LoginScreenProps> = () => {
           onEmailToggle={controller.onEmailToggle}
           onOtpChange={controller.onOtpChange}
           onPhoneChange={controller.onPhoneChange}
+          onPhoneFocus={controller.onPhoneFocus}
           onSetAuthEmail={controller.onSetAuthEmail}
           onUseMyPhoneNumberPress={controller.onUseMyPhoneNumberPress}
           onVerifyOtp={controller.onVerifyOtp}

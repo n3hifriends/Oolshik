@@ -1,7 +1,7 @@
 import demoJa from "./demo-ja" // @demo remove-current-line
-import { Translations } from "./en"
+import { PartialTranslations } from "./en"
 
-const ja: Translations = {
+const ja: PartialTranslations = {
   common: {
     ok: "OK",
     cancel: "キャンセル",
