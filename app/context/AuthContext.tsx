@@ -5,7 +5,7 @@ import { navigationRef } from "@/navigators/navigationUtilities"
 import {
   attachNotificationListeners,
   disablePushNotifications,
-  getExpoPushTokenAsync,
+  getFcmTokenAsync,
   registerDeviceTokenWithRetry,
   setCachedPushToken,
 } from "@/utils/pushNotifications"
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
           await disablePushNotifications()
           return
         }
-        const token = await getExpoPushTokenAsync()
+        const token = await getFcmTokenAsync()
         if (!active || !token) return
         await registerDeviceTokenWithRetry(token)
         setCachedPushToken(token)

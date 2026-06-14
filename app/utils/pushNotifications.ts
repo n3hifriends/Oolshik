@@ -1,5 +1,6 @@
 import { Platform } from "react-native"
-import Constants from "expo-constants"
+import messaging from "@react-native-firebase/messaging"
+import type { FirebaseMessagingTypes } from "@react-native-firebase/messaging"
 import * as Notifications from "expo-notifications"
 
 import { OolshikApi } from "@/api/client"
@@ -9,7 +10,6 @@ import { loadString, saveString, remove } from "@/utils/storage"
 const PUSH_TOKEN_KEY = "push.token"
 const PUSH_PERMISSION_REQUESTED_KEY = "push.permission.requested"
 const ONBOARDING_COMPLETE_KEY = "onboarding.v1.completed"
-const EXPO_PROJECT_ID = "86345f55-b151-453a-aa0e-5357b9aaddf7"
 const NAV_READY_RETRY_DELAY_MS = 150
 const NAV_READY_MAX_RETRIES = 40
 
@@ -37,31 +37,37 @@ Notifications.setNotificationHandler({
   }),
 })
 
-export async function getExpoPushTokenAsync(): Promise<string | null> {
+export async function getFcmTokenAsync(): Promise<string | null> {
   if (Platform.OS === "web") return null
   await ensureAndroidChannel()
-  const { status: existingStatus } = await Notifications.getPermissionsAsync()
-  let finalStatus = existingStatus
+
   const askedBefore = loadString(PUSH_PERMISSION_REQUESTED_KEY) === "true"
-  if (existingStatus !== "granted" && !askedBefore) {
-    const { status } = await Notifications.requestPermissionsAsync()
-    finalStatus = status
+  if (!askedBefore) {
+    const authStatus = await messaging().requestPermission()
     saveString(PUSH_PERMISSION_REQUESTED_KEY, "true")
+    const granted =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL
+    if (!granted) return null
+  } else {
+    const authStatus = await messaging().hasPermission()
+    const granted =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL
+    if (!granted) return null
   }
-  if (finalStatus !== "granted") return null
 
   try {
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId: getExpoProjectId() }))
-      .data
+    const token = await messaging().getToken()
     if (__DEV__) {
       // eslint-disable-next-line no-console
-      console.log("expo push token acquired")
+      console.log("FCM token acquired")
     }
     return token
   } catch {
     if (__DEV__) {
       // eslint-disable-next-line no-console
-      console.warn("expo push token acquisition failed")
+      console.warn("FCM token acquisition failed")
     }
     return null
   }
@@ -108,6 +114,7 @@ export async function unregisterDeviceTokenWithRetry(token: string, maxAttempts 
 }
 
 export function attachNotificationListeners() {
+  const foregroundFcm = messaging().onMessage(handleForegroundFcmMessage)
   const received = Notifications.addNotificationReceivedListener(() => {
     // no-op for now
   })
@@ -119,10 +126,43 @@ export function attachNotificationListeners() {
   flushPendingTarget()
 
   return () => {
+    foregroundFcm()
     received.remove()
     response.remove()
     clearNavRetryTimer()
   }
+}
+
+async function handleForegroundFcmMessage(remoteMessage: FirebaseMessagingTypes.RemoteMessage) {
+  const title =
+    remoteMessage.notification?.title ||
+    getStringDataValue(remoteMessage.data, "title") ||
+    "Oolshik"
+  const body =
+    remoteMessage.notification?.body ||
+    getStringDataValue(remoteMessage.data, "body") ||
+    getStringDataValue(remoteMessage.data, "message") ||
+    ""
+
+  if (!title && !body) return
+
+  await ensureAndroidChannel()
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      data: remoteMessage.data ?? {},
+    },
+    trigger: null,
+  })
+}
+
+function getStringDataValue(
+  data: FirebaseMessagingTypes.RemoteMessage["data"],
+  key: string,
+): string | null {
+  const value = data?.[key]
+  return typeof value === "string" && value.trim().length > 0 ? value : null
 }
 
 async function handleInitialNotificationResponse() {
@@ -292,7 +332,7 @@ export function clearCachedPushToken() {
 }
 
 export async function enablePushNotifications() {
-  const token = await getExpoPushTokenAsync()
+  const token = await getFcmTokenAsync()
   if (!token) return null
   await registerDeviceTokenWithRetry(token)
   setCachedPushToken(token)
@@ -321,14 +361,4 @@ async function ensureAndroidChannel() {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function getExpoProjectId(): string {
-  const constants = Constants as typeof Constants & {
-    easConfig?: { projectId?: string }
-    expoConfig?: { extra?: { eas?: { projectId?: string } } }
-  }
-  return (
-    constants.easConfig?.projectId ?? constants.expoConfig?.extra?.eas?.projectId ?? EXPO_PROJECT_ID
-  )
 }

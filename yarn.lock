@@ -3467,6 +3467,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-firebase/messaging@npm:23.4.0":
+  version: 23.4.0
+  resolution: "@react-native-firebase/messaging@npm:23.4.0"
+  peerDependencies:
+    "@react-native-firebase/app": 23.4.0
+    expo: ">=47.0.0"
+  peerDependenciesMeta:
+    expo:
+      optional: true
+  checksum: 10c0/0463689133e68922bdffd12a9ff23699ad9fda676b379b53c2d052f15cde7ebf69544b789db1d6e05c8754ec53db1c18f690ce5b231899a340457bdb1255f2d4
+  languageName: node
+  linkType: hard
+
 "@react-native/assets-registry@npm:0.79.5":
   version: 0.79.5
   resolution: "@react-native/assets-registry@npm:0.79.5"
@@ -10368,6 +10381,7 @@ __metadata:
     "@react-native-community/slider": "npm:4.5.6"
     "@react-native-firebase/app": "npm:^23.4.0"
     "@react-native-firebase/auth": "npm:^23.4.0"
+    "@react-native-firebase/messaging": "npm:23.4.0"
     "@react-navigation/bottom-tabs": "npm:^7.2.0"
     "@react-navigation/native": "npm:^7.0.14"
     "@react-navigation/native-stack": "npm:^7.2.0"
