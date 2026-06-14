@@ -490,6 +490,18 @@ export type ActiveRequestSummary = {
   activeRequests: ActiveRequestSummaryItem[]
 }
 
+export type UserNotification = {
+  id: string
+  title: string
+  body: string
+  read: boolean
+  createdAt: string
+}
+
+export type UnreadCountResponse = {
+  count: number
+}
+
 export type ActiveRequestCapReachedPayload = {
   code: "ACTIVE_REQUEST_CAP_REACHED"
   message: string
@@ -805,6 +817,13 @@ export const OolshikApi = {
     sourceType: PaymentProfileSourceType
   }) => api.put<PaymentProfileEditApiResponse>("/payment-profile", body),
   deletePaymentProfile: () => api.delete("/payment-profile"),
+
+  // In-app notification inbox
+  getNotifications: (page = 0, size = 20) =>
+    api.get<Page<UserNotification>>(`/notifications?page=${page}&size=${size}`),
+  getUnreadCount: () => api.get<UnreadCountResponse>("/notifications/unread-count"),
+  markNotificationRead: (id: string) => api.patch<UserNotification>(`/notifications/${id}/read`),
+  markAllRead: () => api.patch("/notifications/read-all"),
 }
 // Optional helper: call this after successful OTP verify to persist tokens
 export function setLoginTokens(accessToken?: string | null, refreshToken?: string | null) {

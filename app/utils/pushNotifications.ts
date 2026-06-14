@@ -13,8 +13,13 @@ const ONBOARDING_COMPLETE_KEY = "onboarding.v1.completed"
 const NAV_READY_RETRY_DELAY_MS = 150
 const NAV_READY_MAX_RETRIES = 40
 
+type NotifRoute = "TaskDetail" | "PaymentPay" | "AdminBroadcast" | "InAppInbox"
+
 type PendingNotificationTarget = {
-  taskId: string
+  route: NotifRoute
+  taskId?: string
+  paymentRequestId?: string
+  broadcastId?: string
 }
 
 type RouteLike = {
@@ -151,7 +156,8 @@ async function handleForegroundFcmMessage(remoteMessage: FirebaseMessagingTypes.
     content: {
       title,
       body,
-      data: remoteMessage.data ?? {},
+      // Carry full FCM data so tap routing works after the local notification is pressed
+      data: (remoteMessage.data as Record<string, unknown>) ?? {},
     },
     trigger: null,
   })
@@ -181,19 +187,38 @@ function handleNotificationResponse(resp: Notifications.NotificationResponse) {
       ? resp.notification.request.identifier
       : null
 
-  // Avoid duplicate navigation when both "last response" and listener callbacks fire.
   if (responseIdentifier && responseIdentifier === lastHandledResponseIdentifier) {
     return
   }
   lastHandledResponseIdentifier = responseIdentifier
 
   const data = resp.notification.request.content.data as Record<string, unknown> | undefined
+  const route = typeof data?.route === "string" ? (data.route as string) : ""
   const type = typeof data?.type === "string" ? data.type : ""
   const taskId = typeof data?.taskId === "string" ? data.taskId : ""
+  const paymentRequestId = typeof data?.paymentRequestId === "string" ? data.paymentRequestId : ""
+  const broadcastId = typeof data?.broadcastId === "string" ? data.broadcastId : ""
 
-  if (!type.startsWith("TASK_") || !taskId) return
+  let target: PendingNotificationTarget | null = null
 
-  pendingTarget = { taskId }
+  if (route === "TaskDetail" && taskId) {
+    target = { route: "TaskDetail", taskId }
+  } else if (route === "PaymentPay" && taskId) {
+    // PaymentPay screen requires a QR scan payload — navigate to task detail instead,
+    // which surfaces the payment section and lets the user act from there.
+    target = { route: "TaskDetail", taskId, paymentRequestId: paymentRequestId || undefined }
+  } else if (route === "AdminBroadcast") {
+    target = { route: "AdminBroadcast", broadcastId: broadcastId || undefined }
+  } else if (route === "InAppInbox") {
+    target = { route: "InAppInbox" }
+  } else if (type.startsWith("TASK_") && taskId) {
+    // Fallback for legacy payloads that carry type but no route
+    target = { route: "TaskDetail", taskId }
+  }
+
+  if (!target) return
+
+  pendingTarget = target
   navRetryCount = 0
   flushPendingTarget()
 }
@@ -206,17 +231,24 @@ function flushPendingTarget() {
     return
   }
 
-  const { taskId } = pendingTarget
+  const target = pendingTarget
   pendingTarget = null
   clearNavRetryTimer()
 
-  openTaskDetailFromNotification(taskId)
+  switch (target.route) {
+    case "TaskDetail":
+      if (target.taskId) openTaskDetailFromNotification(target.taskId)
+      break
+    case "AdminBroadcast":
+    case "InAppInbox":
+      openInboxFromNotification()
+      break
+  }
 }
 
 function openTaskDetailFromNotification(taskId: string) {
   const activeRoute = getActiveOolshikRoute()
 
-  // If already on the same detail, ignore the duplicate action.
   if (
     activeRoute?.name === "OolshikDetail" &&
     typeof (activeRoute.params as { id?: unknown } | undefined)?.id === "string" &&
@@ -226,11 +258,23 @@ function openTaskDetailFromNotification(taskId: string) {
   }
 
   if (shouldResetStackForNotification()) {
-    resetToNotificationStack(taskId)
+    resetToTaskDetailStack(taskId)
     return
   }
 
   navigate("Oolshik", { screen: "OolshikDetail", params: { id: taskId } })
+}
+
+function openInboxFromNotification() {
+  const activeRoute = getActiveOolshikRoute()
+  if (activeRoute?.name === "NotificationInbox") return
+
+  if (shouldResetStackForNotification()) {
+    resetToInboxStack()
+    return
+  }
+
+  navigate("Oolshik", { screen: "NotificationInbox", params: undefined })
 }
 
 function shouldResetStackForNotification() {
@@ -245,14 +289,12 @@ function shouldResetStackForNotification() {
   const nestedState = rootRoute.state as { routes?: RouteLike[] } | undefined
   const nestedRoutes = Array.isArray(nestedState?.routes) ? nestedState!.routes! : []
 
-  // Cold-start / minimal stack state should be reset to enforce back behavior.
   return nestedRoutes.length <= 1
 }
 
-function resetToNotificationStack(taskId: string) {
+function resetToTaskDetailStack(taskId: string) {
   const baseRoute = getResetBaseRoute()
 
-  // The navigation ref only knows top-level route types, so nested reset state needs a cast.
   resetRoot({
     index: 0,
     routes: [
@@ -270,10 +312,34 @@ function resetToNotificationStack(taskId: string) {
   } as never)
 }
 
+function resetToInboxStack() {
+  const baseRoute = getResetBaseRoute()
+
+  resetRoot({
+    index: 0,
+    routes: [
+      {
+        name: "Oolshik" as never,
+        state: {
+          index: 1,
+          routes: [
+            { name: baseRoute.name, ...(baseRoute.params ? { params: baseRoute.params } : {}) },
+            { name: "NotificationInbox" },
+          ],
+        } as never,
+      },
+    ],
+  } as never)
+}
+
 function getResetBaseRoute(): { name: string; params?: unknown } {
   const activeRoute = getActiveOolshikRoute()
 
-  if (activeRoute?.name && activeRoute.name !== "OolshikDetail") {
+  if (
+    activeRoute?.name &&
+    activeRoute.name !== "OolshikDetail" &&
+    activeRoute.name !== "NotificationInbox"
+  ) {
     return { name: activeRoute.name, params: activeRoute.params }
   }
 

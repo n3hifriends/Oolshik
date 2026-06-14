@@ -103,6 +103,10 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}
     >
+      <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ alignSelf: "flex-start" }} accessibilityRole="button">
+        <Text text={`← ${t("common:back")}`} />
+      </Pressable>
+
       <Text preset="heading" tx="oolshik:feedback.rateApp" />
 
       <View style={{ gap: spacing.sm }}>

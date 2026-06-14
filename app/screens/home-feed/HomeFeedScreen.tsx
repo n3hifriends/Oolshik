@@ -1,12 +1,12 @@
-import React from "react"
-import { ActivityIndicator, View } from "react-native"
+import React, { useCallback, useState } from "react"
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
+import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { SpotlightComposer } from "@/components/SpotlightComposer"
 import { colors } from "@/theme/colors"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useHomeFeedController } from "@/screens/home-feed/hooks/useHomeFeedController"
-import { LogoutButton } from "@/screens/home-feed/components/LogoutButton"
 import { HomeFeedHeader } from "@/screens/home-feed/components/HomeFeedHeader"
 import { HomeFeedFilters } from "@/screens/home-feed/components/HomeFeedFilters"
 import { HomeFeedLocationState } from "@/screens/home-feed/components/HomeFeedLocationState"
@@ -14,11 +14,13 @@ import { HomeFeedList } from "@/screens/home-feed/components/HomeFeedList"
 import { HomeFeedCreateBar } from "@/screens/home-feed/components/HomeFeedCreateBar"
 import { HomeFeedServiceState } from "@/screens/home-feed/components/HomeFeedServiceState"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
+import { OolshikApi } from "@/api/client"
 
 type Props = OolshikStackScreenProps<"OolshikHome">
 
 export default function HomeFeedScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const controller = useHomeFeedController({
     navigation,
@@ -27,17 +29,26 @@ export default function HomeFeedScreen({ navigation }: Props) {
 
   const { theme, location, feed, user, refs, state, handlers } = controller
 
+  useFocusEffect(
+    useCallback(() => {
+      OolshikApi.getUnreadCount()
+        .then((res) => {
+          if (res.ok && res.data) setUnreadCount(res.data.count)
+        })
+        .catch(() => {})
+    }, []),
+  )
+
+  const openInbox = useCallback(() => {
+    navigation.navigate("NotificationInbox")
+    setUnreadCount(0)
+  }, [navigation])
+
   return (
     <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={{ flex: 1 }}>
       <SpotlightComposer
         onSubmitTask={handlers.onSubmitTask}
         onBeforeOpen={handlers.onBeforeComposerOpen}
-      />
-
-      <LogoutButton
-        onPress={handlers.onLogoutPress}
-        accessibilityLabel={t("oolshik:homeScreen.logoutA11y")}
-        backgroundColor={colors.palette.primary500}
       />
 
       <HomeFeedHeader
@@ -58,6 +69,8 @@ export default function HomeFeedScreen({ navigation }: Props) {
         primary200={theme.themeColors.palette.primary200}
         primary500={theme.themeColors.palette.primary500}
         condensed={feed.controlsCondensed}
+        onOpenInbox={openInbox}
+        unreadCount={unreadCount}
       />
 
       <HomeFeedFilters
@@ -74,9 +87,25 @@ export default function HomeFeedScreen({ navigation }: Props) {
         onToggleExpanded={handlers.toggleFiltersExpanded}
         condensed={feed.controlsCondensed}
         resultCount={feed.filtered.length}
+        isSearchActive={state.searchOpen}
       />
 
-      <View style={{ flex: 1, paddingHorizontal: 16, backgroundColor: colors.background }}>
+      {state.searchOpen && state.rawSearch.length === 0 && (
+        <Pressable
+          onPress={() => {
+            handlers.onSearchClear()
+            handlers.setSearchOpen(false)
+          }}
+          style={StyleSheet.flatten([
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: "rgba(0,0,0,0.22)", zIndex: 50 },
+          ])}
+          accessibilityRole="button"
+          accessibilityLabel={t("oolshik:search.close")}
+        />
+      )}
+
+      <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: state.searchOpen ? 8 : 0, backgroundColor: colors.background }}>
         {location.status !== "ready" ? (
           <HomeFeedLocationState
             status={location.status}

@@ -20,6 +20,7 @@ import { useMMKVString } from "react-native-mmkv"
 import { storage } from "@/utils/storage"
 import { QrScannerScreen } from "@/screens/QrScannerScreen"
 import { PaymentPayScreen } from "@/screens/PaymentPayScreen"
+import NotificationInboxScreen from "@/screens/NotificationInboxScreen"
 
 /**
  * IMPORTANT
@@ -53,6 +54,7 @@ export type OolshikParamList = {
   PaymentProfile: PaymentProfileParams | undefined
   QrScanner: { taskId: string; amount?: number | null }
   PaymentPay: PaymentPayParams
+  NotificationInbox: undefined
 }
 
 export type OolshikStackScreenProps<T extends keyof OolshikParamList> = NativeStackScreenProps<
@@ -143,6 +145,7 @@ export function OolshikNavigator() {
       <Stack.Screen name="PaymentProfile" component={PaymentProfileScreen} />
       <Stack.Screen name="QrScanner" component={QrScannerScreen} />
       <Stack.Screen name="PaymentPay" component={PaymentPayScreen} />
+      <Stack.Screen name="NotificationInbox" component={NotificationInboxScreen} />
     </Stack.Navigator>
   )
 }

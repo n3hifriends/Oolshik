@@ -115,6 +115,10 @@ export default function ReportScreen() {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: 16 }}
     >
+      <Pressable onPress={() => nav.goBack()} hitSlop={8} style={{ alignSelf: "flex-start", marginBottom: 8 }} accessibilityRole="button">
+        <Text text={`← ${t("common:back")}`} />
+      </Pressable>
+
       <Text preset="heading" text={t("oolshik:reportScreen.heading")} />
       <View style={{ height: spacing.md }} />
 

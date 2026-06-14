@@ -1,6 +1,7 @@
 import React from "react"
 import { Pressable, TextInput, View } from "react-native"
 import { useTranslation } from "react-i18next"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { Text } from "@/components/Text"
 import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { Segmented, ViewMode } from "@/components/Segmented"
@@ -23,12 +24,39 @@ type HomeFeedHeaderProps = {
   primary200: string
   primary500: string
   condensed: boolean
+  onOpenInbox: () => void
+  unreadCount: number
 }
 
 export function HomeFeedHeader(props: HomeFeedHeaderProps) {
   const { t } = useTranslation()
   const avatarSize = props.condensed ? 34 : 38
   const avatarInnerSize = props.condensed ? 26 : 30
+  const bellSize = props.condensed ? 22 : 24
+  const badgeCount = Math.min(props.unreadCount, 99)
+
+  if (props.searchOpen) {
+    return (
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: props.condensed ? 4 : 8,
+          paddingBottom: props.condensed ? 8 : 12,
+          zIndex: 100,
+          elevation: 100,
+        }}
+      >
+        <ExpandableSearch
+          open={props.searchOpen}
+          setOpen={props.setSearchOpen}
+          value={props.rawSearch}
+          onChangeText={props.onSearchChange}
+          onClear={props.onClearSearch}
+          inputRef={props.inputRef as React.RefObject<TextInput>}
+        />
+      </View>
+    )
+  }
 
   return (
     <View
@@ -41,7 +69,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
       <View
         style={{
           flexDirection: "row",
-          alignItems: props.searchOpen ? "flex-start" : "center",
+          alignItems: "center",
           gap: props.condensed ? 8 : 10,
         }}
       >
@@ -61,7 +89,6 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
               borderColor: props.primary200,
               alignItems: "center",
               justifyContent: "center",
-              marginTop: props.searchOpen ? props.spacingXxxs : 0,
             },
             !props.isDark && {
               shadowColor: "#000",
@@ -97,6 +124,44 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
             inputRef={props.inputRef as React.RefObject<TextInput>}
           />
         </View>
+
+        <Pressable
+          onPress={props.onOpenInbox}
+          accessibilityRole="button"
+          accessibilityLabel={`Notifications${props.unreadCount > 0 ? `, ${badgeCount} unread` : ""}`}
+          hitSlop={8}
+          style={({ pressed }) => [
+            { alignItems: "center", justifyContent: "center" },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={props.unreadCount > 0 ? "bell-badge" : "bell-outline"}
+            size={bellSize}
+            color={props.unreadCount > 0 ? props.primary500 : "#888"}
+          />
+          {badgeCount > 0 && (
+            <View
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -6,
+                minWidth: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: props.primary500,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 2,
+              }}
+            >
+              <Text
+                text={String(badgeCount)}
+                style={{ color: "#fff", fontSize: 9, fontWeight: "700", lineHeight: 12 }}
+              />
+            </View>
+          )}
+        </Pressable>
       </View>
 
       <Segmented value={props.viewMode} onChange={props.onChangeViewMode} compact />
