@@ -13,6 +13,7 @@
   "jsEngine": "hermes",
   "assetBundlePatterns": ["**/*"],
   "android": {
+    "googleServicesFile": "./google-services.json",
     "icon": "./assets/images/app-icon-android-legacy.png",
     "package": "com.oolshik.aan",
     "adaptiveIcon": {
@@ -28,6 +29,7 @@
     "permissions": ["android.permission.POST_NOTIFICATIONS"]
   },
   "ios": {
+    "googleServicesFile": "./GoogleService-Info.plist",
     "icon": "./assets/images/app-icon-ios.png",
     "supportsTablet": true,
     "bundleIdentifier": "com.oolshik.aan"
@@ -42,9 +44,6 @@
     [
       "expo-splash-screen",
       {
-        "image": "./android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png",
-        "imageWidth": 300,
-        "resizeMode": "contain",
         "backgroundColor": "#FF6B2C"
       }
     ],
