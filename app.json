@@ -26,7 +26,15 @@
     },
     "allowBackup": false,
     "edgeToEdgeEnabled": true,
-    "permissions": ["android.permission.POST_NOTIFICATIONS"]
+    "permissions": ["android.permission.POST_NOTIFICATIONS"],
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "autoVerify": false,
+        "data": [{ "scheme": "com.oolshik.aan", "path": "/oauthredirect" }],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }
+    ]
   },
   "ios": {
     "googleServicesFile": "./GoogleService-Info.plist",

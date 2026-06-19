@@ -7,6 +7,53 @@ This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way 
 - [Quick start documentation](https://github.com/infinitered/ignite/blob/master/docs/boilerplate/Boilerplate.md)
 - [Full documentation](https://github.com/infinitered/ignite/blob/master/docs/README.md)
 
+---
+
+## Environments
+
+`EXPO_PUBLIC_API_URL` controls which backend the app talks to. `app/config/config.dev.ts` reads it at Metro startup; when it is empty the `devHost` fallback kicks in (`localhost:8080` on iOS sim / `10.0.2.2:8080` on Android emulator).
+
+### Local dev (Expo Go / dev client)
+
+```bash
+# API URL intentionally empty → uses devHost Platform.select fallback
+npm run start:local          # same as expo start --dev-client
+
+# Point to cloud-dev backend instead
+npm run start:cloud-dev      # EXPO_PUBLIC_API_URL=https://api-dev.oolshik.in
+```
+
+### EAS build profiles
+
+| EAS profile | `EXPO_PUBLIC_API_URL` | Intended target |
+|-------------|----------------------|-----------------|
+| `development` | `` (empty → devHost) | Local Expo dev client |
+| `development:device` | inherits `development` | Device via tunnel |
+| `preview` | `https://api-dev.oolshik.in` | Cloud-dev staging |
+| `production` | `https://www.oolshik.in` | Production |
+
+Build commands (local EAS):
+
+```bash
+npm run build:ios:sim        # development → simulator
+npm run build:ios:dev        # development:device → physical iOS
+npm run build:ios:preview    # preview → cloud-dev staging
+npm run build:ios:prod       # production
+
+npm run build:android:sim
+npm run build:android:dev
+npm run build:android:preview
+npm run build:android:prod
+```
+
+### Override at runtime (no rebuild)
+
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.1.100:8080 npx expo start --lan --clear
+```
+
+---
+
 ## Getting Started
 
 ```bash

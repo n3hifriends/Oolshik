@@ -19,7 +19,9 @@ if (__DEV__) {
 import "./utils/gestureHandler"
 
 import { useEffect, useState } from "react"
+import { View } from "react-native"
 import { useFonts } from "expo-font"
+import * as SplashScreen from "expo-splash-screen"
 import * as Linking from "expo-linking"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
@@ -53,6 +55,13 @@ import { tokens } from "./auth/tokens"
 import { pickDeviceLocaleTag, resolvePreferredLocale, normalizeLocaleTag } from "./i18n/locale"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
+
+// Keep the native splash visible until JS is fully initialised.
+// SplashScreen.hideAsync() is called inside App once fonts, i18n, and
+// navigation state are all ready.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Already hidden (e.g. fast reload in dev) — safe to ignore.
+})
 
 // Web linking configuration
 const prefix = Linking.createURL("/")
@@ -90,6 +99,8 @@ export function App() {
 
   const [areFontsLoaded, fontLoadError] = useFonts(customFontsToLoad)
   const [isI18nInitialized, setIsI18nInitialized] = useState(false)
+  const isReady =
+    isNavigationStateRestored && isI18nInitialized && (areFontsLoaded || !!fontLoadError)
 
   useEffect(() => {
     let mounted = true
@@ -159,14 +170,13 @@ export function App() {
     }
   }, [])
 
-  // Before we show the app, we have to wait for our state to be ready.
-  // In the meantime, don't render anything. This will be the background
-  // color set in native by rootView's background color.
-  // In iOS: application:didFinishLaunchingWithOptions:
-  // In Android: https://stackoverflow.com/a/45838109/204044
-  // You can replace with your own loading component if you wish.
-  if (!isNavigationStateRestored || !isI18nInitialized || (!areFontsLoaded && !fontLoadError)) {
-    return null
+  // While loading, show the same orange as the native splash so there is no
+  // visible flash between the native splash screen and the first JS frame.
+  // SplashScreen.hideAsync() is called inside AppNavigator after NavigationContainer
+  // fires onReady (first layout committed) — not here — so the splash never hides
+  // before the navigator tree is actually painted.
+  if (!isReady) {
+    return <View style={{ flex: 1, backgroundColor: "#FF6B2C" }} />
   }
 
   const linking = {

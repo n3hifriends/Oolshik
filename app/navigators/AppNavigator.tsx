@@ -9,6 +9,7 @@ import {
   NavigationContainer,
   NavigatorScreenParams, // @demo remove-current-line
 } from "@react-navigation/native"
+import * as SplashScreen from "expo-splash-screen"
 import { createNativeStackNavigator, NativeStackScreenProps } from "@react-navigation/native-stack"
 
 import Config from "@/config"
@@ -107,8 +108,16 @@ export const AppNavigator = (props: NavigationProps) => {
 
   useBackButtonHandler((routeName) => exitRoutes.includes(routeName))
 
+  const handleReady = () => {
+    // Hide the native splash after the NavigationContainer has committed its
+    // first layout — the earliest point where the app is visually ready.
+    // Any onReady prop from a parent (e.g. tests) is also forwarded.
+    SplashScreen.hideAsync()
+    props.onReady?.()
+  }
+
   return (
-    <NavigationContainer ref={navigationRef} theme={navigationTheme} {...props}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme} {...props} onReady={handleReady}>
       <ErrorBoundary catchErrors={Config.catchErrors}>
         <AppStack />
       </ErrorBoundary>
