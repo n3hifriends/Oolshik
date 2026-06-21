@@ -19,6 +19,7 @@ import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
 import { parseOfferInput } from "@/utils/offerRules"
 import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
+import { useAppTheme } from "@/theme/context"
 
 type Radius = 1 | 2 | 5
 
@@ -33,6 +34,8 @@ const normalizeRadius = (value?: number | null): Radius => {
 
 export default function CreateTaskScreen({ navigation }: any) {
   const { t } = useTranslation()
+  const { theme } = useAppTheme()
+  const { colors } = theme
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [radiusKm, setRadiusKm] = useState<Radius>(1)
@@ -373,13 +376,13 @@ export default function CreateTaskScreen({ navigation }: any) {
                   style={{
                     fontSize: 56,
                     fontWeight: "800",
-                    color: countdown <= 3 ? "#dc2626" : countdown <= 6 ? "#ea580c" : "#111827",
+                    color: countdown <= 3 ? colors.error : countdown <= 6 ? colors.palette.warning500 : colors.text,
                     lineHeight: 64,
                   }}
                 />
                 <Text
                   text={t("task:create.countdownLabel")}
-                  style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}
+                  style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}
                 />
               </View>
               {/* Progress bar */}
@@ -387,7 +390,7 @@ export default function CreateTaskScreen({ navigation }: any) {
                 style={{
                   height: 6,
                   borderRadius: 3,
-                  backgroundColor: "#e5e7eb",
+                  backgroundColor: colors.separator,
                   overflow: "hidden",
                 }}
               >
@@ -396,7 +399,7 @@ export default function CreateTaskScreen({ navigation }: any) {
                     height: 6,
                     borderRadius: 3,
                     width: `${(countdown / maxSeconds) * 100}%`,
-                    backgroundColor: countdown <= 3 ? "#dc2626" : countdown <= 6 ? "#ea580c" : "#FF6B2C",
+                    backgroundColor: countdown <= 3 ? colors.error : countdown <= 6 ? colors.palette.warning500 : "#FF6B2C",
                   }}
                 />
               </View>
@@ -411,10 +414,10 @@ export default function CreateTaskScreen({ navigation }: any) {
             <View
               style={{
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderRadius: 12,
                 padding: 12,
-                backgroundColor: "#fafafa",
+                backgroundColor: colors.surface,
                 gap: 10,
               }}
             >
@@ -435,7 +438,7 @@ export default function CreateTaskScreen({ navigation }: any) {
                 {audioAccepted && (
                   <Text
                     text={t("task:create.audioSelected")}
-                    style={{ color: "#16a34a", fontWeight: "600", paddingVertical: 10 }}
+                    style={{ color: colors.palette.success500, fontWeight: "600", paddingVertical: 10 }}
                   />
                 )}
                 <Button text={t("task:create.discardAudio")} onPress={discardRecording} />

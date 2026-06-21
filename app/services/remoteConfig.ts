@@ -45,6 +45,8 @@ export interface RemoteConfigFlags {
   audio_upload_use_presigned: boolean
   help_request_poll_interval_ms: number
   remote_config_fetch_interval_seconds: number
+  nearby_help_poll_interval_ms: number
+  nearby_help_min_location_delta_meters: number
 
   // Privacy / Observability
   analytics_debug_logging_enabled: boolean
@@ -83,6 +85,8 @@ const DEFAULTS: RemoteConfigFlags = {
   audio_upload_use_presigned: false,
   help_request_poll_interval_ms: 10_000,
   remote_config_fetch_interval_seconds: 3600,
+  nearby_help_poll_interval_ms: 45_000,
+  nearby_help_min_location_delta_meters: 100,
 
   analytics_debug_logging_enabled: false,
   crashlytics_user_context_enabled: true,

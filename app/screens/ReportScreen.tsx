@@ -19,7 +19,7 @@ export default function ReportScreen() {
   const nav = useNavigation<any>()
   const { params } = useRoute<any>() as { params: Params }
   const { theme } = useAppTheme()
-  const { spacing } = theme
+  const { spacing, colors, isDark } = theme
 
   const [reason, setReason] = React.useState<Reason>("SPAM")
   const [text, setText] = React.useState("")
@@ -79,6 +79,11 @@ export default function ReportScreen() {
     { label: t("oolshik:reportScreen.unsafe"), value: "UNSAFE" },
     { label: t("oolshik:reportScreen.other"), value: "OTHER" },
   ]
+  const activeBg = isDark ? colors.tint : "#111827"
+  const inactiveBg = isDark ? colors.separator : "#F2F4F7"
+  const activeText = isDark ? colors.background : "#fff"
+  const inactiveText = colors.text
+
   const Pill: React.FC<{
     label: string
     active?: boolean
@@ -94,7 +99,7 @@ export default function ReportScreen() {
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 999,
-        backgroundColor: active ? "#111827" : "#F2F4F7",
+        backgroundColor: active ? activeBg : inactiveBg,
       }}
     >
       <View
@@ -102,11 +107,11 @@ export default function ReportScreen() {
           width: 8,
           height: 8,
           borderRadius: 4,
-          backgroundColor: active ? "#fff" : dotColor,
+          backgroundColor: active ? activeText : dotColor,
           opacity: active ? 1 : 0.8,
         }}
       />
-      <Text style={{ color: active ? "#fff" : "#111827", fontWeight: "600" }} text={label} />
+      <Text style={{ color: active ? activeText : inactiveText, fontWeight: "600" }} text={label} />
     </Pressable>
   )
   return (
@@ -148,7 +153,7 @@ export default function ReportScreen() {
         editable={!loading}
       />
       <Text
-        style={{ alignSelf: "flex-end", color: "#6B7280", marginTop: 4 }}
+        style={{ alignSelf: "flex-end", color: colors.textDim, marginTop: 4 }}
       >{`${text.length}/${MAX_DESC}`}</Text>
 
       <View style={{ height: spacing.lg }} />

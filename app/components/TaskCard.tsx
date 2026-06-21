@@ -8,6 +8,7 @@ import { useAppTheme } from "@/theme/context"
 import { RatingBadge } from "./RatingBadge"
 import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
 import { formatDistanceLabel } from "@/utils/distance"
+import { getStatusColors } from "@/theme/statusColors"
 
 type Props = {
   id: string
@@ -97,26 +98,18 @@ export function TaskCard({
         : (status as any)
 
   const primary = colors.palette.primary500
-  const neutral700 = colors.palette.neutral700
 
-  const statusMap = {
-    PENDING: { label: t("oolshik:status.pending"), bg: colors.palette.primary200, fg: neutral700 },
-    PENDING_AUTH: { label: t("oolshik:status.pendingAuth"), bg: colors.palette.primary100, fg: neutral700 },
-    ASSIGNED: { label: t("oolshik:status.assigned"), bg: colors.palette.warningSoft400, fg: neutral700 },
-    WORK_DONE_PENDING_CONFIRMATION: {
-      label: t("oolshik:status.waitingConfirmation"),
-      bg: "#EDE9FE",
-      fg: "#6D28D9",
-    },
-    REVIEW_REQUIRED: {
-      label: t("oolshik:status.reviewRequired"),
-      bg: "#FFEDD5",
-      fg: "#C2410C",
-    },
-    COMPLETED: { label: t("oolshik:status.completed"), bg: colors.palette.successSoft400, fg: neutral700 },
-    CANCELLED: { label: t("oolshik:status.cancelled"), bg: colors.palette.neutral200, fg: neutral700 },
-  } as const
-  const S = statusMap[normalizedStatus] ?? statusMap.PENDING
+  const statusLabels: Record<string, string> = {
+    PENDING: t("oolshik:status.pending"),
+    PENDING_AUTH: t("oolshik:status.pendingAuth"),
+    ASSIGNED: t("oolshik:status.assigned"),
+    WORK_DONE_PENDING_CONFIRMATION: t("oolshik:status.waitingConfirmation"),
+    REVIEW_REQUIRED: t("oolshik:status.reviewRequired"),
+    COMPLETED: t("oolshik:status.completed"),
+    CANCELLED: t("oolshik:status.cancelled"),
+  }
+  const { bg: statusBg, fg: statusFg } = getStatusColors(normalizedStatus, theme.isDark)
+  const statusLabel = statusLabels[normalizedStatus] ?? normalizedStatus
 
   const canAccept = !!onAccept && (status === "OPEN" || status === "PENDING")
   const normalizedVoiceUrl = typeof voiceUrl === "string" ? voiceUrl.trim() : ""
@@ -147,7 +140,7 @@ export function TaskCard({
           width: 28,
           height: 28,
           borderRadius: 14,
-          backgroundColor: "#E5E7EB",
+          backgroundColor: colors.separator,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -220,7 +213,7 @@ export function TaskCard({
             <Text text={t("oolshik:taskCard.refreshTitle")} style={{ color: primary }} />
           </Pressable>
         ) : (
-          <Text text={title || t("oolshik:taskCard.voiceTask")} weight="bold" style={{ color: neutral700, flex: 1 }} />
+          <Text text={title || t("oolshik:taskCard.voiceTask")} weight="bold" style={{ color: colors.text, flex: 1 }} />
         )}
       </View>
 
@@ -233,17 +226,17 @@ export function TaskCard({
           gap: spacing.sm,
         }}
       >
-        {<Text text={t("oolshik:taskCard.distanceAway", { distance })} size="xs" style={{ color: neutral700 }} />}
+        {<Text text={t("oolshik:taskCard.distanceAway", { distance })} size="xs" style={{ color: colors.textDim }} />}
 
         <View
           style={{
             paddingHorizontal: spacing.sm,
             paddingVertical: spacing.xxs,
             borderRadius: 999,
-            backgroundColor: S.bg,
+            backgroundColor: statusBg,
           }}
         >
-          <Text text={S.label} size="xs" weight="medium" style={{ color: S.fg }} />
+          <Text text={statusLabel} size="xs" weight="medium" style={{ color: statusFg }} />
         </View>
         <RatingBadge value={avgRating} />
       </View>

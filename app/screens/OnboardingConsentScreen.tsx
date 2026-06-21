@@ -178,7 +178,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
         borderRadius: 6,
         borderWidth: 1,
         borderColor: colors.palette.neutral400,
-        backgroundColor: checked ? colors.palette.primary500 : colors.palette.neutral100,
+        backgroundColor: checked ? colors.palette.primary500 : colors.background,
         alignItems: "center",
         justifyContent: "center",
       }}
@@ -288,7 +288,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
             padding: spacing.lg,
           }}
         >
-          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: spacing.md }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: spacing.md }}>
             <ScrollView>
               <Text text={t("oolshik:consent.preface")} />
               {consentSections.map((s, i) => (

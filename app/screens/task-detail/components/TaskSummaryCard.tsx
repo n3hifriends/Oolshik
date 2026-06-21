@@ -46,7 +46,7 @@ export function TaskSummaryCard(props: TaskSummaryCardProps) {
             width: 36,
             height: 36,
             borderRadius: 18,
-            backgroundColor: "#E5E7EB",
+            backgroundColor: props.neutral200,
             alignItems: "center",
             justifyContent: "center",
           }}

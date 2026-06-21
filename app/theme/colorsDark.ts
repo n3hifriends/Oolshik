@@ -31,13 +31,13 @@ const palette = {
   angry100: "#F2D6CD",
   angry500: "#C03403",
 
-  overlay20: "rgba(25, 16, 21, 0.2)",
-  overlay50: "rgba(25, 16, 21, 0.5)",
+  overlay20: "rgba(255, 255, 255, 0.12)",
+  overlay50: "rgba(255, 255, 255, 0.40)",
 
   success500: "#16A34A",
-  successSoft400: "#BBF7D0",
+  successSoft400: "#14532D",
   warning500: "#D97706",
-  warningSoft400: "#FDE68A",
+  warningSoft400: "#78350F",
 } as const
 
 export const colors = {
@@ -52,4 +52,5 @@ export const colors = {
   separator: palette.neutral300,
   error: palette.angry500,
   errorBackground: palette.angry100,
+  surface: "#2C2829",
 } as const

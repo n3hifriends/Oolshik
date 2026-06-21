@@ -53,11 +53,11 @@ export function HomeFeedBottomBar(props: HomeFeedBottomBarProps) {
     }).start()
   }, [props.condensed, labelOpacity])
 
-  const dividerColor = theme.isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"
-  const barBg = theme.isDark ? "rgba(28,28,30,0.96)" : "#FFFFFF"
-  const barBorder = theme.isDark ? "rgba(255,107,44,0.15)" : "#E5E7EB"
-  const createTextColor = theme.isDark ? theme.colors.text : "#3C3836"
-  const chevronColor = theme.isDark ? "rgba(255,255,255,0.4)" : "#9CA3AF"
+  const dividerColor = theme.isDark ? "rgba(255,255,255,0.1)" : theme.colors.separator
+  const barBg = theme.isDark ? "rgba(28,28,30,0.96)" : theme.colors.surface
+  const barBorder = theme.isDark ? "rgba(255,107,44,0.15)" : theme.colors.border
+  const createTextColor = theme.colors.text
+  const chevronColor = theme.isDark ? "rgba(255,255,255,0.4)" : theme.colors.textDim
   const iconBg = "rgba(255,107,44,0.08)"
   const iconBgPressed = "rgba(255,107,44,0.14)"
 

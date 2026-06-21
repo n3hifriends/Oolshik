@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
 import { typography } from "@/theme/typography"
-import { colors } from "@/theme/colors"
+import { useAppTheme } from "@/theme/context"
 import { addToSearchHistory, clearSearchHistory, getSearchHistory } from "@/utils/searchHistory"
 
 type Props = {
@@ -26,6 +26,8 @@ export const ExpandableSearch: React.FC<Props> = ({
   inputRef,
 }) => {
   const { t } = useTranslation()
+  const { theme } = useAppTheme()
+  const { colors } = theme
   const underlineAnim = useRef(new Animated.Value(open ? 1 : 0)).current
   const suggestionsAnim = useRef(new Animated.Value(0)).current
   const [history, setHistory] = useState<string[]>([])
@@ -93,9 +95,9 @@ export const ExpandableSearch: React.FC<Props> = ({
           flex: 1,
           height: 36,
           borderRadius: 18,
-          backgroundColor: colors.palette.neutral200,
+          backgroundColor: colors.separator,
           borderWidth: 1,
-          borderColor: "#E5E1DF",
+          borderColor: colors.border,
           flexDirection: "row",
           alignItems: "center",
           paddingHorizontal: 12,
@@ -103,13 +105,13 @@ export const ExpandableSearch: React.FC<Props> = ({
           opacity: pressed ? 0.8 : 1,
         })}
       >
-        <MaterialCommunityIcons name="magnify" size={16} color="#AAA" />
+        <MaterialCommunityIcons name="magnify" size={16} color={colors.textDim} />
         <Text
           text={t("oolshik:search.placeholder")}
           numberOfLines={1}
           style={{
             flex: 1,
-            color: "#AAA",
+            color: colors.textDim,
             fontSize: 13,
             fontFamily: typography.primary.normal,
           }}
@@ -124,7 +126,7 @@ export const ExpandableSearch: React.FC<Props> = ({
         style={{
           minHeight: 46,
           borderRadius: 23,
-          backgroundColor: colors.palette.neutral100,
+          backgroundColor: colors.surface,
           borderWidth: 1,
           borderColor: colors.palette.primary200,
           flexDirection: "row",
@@ -143,7 +145,7 @@ export const ExpandableSearch: React.FC<Props> = ({
           <MaterialCommunityIcons
             name="arrow-left"
             size={21}
-            color={colors.palette.neutral700}
+            color={colors.text}
           />
         </Pressable>
 
@@ -153,7 +155,7 @@ export const ExpandableSearch: React.FC<Props> = ({
             value={value}
             onChangeText={onChangeText}
             placeholder={t("oolshik:search.placeholder")}
-            placeholderTextColor="#AAA"
+            placeholderTextColor={colors.textDim}
             returnKeyType="search"
             autoCapitalize="none"
             onSubmitEditing={() => {
@@ -169,7 +171,7 @@ export const ExpandableSearch: React.FC<Props> = ({
               fontSize: 15,
               lineHeight: 20,
               fontFamily: typography.primary.medium,
-              color: colors.palette.neutral700,
+              color: colors.text,
               textAlignVertical: "center",
               includeFontPadding: false,
             }}
@@ -178,7 +180,7 @@ export const ExpandableSearch: React.FC<Props> = ({
             style={{
               height: 2,
               width: underlineWidth,
-              backgroundColor: colors.palette.primary500,
+              backgroundColor: colors.tint,
               borderRadius: 1,
             }}
           />
@@ -191,7 +193,7 @@ export const ExpandableSearch: React.FC<Props> = ({
             accessibilityLabel={t("oolshik:search.clear")}
             hitSlop={10}
           >
-            <MaterialCommunityIcons name="close-circle" size={18} color="#BBB" />
+            <MaterialCommunityIcons name="close-circle" size={18} color={colors.textDim} />
           </Pressable>
         )}
       </View>
@@ -218,7 +220,7 @@ export const ExpandableSearch: React.FC<Props> = ({
               text={t("oolshik:search.recent")}
               size="xxs"
               weight="semiBold"
-              style={{ color: colors.palette.neutral600 }}
+              style={{ color: colors.textDim }}
             />
             <Pressable
               onPress={() => {
@@ -231,7 +233,7 @@ export const ExpandableSearch: React.FC<Props> = ({
               <Text
                 text={t("oolshik:search.clearHistory")}
                 size="xxs"
-                style={{ color: colors.palette.primary500 }}
+                style={{ color: colors.tint }}
               />
             </Pressable>
           </View>
@@ -253,12 +255,12 @@ export const ExpandableSearch: React.FC<Props> = ({
                 opacity: pressed ? 0.7 : 1,
               })}
             >
-              <MaterialCommunityIcons name="history" size={16} color="#BBB" />
+              <MaterialCommunityIcons name="history" size={16} color={colors.textDim} />
               <Text
                 text={item}
                 size="xs"
                 numberOfLines={1}
-                style={{ flex: 1, color: colors.palette.neutral700 }}
+                style={{ flex: 1, color: colors.text }}
               />
             </Pressable>
           ))}

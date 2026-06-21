@@ -8,7 +8,6 @@ import { useFocusEffect } from "@react-navigation/native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Screen } from "@/components/Screen"
 import { SpotlightComposer, type SpotlightComposerHandle } from "@/components/SpotlightComposer"
-import { colors } from "@/theme/colors"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useHomeFeedController } from "@/screens/home-feed/hooks/useHomeFeedController"
 import { HomeFeedHeader } from "@/screens/home-feed/components/HomeFeedHeader"
@@ -72,7 +71,8 @@ export default function HomeFeedScreen({ navigation }: Props) {
     setBannerDismissed(true)
   }, [home_banner_id])
 
-  const showBanner = home_banner_enabled && !bannerDismissed
+  const showBanner =
+    home_banner_enabled && !bannerDismissed && (!!home_banner_title || !!home_banner_message)
 
   useFocusEffect(
     useCallback(() => {
@@ -169,7 +169,7 @@ export default function HomeFeedScreen({ navigation }: Props) {
           flex: 1,
           paddingHorizontal: 16,
           paddingTop: state.searchOpen ? 8 : 0,
-          backgroundColor: colors.background,
+          backgroundColor: theme.themeColors.background,
         }}
       >
         {location.status !== "ready" ? (

@@ -3,6 +3,17 @@ import { getRemoteFlag } from "@/services/remoteConfig"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
 import { OolshikApi } from "@/api"
 import type { AppApiError } from "@/api/apiResult"
+import { load, remove, save } from "@/utils/storage"
+
+const nearbyKey = (uid: string) => `nearby.cache.v2.${uid}`
+type NearbyCacheEntry = { tasks: Task[]; lastNearbyLoadedAt: string }
+
+// Monotonic counter — incremented on every fetchNearby call.
+// Each call captures its own value and ignores responses from older calls.
+let nearbyFetchSeq = 0
+
+// Tracks which user's cache is currently loaded. Set by hydrateForUser, cleared by clearNearby.
+let currentUserId: string | null = null
 
 type Task = {
   id: string
@@ -101,6 +112,8 @@ type State = {
   setTab: (t: TaskTab) => void
   upsertTask: (task: Task) => void
   fetchNearby: (lat: number, lng: number, statuses?: string[]) => Promise<void>
+  hydrateForUser: (userId: string) => void
+  clearNearby: () => void
   accept: (id: string, latitude: number, longitude: number) => Promise<"OK" | "ALREADY" | "ERROR">
   complete: (id: string) => Promise<"OK" | "FORBIDDEN" | "ERROR">
 }
@@ -126,10 +139,13 @@ export const useTaskStore = create<State>((set, get) => ({
     }),
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
+    const seq = ++nearbyFetchSeq
+    const requestUserId = currentUserId
     set({ loading: true })
     try {
       if (getRemoteFlag("mock_nearby_enabled") && __DEV__) {
         await new Promise((r) => setTimeout(r, 300))
+        if (seq !== nearbyFetchSeq) return
         const r = get().radiusMeters
         const allowed = new Set(
           (statuses?.length
@@ -147,34 +163,50 @@ export const useTaskStore = create<State>((set, get) => ({
         const filtered = normalizeTasks(MOCK_NEARBY_TASKS)
           .filter((t) => (t.distanceMtr ?? 0) <= r && allowed.has(t.status))
           .sort((a, b) => (a.distanceMtr ?? 0) - (b.distanceMtr ?? 0))
-        set({
-          tasks: filtered,
-          nearbyError: null,
-          isNearbyStale: false,
-          lastNearbyLoadedAt: new Date().toISOString(),
-        })
+        const loadedAt = new Date().toISOString()
+        set({ tasks: filtered, nearbyError: null, isNearbyStale: false, lastNearbyLoadedAt: loadedAt })
       } else {
         const r = get().radiusMeters
         const res = await OolshikApi.nearbyTasks(lat, lon, 1000 * r, statuses)
+        if (seq !== nearbyFetchSeq || currentUserId !== requestUserId) return
         if (res.ok) {
-          set({
-            tasks: normalizeTasks(res.data as Task[]),
-            nearbyError: null,
-            isNearbyStale: false,
-            lastNearbyLoadedAt: new Date().toISOString(),
-          })
+          const normalized = normalizeTasks(res.data as Task[])
+          const loadedAt = new Date().toISOString()
+          set({ tasks: normalized, nearbyError: null, isNearbyStale: false, lastNearbyLoadedAt: loadedAt })
+          if (requestUserId) {
+            save(nearbyKey(requestUserId), { tasks: normalized, lastNearbyLoadedAt: loadedAt } satisfies NearbyCacheEntry)
+          }
           return
         }
-
         const hasVisibleTasks = get().tasks.length > 0
-        set({
-          nearbyError: res.error,
-          isNearbyStale: hasVisibleTasks,
-        })
+        set({ nearbyError: res.error, isNearbyStale: hasVisibleTasks })
       }
     } finally {
-      set({ loading: false })
+      if (seq === nearbyFetchSeq) set({ loading: false })
     }
+  },
+
+  hydrateForUser: (userId) => {
+    if (currentUserId === userId) return
+    nearbyFetchSeq++
+    currentUserId = userId
+    const cached = load<NearbyCacheEntry>(nearbyKey(userId))
+    if (!cached?.tasks?.length) {
+      set({ tasks: [], lastNearbyLoadedAt: null, isNearbyStale: false })
+      return
+    }
+    set({
+      tasks: normalizeTasks(cached.tasks),
+      lastNearbyLoadedAt: cached.lastNearbyLoadedAt,
+      isNearbyStale: true,
+    })
+  },
+
+  clearNearby: () => {
+    nearbyFetchSeq++
+    if (currentUserId) remove(nearbyKey(currentUserId))
+    currentUserId = null
+    set({ tasks: [], lastNearbyLoadedAt: null, isNearbyStale: false, nearbyError: null })
   },
 
   accept: async (id: string, latitude: number, longitude: number) => {

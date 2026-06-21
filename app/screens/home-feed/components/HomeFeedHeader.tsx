@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { Text } from "@/components/Text"
 import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { Segmented, ViewMode } from "@/components/Segmented"
+import { useAppTheme } from "@/theme/context"
 
 type HomeFeedHeaderProps = {
   searchOpen: boolean
@@ -30,6 +31,7 @@ type HomeFeedHeaderProps = {
 
 export function HomeFeedHeader(props: HomeFeedHeaderProps) {
   const { t } = useTranslation()
+  const { theme } = useAppTheme()
   const avatarSize = props.condensed ? 34 : 38
   const avatarInnerSize = props.condensed ? 26 : 30
   const bellSize = props.condensed ? 22 : 24
@@ -138,7 +140,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
           <MaterialCommunityIcons
             name={props.unreadCount > 0 ? "bell-badge" : "bell-outline"}
             size={bellSize}
-            color={props.unreadCount > 0 ? props.primary500 : "#888"}
+            color={props.unreadCount > 0 ? props.primary500 : theme.colors.textDim}
           />
           {badgeCount > 0 && (
             <View

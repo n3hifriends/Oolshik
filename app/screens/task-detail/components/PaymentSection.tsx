@@ -3,6 +3,7 @@ import { View } from "react-native"
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import { TextField, TextFieldAccessoryProps } from "@/components/TextField"
+import { useAppTheme } from "@/theme/context"
 
 type PaymentSectionProps = {
   showHelperScanner: boolean
@@ -40,6 +41,7 @@ type PaymentSectionProps = {
 }
 
 export function PaymentSection(props: PaymentSectionProps) {
+  const { theme } = useAppTheme()
   return (
     <>
       {props.showHelperScanner ? (
@@ -85,7 +87,7 @@ export function PaymentSection(props: PaymentSectionProps) {
             style={{ minHeight: 46, justifyContent: "center" }}
           />
           {props.helperAmountError ? (
-            <Text text={props.helperAmountError} size="xs" style={{ color: "#b91c1c" }} />
+            <Text text={props.helperAmountError} size="xs" style={{ color: theme.colors.error }} />
           ) : null}
         </View>
       ) : null}

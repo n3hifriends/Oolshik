@@ -1,6 +1,7 @@
 import React, { memo } from "react"
 import { Pressable, View, StyleSheet, Platform } from "react-native"
 import { Text } from "@/components/Text"
+import { useAppTheme } from "@/theme/context"
 
 export type RadioChipValue = string | number
 
@@ -21,7 +22,8 @@ export const RadioChip = memo(function RadioChip({
   onChange,
   size = "md",
 }: RadioChipProps) {
-  const S = styles(size, selected, disabled)
+  const { theme } = useAppTheme()
+  const S = styles(size, selected, disabled, theme)
 
   return (
     <Pressable
@@ -39,22 +41,21 @@ export const RadioChip = memo(function RadioChip({
         text={label}
         preset="default"
         style={S.label}
-        // If your Text supports `color` or `preset` variants, you can swap S.label for those
       />
     </Pressable>
   )
 })
 
-function styles(size: "md" | "lg", selected: boolean, disabled: boolean) {
+function styles(size: "md" | "lg", selected: boolean, disabled: boolean, theme: any) {
   const height = size === "lg" ? 44 : 36
   const padH = size === "lg" ? 14 : 12
   const dot = size === "lg" ? 12 : 10
 
-  // neutral + selected palette (tweak to your theme if you expose tokens)
-  const bg = selected ? "rgba(59,130,246,0.12)" : "#FFFFFF" // selected: soft primary tint
-  const bd = selected ? "#BF360C" : "#E5E7EB" // border: primary vs. gray-200
-  const fg = disabled ? "#9CA3AF" : selected ? "#1F2937" : "#374151" // text: dim if disabled
-  const dotBg = selected ? "#FF6B2C" : "transparent"
+  const bg = selected
+    ? theme.isDark ? "rgba(59,130,246,0.20)" : "rgba(59,130,246,0.12)"
+    : theme.colors.surface
+  const bd = selected ? "#BF360C" : theme.colors.border
+  const fg = disabled ? theme.colors.textDim : theme.colors.text
 
   return StyleSheet.create({
     base: {
@@ -85,8 +86,8 @@ function styles(size: "md" | "lg", selected: boolean, disabled: boolean) {
       height: dot,
       borderRadius: 999,
       borderWidth: selected ? 0 : 1,
-      borderColor: selected ? "transparent" : "#FF6B2C",
-      backgroundColor: dotBg,
+      borderColor: selected ? "transparent" : theme.colors.tint,
+      backgroundColor: selected ? theme.colors.tint : "transparent",
     },
     label: {
       color: fg,

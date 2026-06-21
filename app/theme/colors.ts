@@ -87,4 +87,8 @@ export const colors = {
    * Error Background.
    */
   errorBackground: palette.angry100,
+  /**
+   * Card / elevated surface background (sits on top of background).
+   */
+  surface: palette.neutral100,
 } as const

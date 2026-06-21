@@ -11,6 +11,7 @@ import {
   setCachedPushToken,
 } from "@/utils/pushNotifications"
 import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
+import { useTaskStore } from "@/store/taskStore"
 import * as analyticsService from "@/services/analytics"
 import * as crashReporting from "@/utils/crashReporting"
 import { useRemoteConfig } from "@/services/remoteConfig"
@@ -91,6 +92,8 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     setUserPhoneMMKV("")
     // ✅ clear Authorization header in the HTTP client
     setLoginTokens(undefined, undefined)
+    // ✅ clear nearby cache so the next user never sees this session's tasks
+    useTaskStore.getState().clearNearby()
     // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV])
 
@@ -102,6 +105,13 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     if (tokens.access) return
     setLoginTokens(authToken, tokens.refresh)
   }, [authToken])
+
+  useEffect(() => {
+    // Hydrate the nearby cache for the confirmed user. Uses raw userId (not effectiveUserId)
+    // so the dev fallback "U-LOCAL-1" never loads a real user's scoped cache.
+    if (!authToken || !userId) return
+    useTaskStore.getState().hydrateForUser(userId)
+  }, [authToken, userId])
 
   useEffect(() => {
     const handler = () => {

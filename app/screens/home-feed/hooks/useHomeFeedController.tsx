@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Alert, Linking, TextInput } from "react-native"
+import { Alert, AppState, Linking, TextInput } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { useAppTheme } from "@/theme/context"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { useTaskStore } from "@/store/taskStore"
 import { useAuth } from "@/context/AuthContext"
+import { useRemoteConfig } from "@/services/remoteConfig"
 import { useTaskFiltering } from "@/hooks/useTaskFiltering"
 import { getDistanceMeters } from "@/utils/distance"
 import { kmDistance } from "@/utils/haversine"
@@ -192,6 +193,14 @@ export function useHomeFeedController({
   const { theme } = useAppTheme()
   const { colors: themeColors, spacing, isDark } = theme
   const activeCapGuard = useActiveRequestCapGuard(navigation)
+
+  const {
+    nearby_help_poll_interval_ms: rawPollIntervalMs,
+    nearby_help_min_location_delta_meters: minLocationDeltaMeters,
+  } = useRemoteConfig()
+  // Clamp poll interval between 15s and 5min to prevent misconfigured RC values
+  // from hammering the backend or making the feed feel completely dead.
+  const pollIntervalMs = Math.min(Math.max(rawPollIntervalMs, 15_000), 300_000)
 
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const {
@@ -459,9 +468,15 @@ export function useHomeFeedController({
 
       const shouldUseStatusFilter = viewMode === "forYou" && forYouTouchedStatusesRef.current
       const statusesArg = shouldUseStatusFilter ? sortedStatuses : undefined
+      // Snap coordinates to the nearest bin of size `minLocationDeltaMeters`.
+      // 1° latitude ≈ 111km; rounding to bin boundaries prevents sub-threshold
+      // GPS jitter from generating a new fetch key on every GPS update.
+      const binDeg = Math.max(minLocationDeltaMeters, 10) / 111_000
+      const latBin = Math.round(coords.latitude / binDeg) * binDeg
+      const lonBin = Math.round(coords.longitude / binDeg) * binDeg
       const key = [
-        coords.latitude.toFixed(5),
-        coords.longitude.toFixed(5),
+        latBin.toFixed(6),
+        lonBin.toFixed(6),
         radiusMeters,
         shouldUseStatusFilter ? statusesKey : "auto",
       ].join("|")
@@ -480,12 +495,47 @@ export function useHomeFeedController({
       coords?.latitude,
       coords?.longitude,
       fetchNearby,
+      minLocationDeltaMeters,
       radiusMeters,
       sortedStatuses,
       status,
       statusesKey,
       viewMode,
     ]),
+  )
+
+  // Ref that always holds the latest values needed by the polling callback.
+  // Using a ref keeps the setInterval stable — the interval is only restarted
+  // when pollIntervalMs changes from Remote Config, not on every GPS tick.
+  const pollParamsRef = useRef({
+    coords,
+    status,
+    sortedStatuses,
+    viewMode,
+    fetchNearby,
+    forYouTouchedStatusesRef,
+  })
+  pollParamsRef.current = {
+    coords,
+    status,
+    sortedStatuses,
+    viewMode,
+    fetchNearby,
+    forYouTouchedStatusesRef,
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      const timerId = setInterval(() => {
+        if (AppState.currentState !== "active") return
+        const p = pollParamsRef.current
+        if (p.status !== "ready" || !p.coords) return
+        const statusesArg =
+          p.viewMode === "forYou" && p.forYouTouchedStatusesRef.current ? p.sortedStatuses : undefined
+        void p.fetchNearby(p.coords.latitude, p.coords.longitude, statusesArg)
+      }, pollIntervalMs)
+      return () => clearInterval(timerId)
+    }, [pollIntervalMs]),
   )
 
   useEffect(() => {

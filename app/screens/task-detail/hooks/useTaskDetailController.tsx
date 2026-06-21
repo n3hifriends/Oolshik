@@ -24,6 +24,7 @@ import type {
 } from "@/navigators/OolshikNavigator"
 import { OolshikApi } from "@/api"
 import { getRemoteFlag } from "@/services/remoteConfig"
+import { getStatusColors } from "@/theme/statusColors"
 import type {
   PaymentProfileApiResponse,
   PaymentPayerRole,
@@ -227,43 +228,21 @@ export function useTaskDetailController({
   })
 
   const primary = colors.palette.primary500
-  const primarySoft = colors.palette.primary200
-  const success = "#16A34A"
-  const successSoft = "#BBF7D0"
-  const warning = "#D97706"
-  const warningSoft = "#FDE68A"
   const neutral600 = colors.palette.neutral600
   const neutral700 = colors.palette.neutral700
+  const success = colors.palette.success500
+  const successSoft = colors.palette.successSoft400
 
+  const sc = (s: string) => getStatusColors(s, theme.isDark)
   const statusMap: StatusPaletteMap = {
-    PENDING: { label: t("oolshik:status.pending"), bg: primarySoft, fg: primary },
-    PENDING_AUTH: {
-      label: t("oolshik:status.pendingAuth"),
-      bg: colors.palette.primary100,
-      fg: primary,
-    },
-    ASSIGNED: { label: t("oolshik:status.assigned"), bg: warningSoft, fg: warning },
-    WORK_DONE_PENDING_CONFIRMATION: {
-      label: t("oolshik:status.waitingConfirmation"),
-      bg: "#EDE9FE",
-      fg: "#6D28D9",
-    },
-    REVIEW_REQUIRED: {
-      label: t("oolshik:status.reviewRequired"),
-      bg: "#FFEDD5",
-      fg: "#C2410C",
-    },
-    COMPLETED: { label: t("oolshik:status.completed"), bg: successSoft, fg: success },
-    CANCELLED: {
-      label: t("oolshik:status.cancelled"),
-      bg: colors.palette.neutral200,
-      fg: neutral700,
-    },
-    UNKNOWN: {
-      label: t("oolshik:taskDetailScreen.unknownStatus"),
-      bg: colors.palette.neutral200,
-      fg: neutral700,
-    },
+    PENDING:                        { label: t("oolshik:status.pending"),               ...sc("PENDING") },
+    PENDING_AUTH:                   { label: t("oolshik:status.pendingAuth"),            ...sc("PENDING_AUTH") },
+    ASSIGNED:                       { label: t("oolshik:status.assigned"),               ...sc("ASSIGNED") },
+    WORK_DONE_PENDING_CONFIRMATION: { label: t("oolshik:status.waitingConfirmation"),    ...sc("WORK_DONE_PENDING_CONFIRMATION") },
+    REVIEW_REQUIRED:                { label: t("oolshik:status.reviewRequired"),         ...sc("REVIEW_REQUIRED") },
+    COMPLETED:                      { label: t("oolshik:status.completed"),              ...sc("COMPLETED") },
+    CANCELLED:                      { label: t("oolshik:status.cancelled"),              ...sc("CANCELLED") },
+    UNKNOWN:                        { label: t("oolshik:taskDetailScreen.unknownStatus"),...sc("UNKNOWN") },
   }
 
   useFocusEffect(

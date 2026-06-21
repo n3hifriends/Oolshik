@@ -256,7 +256,8 @@ const en = {
       notifications: "Notifications",
       notificationsHint: "Local-only toggle",
       notificationsToggleA11y: "Notifications toggle",
-      notificationsPermissionDeniedHint: "Notifications blocked by device. Tap to open Settings and allow.",
+      notificationsPermissionDeniedHint:
+        "Notifications blocked by device. Tap to open Settings and allow.",
       locationPermission: "Location access",
       locationEnabled: "Enabled",
       locationDenied: "Denied",
@@ -276,7 +277,7 @@ const en = {
       deleteAccountA11y: "Delete account",
       safetyTipsHeading: "Safety tips",
       safetyTip1: "Confirm task details before accepting.",
-      safetyTip2: "Use in-app chat and avoid sharing sensitive information.",
+      safetyTip2: "Avoid sharing sensitive information.",
       safetyTip3: "Meet in public places when possible.",
       safetyTip4: "Report suspicious behavior immediately.",
       close: "Close",
@@ -720,14 +721,18 @@ const en = {
       title: "Payment profile",
       body: "Add one UPI ID so neighbours can reimburse you directly. You'll still pay inside your UPI app.",
       requiredTitle: "Add your payment profile to continue",
-      requiredBody: "Direct payments need your UPI ID first. Add it once and use it whenever payment is needed.",
+      requiredBody:
+        "Direct payments need your UPI ID first. Add it once and use it whenever payment is needed.",
       onboardingTitle: "Add your payment profile",
-      onboardingBody: "This is optional for now. Add it if you want people to pay you easily later.",
+      onboardingBody:
+        "This is optional for now. Add it if you want people to pay you easily later.",
       onboardingCardTitle: "Receive money more easily",
-      onboardingCardBody: "Add one UPI ID now or skip for later. Oolshik only helps open your UPI app.",
+      onboardingCardBody:
+        "Add one UPI ID now or skip for later. Oolshik only helps open your UPI app.",
       onboardingAdded: "Added: {{upiId}}",
       profileCardTitle: "Payment profile",
-      profileCardBody: "Keep one UPI ID ready for direct reimbursements. You can update or remove it anytime.",
+      profileCardBody:
+        "Keep one UPI ID ready for direct reimbursements. You can update or remove it anytime.",
       addTitle: "Add payment profile",
       editTitle: "Update payment profile",
       helper: "We store only the UPI details needed to help neighbours pay you directly.",
@@ -744,7 +749,8 @@ const en = {
       scanUnsupported: "We couldn't find a UPI ID in this QR. Try a personal UPI QR.",
       reviewTitle: "Review before saving",
       reviewBody: "We found {{upiId}}. Please confirm it on the form before saving.",
-      inlineNote: "You'll still pay using your own UPI app. Oolshik does not hold or process money.",
+      inlineNote:
+        "You'll still pay using your own UPI app. Oolshik does not hold or process money.",
       invalidUpi: "Enter a valid UPI ID like name@bank.",
       saveFailed: "We couldn't save your payment profile.",
       savedTitle: "Payment profile saved",
@@ -780,7 +786,8 @@ const en = {
     direct: {
       helperCta: "Pay or request via UPI",
       choiceTitle: "Choose direct payment",
-      choiceBody: "Decide who should receive this money. We'll still open the transfer in a UPI app.",
+      choiceBody:
+        "Decide who should receive this money. We'll still open the transfer in a UPI app.",
       requestToMe: "Requester pays me",
       payRequester: "I pay requester",
       requestedTitle: "Direct payment is ready",
@@ -822,10 +829,14 @@ const en = {
       contextFallbackTitle: "Neighbourhood payment request",
       requestedBy: "Requested by",
       reference: "Reference",
-      secureNote: "Only the masked payee details are shown here. Verify inside your UPI app before you pay.",
-      contextHeroBody: "Review the task and requester once, then complete the transfer in your UPI app.",
-      requesterHeroBody: "This payment request was prepared for {{name}}. Check the payee details before continuing.",
-      defaultHeroBody: "Review the payee details below, pay in your UPI app, then return here to confirm.",
+      secureNote:
+        "Only the masked payee details are shown here. Verify inside your UPI app before you pay.",
+      contextHeroBody:
+        "Review the task and requester once, then complete the transfer in your UPI app.",
+      requesterHeroBody:
+        "This payment request was prepared for {{name}}. Check the payee details before continuing.",
+      defaultHeroBody:
+        "Review the payee details below, pay in your UPI app, then return here to confirm.",
       recipient: "Recipient",
       upiId: "UPI ID",
       paymentWindow: "Payment window",

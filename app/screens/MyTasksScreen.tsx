@@ -18,6 +18,7 @@ import { OolshikApi, type ActiveRequestSummaryItem } from "@/api/client"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { minsAgo } from "@/screens/task-detail/helpers/taskDetailFormatters"
+import { getStatusColors } from "@/theme/statusColors"
 
 type Props = OolshikStackScreenProps<"OolshikMy">
 type LoadOptions = { refreshing?: boolean; liveRef?: { current: boolean } }
@@ -51,18 +52,14 @@ function getStatusMeta(theme: Theme, t: (key: string) => string, rawStatus: stri
         backgroundColor: theme.colors.palette.warningSoft400,
         textColor: neutral700,
       }
-    case "WORK_DONE_PENDING_CONFIRMATION":
-      return {
-        label: t("oolshik:status.waitingConfirmation"),
-        backgroundColor: "#EDE9FE",
-        textColor: "#6D28D9",
-      }
-    case "REVIEW_REQUIRED":
-      return {
-        label: t("oolshik:status.reviewRequired"),
-        backgroundColor: "#FFEDD5",
-        textColor: "#C2410C",
-      }
+    case "WORK_DONE_PENDING_CONFIRMATION": {
+      const sc = getStatusColors("WORK_DONE_PENDING_CONFIRMATION", theme.isDark)
+      return { label: t("oolshik:status.waitingConfirmation"), backgroundColor: sc.bg, textColor: sc.fg }
+    }
+    case "REVIEW_REQUIRED": {
+      const sc = getStatusColors("REVIEW_REQUIRED", theme.isDark)
+      return { label: t("oolshik:status.reviewRequired"), backgroundColor: sc.bg, textColor: sc.fg }
+    }
     case "COMPLETED":
       return {
         label: t("oolshik:status.completed"),
@@ -328,7 +325,7 @@ const createStyles = (theme: Theme) =>
       minWidth: 132,
     },
     requestCard: {
-      backgroundColor: theme.colors.palette.neutral100,
+      backgroundColor: theme.colors.surface,
       borderColor: theme.colors.separator,
       marginBottom: theme.spacing.md,
       padding: theme.spacing.md,
@@ -347,7 +344,7 @@ const createStyles = (theme: Theme) =>
       height: theme.spacing.md,
     },
     stateCard: {
-      backgroundColor: theme.colors.palette.neutral100,
+      backgroundColor: theme.colors.surface,
       borderColor: theme.colors.separator,
       marginTop: theme.spacing.xs,
       padding: theme.spacing.lg,
