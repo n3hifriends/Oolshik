@@ -11,13 +11,18 @@ import {
 } from "@react-navigation/native"
 import * as SplashScreen from "expo-splash-screen"
 import { createNativeStackNavigator, NativeStackScreenProps } from "@react-navigation/native-stack"
+import { Platform } from "react-native"
+import * as Application from "expo-application"
 
 import Config from "@/config"
 import { useAuth } from "@/context/AuthContext" // @demo remove-current-line
 import { ErrorBoundary } from "@/screens/ErrorScreen/ErrorBoundary"
 import { LoginScreen } from "@/screens/LoginScreen" // @demo remove-current-line
-import { WelcomeScreen } from "@/screens/WelcomeScreen"
+import { HelpRequestsUnavailableScreen } from "@/screens/HelpRequestsUnavailableScreen"
 import { useAppTheme } from "@/theme/context"
+import { useRemoteConfig, getMaintenanceConfig, getVersionConfig } from "@/services/remoteConfig"
+import { MaintenanceScreen } from "@/screens/MaintenanceScreen"
+import { ForceUpdateScreen } from "@/screens/ForceUpdateScreen"
 
 import { DemoNavigator, DemoTabParamList } from "./DemoNavigator" // @demo remove-current-line
 import { navigationRef, useBackButtonHandler } from "./navigationUtilities"
@@ -32,7 +37,6 @@ import { OolshikNavigator } from "@/navigators/OolshikNavigator"
  *   https://reactnavigation.org/docs/typescript/#organizing-types
  */
 export type AppStackParamList = {
-  Welcome: undefined
   Login: undefined // @demo remove-current-line
   Demo: NavigatorScreenParams<DemoTabParamList> // @demo remove-current-line
   // 🔥 Your screens go here
@@ -40,6 +44,9 @@ export type AppStackParamList = {
 	PaymentPay: undefined
 	// IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
   Oolshik: undefined
+  Maintenance: undefined
+  ForceUpdate: undefined
+  HelpRequestsUnavailable: undefined
 }
 
 /**
@@ -53,6 +60,17 @@ export type AppStackScreenProps<T extends keyof AppStackParamList> = NativeStack
   T
 >
 
+// Compares semver strings; returns true if `current` is below `minimum`.
+function isBelowMinVersion(current: string, minimum: string): boolean {
+  if (!minimum || minimum === "0.0.0") return false
+  const parse = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0)
+  const [cMaj, cMin, cPatch] = parse(current)
+  const [mMaj, mMin, mPatch] = parse(minimum)
+  if (cMaj !== mMaj) return cMaj < mMaj
+  if (cMin !== mMin) return cMin < mMin
+  return cPatch < mPatch
+}
+
 // Documentation: https://reactnavigation.org/docs/stack-navigator/
 const Stack = createNativeStackNavigator<AppStackParamList>()
 
@@ -64,6 +82,33 @@ const AppStack = () => {
     theme: { colors },
   } = useAppTheme()
 
+  const flags = useRemoteConfig()
+
+  // --- Maintenance gate (highest priority — applies to all users) ---
+  const maintenance = getMaintenanceConfig()
+  if (maintenance.enabled) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false, navigationBarColor: colors.background, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
+      </Stack.Navigator>
+    )
+  }
+
+  // --- Force update / version gate ---
+  const version = getVersionConfig()
+  const currentVersion = Application.nativeApplicationVersion ?? "0.0.0"
+  const minVersion = Platform.OS === "android" ? version.minAndroid : version.minIos
+  const needsUpdate = version.forceUpdateEnabled && isBelowMinVersion(currentVersion, minVersion)
+  if (needsUpdate) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false, navigationBarColor: colors.background, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack.Screen name="ForceUpdate" component={ForceUpdateScreen} />
+      </Stack.Navigator>
+    )
+  }
+
+  const helpRequestsEnabled = flags.feature_help_requests_enabled
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -73,18 +118,20 @@ const AppStack = () => {
           backgroundColor: colors.background,
         },
       }}
-      initialRouteName={isAuthenticated ? "Oolshik" : "Login"} // @demo remove-current-line
     >
       {/* @demo remove-block-start */}
       {isAuthenticated ? (
         <>
-          <Stack.Screen
-            name="Oolshik"
-            component={OolshikNavigator}
-            options={{ headerShown: false }}
-          />
+          {helpRequestsEnabled ? (
+            <Stack.Screen
+              name="Oolshik"
+              component={OolshikNavigator}
+              options={{ headerShown: false }}
+            />
+          ) : (
+            <Stack.Screen name="HelpRequestsUnavailable" component={HelpRequestsUnavailableScreen} />
+          )}
           {/* @demo remove-block-end */}
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           {/* @demo remove-block-start */}
           {/* <Stack.Screen name="Demo" component={DemoNavigator} /> */}
         </>

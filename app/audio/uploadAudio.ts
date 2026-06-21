@@ -11,6 +11,7 @@ import {
 } from "@/api/audio"
 import { api as Api } from "@/api/client"
 import Config from "@/config"
+import { getRemoteFlag } from "@/services/remoteConfig"
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
 const PRESIGN_RETRY_COOLDOWN_MS = 10 * 60 * 1000
@@ -51,14 +52,19 @@ type AudioFileResponse = {
  * Returns the registered AudioFile id plus a playback URL.
  */
 export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
+  if (!getRemoteFlag("feature_audio_upload_enabled")) {
+    throw new Error("Audio upload is temporarily unavailable. Please try again later.")
+  }
+
   const mimeType = opts.mimeType ?? "audio/m4a"
   const filename = opts.filename ?? `recording_${Date.now()}.m4a`
   const requestId = buildUploadRequestId(opts.requestId)
   const filePath = toFilePath(opts.uri)
   let presignFailureMessage: string | null = null
 
+  const audioUploadPresigned = getRemoteFlag("audio_upload_use_presigned")
   const shouldTryPresign =
-    Config.REQUIRE_PRESIGNED_AUDIO_UPLOAD ||
+    audioUploadPresigned ||
     presignState !== "unsupported" ||
     Date.now() - lastPresignAttemptAt > PRESIGN_RETRY_COOLDOWN_MS
 
@@ -112,7 +118,7 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
     }
   }
 
-  if (Config.REQUIRE_PRESIGNED_AUDIO_UPLOAD) {
+  if (audioUploadPresigned) {
     throw new Error(presignFailureMessage ?? PRESIGNED_UPLOAD_REQUIRED_MESSAGE)
   }
 

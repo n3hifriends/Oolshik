@@ -1,7 +1,18 @@
 import { Platform } from "react-native"
-import messaging from "@react-native-firebase/messaging"
+import { getApp } from "@react-native-firebase/app"
+import {
+  getMessaging,
+  requestPermission,
+  hasPermission,
+  getToken,
+  onMessage,
+  AuthorizationStatus,
+} from "@react-native-firebase/messaging"
 import type { FirebaseMessagingTypes } from "@react-native-firebase/messaging"
 import * as Notifications from "expo-notifications"
+
+// Cached modular Messaging instance.
+const messagingInstance = getMessaging(getApp())
 
 import { OolshikApi } from "@/api/client"
 import { navigate, navigationRef, resetRoot } from "@/navigators/navigationUtilities"
@@ -46,24 +57,28 @@ export async function getFcmTokenAsync(): Promise<string | null> {
   if (Platform.OS === "web") return null
   await ensureAndroidChannel()
 
-  const askedBefore = loadString(PUSH_PERMISSION_REQUESTED_KEY) === "true"
-  if (!askedBefore) {
-    const authStatus = await messaging().requestPermission()
-    saveString(PUSH_PERMISSION_REQUESTED_KEY, "true")
+  const stored = loadString(PUSH_PERMISSION_REQUESTED_KEY)
+  if (!stored) {
+    const authStatus = await requestPermission(messagingInstance)
     const granted =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL
+    saveString(PUSH_PERMISSION_REQUESTED_KEY, granted ? "granted" : "denied")
     if (!granted) return null
   } else {
-    const authStatus = await messaging().hasPermission()
+    const authStatus = await hasPermission(messagingInstance)
     const granted =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL
+    if (granted && stored === "denied") {
+      // User granted in device Settings since last ask — update stored state.
+      saveString(PUSH_PERMISSION_REQUESTED_KEY, "granted")
+    }
     if (!granted) return null
   }
 
   try {
-    const token = await messaging().getToken()
+    const token = await getToken(messagingInstance)
     if (__DEV__) {
       // eslint-disable-next-line no-console
       console.log("FCM token acquired")
@@ -119,7 +134,7 @@ export async function unregisterDeviceTokenWithRetry(token: string, maxAttempts 
 }
 
 export function attachNotificationListeners() {
-  const foregroundFcm = messaging().onMessage(handleForegroundFcmMessage)
+  const foregroundFcm = onMessage(messagingInstance, handleForegroundFcmMessage)
   const received = Notifications.addNotificationReceivedListener(() => {
     // no-op for now
   })
@@ -383,6 +398,12 @@ function clearNavRetryTimer() {
   if (!navRetryTimer) return
   clearTimeout(navRetryTimer)
   navRetryTimer = null
+}
+
+export function getNotificationPermissionState(): "unknown" | "granted" | "denied" {
+  const stored = loadString(PUSH_PERMISSION_REQUESTED_KEY)
+  if (!stored) return "unknown"
+  return stored === "granted" ? "granted" : "denied"
 }
 
 export function getCachedPushToken() {

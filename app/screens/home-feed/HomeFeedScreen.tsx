@@ -1,6 +1,9 @@
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from "react-native"
 import { useTranslation } from "react-i18next"
+import { useRemoteConfig } from "@/services/remoteConfig"
+import { loadString, saveString } from "@/utils/storage"
+import { HomeBanner } from "@/screens/home-feed/components/HomeBanner"
 import { useFocusEffect } from "@react-navigation/native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Screen } from "@/components/Screen"
@@ -44,6 +47,32 @@ export default function HomeFeedScreen({ navigation }: Props) {
   })
 
   const { theme, location, feed, user, refs, state, handlers } = controller
+
+  const {
+    home_banner_enabled,
+    home_banner_type,
+    home_banner_id,
+    home_banner_title,
+    home_banner_message,
+    home_banner_auto_dismiss_seconds,
+  } = useRemoteConfig()
+
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+
+  useEffect(() => {
+    if (!home_banner_id) {
+      setBannerDismissed(false)
+      return
+    }
+    setBannerDismissed(loadString("home.banner.dismissed.id") === home_banner_id)
+  }, [home_banner_id])
+
+  const handleBannerDismiss = useCallback(() => {
+    if (home_banner_id) saveString("home.banner.dismissed.id", home_banner_id)
+    setBannerDismissed(true)
+  }, [home_banner_id])
+
+  const showBanner = home_banner_enabled && !bannerDismissed
 
   useFocusEffect(
     useCallback(() => {
@@ -92,6 +121,16 @@ export default function HomeFeedScreen({ navigation }: Props) {
         onOpenInbox={openInbox}
         unreadCount={unreadCount}
       />
+
+      {showBanner ? (
+        <HomeBanner
+          title={home_banner_title}
+          message={home_banner_message}
+          type={home_banner_type}
+          autoDismissSeconds={home_banner_auto_dismiss_seconds}
+          onDismiss={handleBannerDismiss}
+        />
+      ) : null}
 
       <HomeFeedFilters
         viewMode={feed.viewMode}
@@ -207,3 +246,4 @@ export default function HomeFeedScreen({ navigation }: Props) {
     </Screen>
   )
 }
+

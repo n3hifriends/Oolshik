@@ -6,18 +6,23 @@ import {
   attachNotificationListeners,
   disablePushNotifications,
   getFcmTokenAsync,
+  getCachedPushToken,
   registerDeviceTokenWithRetry,
   setCachedPushToken,
 } from "@/utils/pushNotifications"
 import { getProfileExtras } from "@/features/profile/storage/profileExtrasStore"
+import * as analyticsService from "@/services/analytics"
+import * as crashReporting from "@/utils/crashReporting"
+import { useRemoteConfig } from "@/services/remoteConfig"
 import React, {
   createContext,
   useContext,
   useMemo,
   PropsWithChildren,
   useCallback,
-  useEffect, // ✅ added
+  useEffect,
 } from "react"
+import { AppState } from "react-native"
 import { useMMKVString } from "react-native-mmkv"
 
 export type AuthContextType = {
@@ -46,6 +51,7 @@ export const AuthContext = createContext<AuthContextType | null>(null)
 export interface AuthProviderProps {}
 
 export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>) {
+  const { feature_push_registration_enabled: pushEnabled } = useRemoteConfig()
   const [authToken, setAuthTokenMMKV] = useMMKVString(MMKV_AUTH_TOKEN)
   const [authEmail, setAuthEmailMMKV] = useMMKVString(MMKV_AUTH_EMAIL)
   const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
@@ -111,6 +117,14 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     if (!authToken) return
     let active = true
     const cleanup = attachNotificationListeners()
+
+    if (!pushEnabled) {
+      // Flag disabled — unregister token with backend (full unregister, not just local).
+      // Re-runs whenever pushEnabled changes mid-session, e.g. after Remote Config activates.
+      disablePushNotifications().catch(() => {})
+      return cleanup
+    }
+
     ;(async () => {
       try {
         const extras = await getProfileExtras()
@@ -131,7 +145,44 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       active = false
       cleanup()
     }
-  }, [authToken])
+  }, [authToken, pushEnabled])
+
+  // Re-register FCM token whenever the app returns to the foreground.
+  // Firebase may silently rotate tokens (reinstall, service update, etc.); re-running on
+  // foreground catches that without requiring a logout/login cycle.
+  useEffect(() => {
+    if (!authToken || !pushEnabled) return
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") return
+      ;(async () => {
+        try {
+          const extras = await getProfileExtras()
+          if (!(extras.notificationsEnabled ?? true)) return
+          const token = await getFcmTokenAsync()
+          if (!token) return
+          if (token === getCachedPushToken()) return
+          await registerDeviceTokenWithRetry(token)
+          setCachedPushToken(token)
+        } catch {
+          // best-effort
+        }
+      })()
+    })
+    return () => subscription.remove()
+  }, [authToken, pushEnabled])
+
+  // Sync real user identity to Analytics and Crashlytics on auth state change.
+  // Uses raw `userId` + `authToken` — NOT effectiveUserId — to avoid attaching
+  // the "U-LOCAL-1" dev fallback to production sessions.
+  useEffect(() => {
+    if (authToken && userId) {
+      analyticsService.setUserId(userId)
+      crashReporting.setUserId(userId)
+    } else {
+      analyticsService.setUserId(null)
+      crashReporting.clearUserId()
+    }
+  }, [authToken, userId])
 
   // 🔑 email validation logic preserved
   const validationError = useMemo(() => {

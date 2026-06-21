@@ -1,0 +1,177 @@
+{
+  "conditions": [
+    {
+      "name": "android_only",
+      "expression": "device.os == 'android'",
+      "tagColor": "GREEN"
+    },
+    {
+      "name": "ios_only",
+      "expression": "device.os == 'ios'",
+      "tagColor": "BLUE"
+    }
+  ],
+  "parameterGroups": {
+    "Feature Flags": {
+      "description": "Control feature availability without an app release.",
+      "parameters": {
+        "feature_help_requests_enabled": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Show/hide the help requests flow for all users. UX gate only — backend still enforces access."
+        },
+        "feature_audio_upload_enabled": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Enable/disable audio upload. Set false to suppress the feature globally without a release."
+        },
+        "feature_location_capture_enabled": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Enable/disable foreground location capture and permission request."
+        },
+        "feature_push_registration_enabled": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Enable/disable FCM token registration. Set false for emergency suppression or backend instability."
+        }
+      }
+    },
+    "Auth Flags": {
+      "description": "Control login method availability. UX only — backend validates all tokens.",
+      "parameters": {
+        "auth_phone_otp_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Show OTP phone login option. UX only — backend validates tokens regardless."
+        },
+        "auth_google_enabled": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Show Google Sign-In option. UX only — backend validates tokens regardless."
+        },
+        "auth_google_require_phone": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Require phone number collection after Google sign-in."
+        }
+      }
+    },
+    "UI and Content": {
+      "description": "Dynamic strings and banners without a release.",
+      "parameters": {
+        "home_banner_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Show a dismissable announcement banner on the home screen."
+        },
+        "home_banner_title": {
+          "defaultValue": { "value": "" },
+          "valueType": "STRING",
+          "description": "Title text for the home screen banner. Only shown when home_banner_enabled is true."
+        },
+        "home_banner_message": {
+          "defaultValue": { "value": "" },
+          "valueType": "STRING",
+          "description": "Body text for the home screen banner. Only shown when home_banner_enabled is true."
+        },
+        "support_contact_whatsapp": {
+          "defaultValue": { "value": "" },
+          "valueType": "STRING",
+          "description": "WhatsApp number for support contact (e.g. +919876543210). Empty hides the WhatsApp link."
+        },
+        "support_contact_email": {
+          "defaultValue": { "value": "" },
+          "valueType": "STRING",
+          "description": "Email address for support contact. Empty hides the email link."
+        },
+        "feature_help_requests_disabled_message": {
+          "defaultValue": { "value": "" },
+          "valueType": "STRING",
+          "description": "Message shown when help requests are temporarily disabled. Empty falls back to app-local copy."
+        }
+      }
+    },
+    "Operational Controls": {
+      "description": "App-wide gates and performance tuning.",
+      "parameters": {
+        "maintenance_mode_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Show full-screen maintenance gate to all users. Set maintenance_message first before enabling."
+        },
+        "maintenance_message": {
+          "defaultValue": { "value": "" },
+          "valueType": "STRING",
+          "description": "Message shown on maintenance screen. Falls back to hardcoded default if empty."
+        },
+        "min_supported_app_version_android": {
+          "defaultValue": { "value": "0.0.0" },
+          "conditionalValues": {
+            "android_only": { "value": "0.0.0" }
+          },
+          "valueType": "STRING",
+          "description": "Minimum supported Android version (semver). Raise above current build to trigger force update. Requires force_update_enabled=true."
+        },
+        "min_supported_app_version_ios": {
+          "defaultValue": { "value": "0.0.0" },
+          "conditionalValues": {
+            "ios_only": { "value": "0.0.0" }
+          },
+          "valueType": "STRING",
+          "description": "Minimum supported iOS version (semver). Raise above current build to trigger force update. Requires force_update_enabled=true."
+        },
+        "force_update_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Additional gate for force update — must be true AND version below minimum. Prevents a single mis-click from blocking all users."
+        },
+        "audio_upload_use_presigned": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Use S3 presigned PUT for audio upload (true) or server-buffered chunked upload (false)."
+        },
+        "help_request_poll_interval_ms": {
+          "defaultValue": { "value": "10000" },
+          "valueType": "NUMBER",
+          "description": "Transcription polling interval in milliseconds. Clamped app-side to [5000, 60000]."
+        },
+        "remote_config_fetch_interval_seconds": {
+          "defaultValue": { "value": "3600" },
+          "valueType": "NUMBER",
+          "description": "How often the app re-fetches Remote Config (seconds). Clamped app-side to [300, 86400]. Does not apply in dev builds."
+        }
+      }
+    },
+    "Privacy and Observability": {
+      "description": "Defaults match production-safe behavior.",
+      "parameters": {
+        "analytics_debug_logging_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Enable Analytics collection in dev/debug builds for DebugView output. Never enable in production."
+        },
+        "crashlytics_user_context_enabled": {
+          "defaultValue": { "value": "true" },
+          "valueType": "BOOLEAN",
+          "description": "Attach user ID and attributes to crash reports. Set false for privacy-sensitive regions or user opt-out."
+        }
+      }
+    },
+    "Debug Flags": {
+      "description": "Dev and staging only. Both require __DEV__ app-side guard — never enable in production.",
+      "parameters": {
+        "mock_nearby_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Use mock nearby tasks instead of real API. App-side guard also requires __DEV__. Never enable in production Console."
+        },
+        "mock_upload_create_enabled": {
+          "defaultValue": { "value": "false" },
+          "valueType": "BOOLEAN",
+          "description": "Use mock upload/create API client. App-side guard also requires __DEV__. Never enable in production Console."
+        }
+      }
+    }
+  }
+}

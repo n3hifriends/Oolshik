@@ -17,6 +17,11 @@ if (__DEV__) {
   require("./devtools/ReactotronConfig.ts")
 }
 import "./utils/gestureHandler"
+import { initCrashReporting } from "./utils/crashReporting"
+
+// Initialise crash reporting before the React tree mounts so that even errors
+// thrown during provider setup are captured. Collection is disabled in __DEV__.
+initCrashReporting()
 
 import { useEffect, useState } from "react"
 import { View } from "react-native"
@@ -70,7 +75,6 @@ const config = {
     Login: {
       path: "",
     },
-    Welcome: "welcome",
     Demo: {
       screens: {
         DemoShowroom: {

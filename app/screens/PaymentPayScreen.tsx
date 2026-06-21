@@ -25,6 +25,7 @@ type PaymentBreakdownItem = {
 type PaymentHighlight = {
   label: string
   value: string
+  type?: string
 }
 
 type PaymentSnapshot = {
@@ -54,6 +55,7 @@ type BuildSeedArgs = {
   paymentRequestId?: string
   scanPayload: PaymentScanPayload
   taskContext?: PaymentTaskContext
+  labels: { task: string; requester: string }
 }
 
 const DEFAULT_STATUS = "PENDING"
@@ -75,7 +77,7 @@ const mergeHighlights = (a?: PaymentHighlight[], b?: PaymentHighlight[]) => {
   return result.length ? result : undefined
 }
 
-const buildSeedPayment = ({ paymentRequestId, scanPayload, taskContext }: BuildSeedArgs) => {
+const buildSeedPayment = ({ paymentRequestId, scanPayload, taskContext, labels }: BuildSeedArgs) => {
   const amount =
     typeof scanPayload.amount === "number" && !Number.isNaN(scanPayload.amount)
       ? scanPayload.amount
@@ -83,10 +85,10 @@ const buildSeedPayment = ({ paymentRequestId, scanPayload, taskContext }: BuildS
 
   const highlights: PaymentHighlight[] = []
   if (taskContext?.title) {
-    highlights.push({ label: "Task", value: taskContext.title })
+    highlights.push({ type: "task", label: labels.task, value: taskContext.title })
   }
   if (taskContext?.createdByName) {
-    highlights.push({ label: "Requester", value: taskContext.createdByName })
+    highlights.push({ type: "requester", label: labels.requester, value: taskContext.createdByName })
   }
 
   const snapshot: PaymentSnapshot = {
@@ -158,9 +160,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const styles = useMemo(() => createStyles(theme), [theme])
 
   const seedPayment = useMemo(() => {
-    const base = buildSeedPayment({ paymentRequestId, scanPayload, taskContext })
+    const labels = { task: t("payment:pay.highlightTask"), requester: t("payment:pay.highlightRequester") }
+    const base = buildSeedPayment({ paymentRequestId, scanPayload, taskContext, labels })
     return upiIntentOverride ? { ...base, upiIntent: upiIntentOverride } : base
-  }, [paymentRequestId, scanPayload, taskContext, upiIntentOverride])
+  }, [paymentRequestId, scanPayload, taskContext, upiIntentOverride, t])
 
   const [payment, setPayment] = useState<PaymentRequestPayload | null>(seedPayment)
   const [loading, setLoading] = useState<boolean>(Boolean(paymentRequestId))
@@ -185,7 +188,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       setPayment((prev) => mergePaymentPayload(prev ?? seedPayment, normalized))
     } catch (err) {
       if (requestId !== requestIdRef.current) return
-      setError(extractErrorMessage(err))
+      setError(extractErrorMessage(err, t("payment:pay.unknownError")))
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false)
@@ -217,17 +220,13 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       if (identifier) {
         await OolshikApi.initiatePayment(identifier)
       }
-      const isSupported = await Linking.canOpenURL(upiIntent)
-      if (!isSupported) {
-        Alert.alert(
-          t("payment:pay.noUpiAppTitle"),
-          t("payment:pay.noUpiAppBody", { upiLink: upiIntent }),
-        )
-        return
-      }
       await Linking.openURL(upiIntent)
-    } catch (err) {
-      Alert.alert(t("payment:pay.launchFailTitle"), extractErrorMessage(err))
+    } catch {
+      // openURL throws when no app can handle the upi:// intent (no UPI app installed).
+      Alert.alert(
+        t("payment:pay.noUpiAppTitle"),
+        t("payment:pay.noUpiAppBody", { upiLink: upiIntent }),
+      )
     } finally {
       setIsLaunchingPayment(false)
     }
@@ -263,7 +262,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
                 ],
               )
             } catch (err) {
-              Alert.alert(t("payment:pay.markFailTitle"), extractErrorMessage(err))
+              Alert.alert(t("payment:pay.markFailTitle"), extractErrorMessage(err, t("payment:pay.unknownError")))
             } finally {
               setIsConfirming(false)
             }
@@ -288,7 +287,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       }
       await Linking.openURL(supportLink)
     } catch (err) {
-      Alert.alert(t("payment:pay.supportFailTitle"), extractErrorMessage(err))
+      Alert.alert(t("payment:pay.supportFailTitle"), extractErrorMessage(err, t("payment:pay.unknownError")))
     }
   }, [payment, seedPayment, t])
 
@@ -354,10 +353,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const breakdownTotal = breakdown.reduce((sum, item) => sum + (item.amount ?? 0), 0)
   const inlineError = error && payment ? error : null
   const supportLink = payment?.supportLink ?? seedPayment?.supportLink
-  const contextTitle = taskContext?.title?.trim() || snapshot.highlights?.find((item) => item.label === "Task")?.value
+  const contextTitle = taskContext?.title?.trim() || snapshot.highlights?.find((item) => item.type === "task")?.value
   const requesterName =
     taskContext?.createdByName?.trim() ||
-    snapshot.highlights?.find((item) => item.label === "Requester")?.value ||
+    snapshot.highlights?.find((item) => item.type === "requester")?.value ||
     snapshot.payeeName ||
     null
   const displayReference = formatReference(snapshot.id ?? paymentRequestId ?? taskId)
@@ -684,7 +683,7 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
   }
 }
 
-const extractErrorMessage = (err: unknown) => {
+const extractErrorMessage = (err: unknown, fallback = "") => {
   if (typeof err === "string") return err
   if (err instanceof Error) return err.message
   if (err && typeof err === "object") {
@@ -692,7 +691,7 @@ const extractErrorMessage = (err: unknown) => {
       (err as any)?.response?.data?.message ?? (err as any)?.data?.message ?? (err as any)?.message
     if (typeof message === "string") return message
   }
-  return "Something went wrong while loading the payment details."
+  return fallback
 }
 
 const formatReference = (value?: string | null) => {

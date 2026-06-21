@@ -14,7 +14,11 @@ import { useAppTheme } from "@/theme/context"
 import { useAuth } from "@/context/AuthContext"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { OolshikApi } from "@/api"
-import { disablePushNotifications, enablePushNotifications } from "@/utils/pushNotifications"
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getNotificationPermissionState,
+} from "@/utils/pushNotifications"
 import type { ProfileExtras } from "@/features/profile/types"
 import {
   getProfileExtras,
@@ -22,8 +26,9 @@ import {
 } from "@/features/profile/storage/profileExtrasStore"
 import { fromLanguageCode, normalizeLocaleTag, toLanguageCode } from "@/i18n/locale"
 import type { PaymentProfileApiResponse } from "@/api/client"
+import { useRemoteConfig } from "@/services/remoteConfig"
 
-const SUPPORT_EMAIL = "support@oolshik.in"
+const FALLBACK_supportEmail = "support@oolshik.in"
 
 function getInitials(name?: string, fallback?: string) {
   const source = (name || fallback || "").trim()
@@ -38,6 +43,8 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const { spacing, colors } = theme
   const { t, i18n } = useTranslation()
   const { logout, userName, authEmail, userId } = useAuth()
+  const { support_contact_email: remoteEmail, support_contact_whatsapp: remoteWhatsapp } = useRemoteConfig()
+  const supportEmail = remoteEmail || FALLBACK_supportEmail
   const { status: locationStatus } = useForegroundLocation({ autoRequest: false })
 
   const [extras, setExtras] = useState<ProfileExtras>({})
@@ -47,6 +54,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [showSafetyTips, setShowSafetyTips] = useState(false)
   const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({ hasProfile: false })
+  const [notifPermissionState, setNotifPermissionState] = useState(getNotificationPermissionState)
 
   useEffect(() => {
     let active = true
@@ -66,6 +74,12 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       active = false
     }
   }, [i18n])
+
+  useFocusEffect(
+    useCallback(() => {
+      setNotifPermissionState(getNotificationPermissionState())
+    }, []),
+  )
 
   useFocusEffect(
     useCallback(() => {
@@ -123,7 +137,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   }, [t])
 
   const onReportIssue = useCallback(async () => {
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t("oolshik:profileScreen.mailSubject"))}`
+    const url = `mailto:${supportEmail}?subject=${encodeURIComponent(t("oolshik:profileScreen.mailSubject"))}`
     try {
       const canOpen = await Linking.canOpenURL(url)
       if (!canOpen) throw new Error("Cannot open mail app")
@@ -131,10 +145,25 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     } catch {
       Alert.alert(
         t("oolshik:profileScreen.mailOpenFailedTitle"),
-        t("oolshik:profileScreen.mailOpenFailedBody", { email: SUPPORT_EMAIL }),
+        t("oolshik:profileScreen.mailOpenFailedBody", { email: supportEmail }),
       )
     }
-  }, [t])
+  }, [t, supportEmail])
+
+  const onContactWhatsApp = useCallback(async () => {
+    const phone = remoteWhatsapp.replace(/\D/g, "")
+    const url = `whatsapp://send?phone=${encodeURIComponent(phone)}`
+    try {
+      const canOpen = await Linking.canOpenURL(url)
+      if (!canOpen) throw new Error("WhatsApp not available")
+      await Linking.openURL(url)
+    } catch {
+      Alert.alert(
+        t("oolshik:profileScreen.whatsappOpenFailedTitle"),
+        t("oolshik:profileScreen.whatsappOpenFailedBody", { number: remoteWhatsapp }),
+      )
+    }
+  }, [t, remoteWhatsapp])
 
   const onLanguageChange = useCallback(
     async (lang: "mr" | "en") => {
@@ -325,6 +354,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             style={{ borderRadius: 10, minHeight: 44 }}
             accessibilityLabel={t("oolshik:profileScreen.reportIssueA11y")}
           />
+          {remoteWhatsapp ? (
+            <Button
+              text={t("oolshik:profileScreen.contactWhatsApp")}
+              onPress={onContactWhatsApp}
+              style={{ borderRadius: 10, minHeight: 44 }}
+            />
+          ) : null}
         </View>
       </SectionCard>
 
@@ -361,6 +397,16 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             accessibilityLabel={t("oolshik:profileScreen.notificationsToggleA11y")}
           />
         </View>
+
+        {notificationsEnabled && notifPermissionState === "denied" ? (
+          <Pressable onPress={openSettings} accessibilityRole="button">
+            <Text
+              text={t("oolshik:profileScreen.notificationsPermissionDeniedHint")}
+              size="xs"
+              style={{ color: colors.palette.warning500, marginTop: spacing.xs }}
+            />
+          </Pressable>
+        ) : null}
 
         <View
           style={{

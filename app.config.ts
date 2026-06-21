@@ -46,6 +46,16 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
       require("./plugins/withAndroidPhoneNumberHint").withAndroidPhoneNumberHint,
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      "@react-native-firebase/crashlytics",
+      [
+        "expo-build-properties",
+        {
+          ios: {
+            // React Native Firebase requires static framework linkage on iOS.
+            useFrameworks: "static",
+          },
+        },
+      ],
     ],
   }
 }

@@ -6,6 +6,7 @@ import * as Google from "expo-auth-session/providers/google"
 import { OolshikApi, type AuthMeResponse } from "@/api"
 import { setLoginTokens } from "@/api/client"
 import Config from "@/config"
+import { useRemoteConfig } from "@/services/remoteConfig"
 import { useAuth } from "@/context/AuthContext"
 import {
   getProfileExtras,
@@ -73,9 +74,12 @@ export function useLoginScreenController() {
         ? Config.GOOGLE_IOS_CLIENT_ID
         : Config.GOOGLE_WEB_CLIENT_ID
 
-  const phoneOtpEnabled = Config.AUTH_PHONE_OTP_ENABLED
-  const googlePhoneRequired = Config.AUTH_GOOGLE_REQUIRE_PHONE
-  const googleEnabled = Config.AUTH_GOOGLE_ENABLED && Boolean(platformGoogleClientId)
+  // Reactive: re-renders when Remote Config fetch completes (important for first-install users
+  // who land here while fetch is still in flight).
+  const rcFlags = useRemoteConfig()
+  const phoneOtpEnabled = rcFlags.auth_phone_otp_enabled
+  const googlePhoneRequired = rcFlags.auth_google_require_phone
+  const googleEnabled = rcFlags.auth_google_enabled && Boolean(platformGoogleClientId)
   const googleConfigured = googleEnabled
   const canUsePhoneNumberHint = Platform.OS === "android"
 

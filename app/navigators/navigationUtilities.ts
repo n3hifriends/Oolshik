@@ -10,6 +10,8 @@ import Config from "@/config"
 import type { PersistNavigationConfig } from "@/config/config.base"
 import * as storage from "@/utils/storage"
 import { useIsMounted } from "@/utils/useIsMounted"
+import { logScreenView } from "@/services/analytics"
+import { log as crashLog } from "@/utils/crashReporting"
 
 import type { AppStackParamList, NavigationProps } from "./AppNavigator"
 
@@ -131,7 +133,8 @@ export function useNavigationPersistence(storage: Storage, persistenceKey: strin
       const currentRouteName = getActiveRouteName(state)
 
       if (previousRouteName !== currentRouteName) {
-        // track screens.
+        logScreenView(currentRouteName as string)
+        crashLog(`screen:${currentRouteName}`)
         if (__DEV__) {
           console.log(currentRouteName)
         }

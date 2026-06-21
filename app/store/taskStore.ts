@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { FLAGS } from "@/config/flags"
+import { getRemoteFlag } from "@/services/remoteConfig"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
 import { OolshikApi } from "@/api"
 import type { AppApiError } from "@/api/apiResult"
@@ -128,7 +128,7 @@ export const useTaskStore = create<State>((set, get) => ({
   fetchNearby: async (lat, lon, statuses?: string[]) => {
     set({ loading: true })
     try {
-      if (FLAGS.USE_MOCK_NEARBY) {
+      if (getRemoteFlag("mock_nearby_enabled") && __DEV__) {
         await new Promise((r) => setTimeout(r, 300))
         const r = get().radiusMeters
         const allowed = new Set(
@@ -178,7 +178,7 @@ export const useTaskStore = create<State>((set, get) => ({
   },
 
   accept: async (id: string, latitude: number, longitude: number) => {
-    if (FLAGS.USE_MOCK_NEARBY) {
+    if (getRemoteFlag("mock_nearby_enabled") && __DEV__) {
       // optimistic accept in mock mode
       set((s) => ({
         tasks: s.tasks.map((t) =>
@@ -208,7 +208,7 @@ export const useTaskStore = create<State>((set, get) => ({
   },
 
   complete: async (id) => {
-    if (FLAGS.USE_MOCK_NEARBY) {
+    if (getRemoteFlag("mock_nearby_enabled") && __DEV__) {
       // In mock mode, allow completion if requester unknown; otherwise block (no auth context here)
       let updated = false
       set((s) => {

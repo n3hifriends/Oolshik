@@ -23,6 +23,7 @@ import type {
   OolshikStackScreenProps,
 } from "@/navigators/OolshikNavigator"
 import { OolshikApi } from "@/api"
+import { getRemoteFlag } from "@/services/remoteConfig"
 import type {
   PaymentProfileApiResponse,
   PaymentPayerRole,
@@ -76,7 +77,6 @@ import type {
 } from "@/screens/task-detail/types"
 
 const MAX_REASSIGN = 2
-const TRANSCRIPTION_POLL_INTERVAL_MS = 5000
 const TRANSCRIPTION_POLL_MAX_ATTEMPTS = 36
 
 type Navigation = OolshikStackScreenProps<"OolshikDetail">["navigation"]
@@ -325,6 +325,7 @@ export function useTaskDetailController({
     let cancelled = false
     let attempts = 0
     let timer: ReturnType<typeof setTimeout> | null = null
+    const pollIntervalMs = Math.min(Math.max(getRemoteFlag("help_request_poll_interval_ms"), 5000), 60000)
 
     const poll = async () => {
       attempts += 1
@@ -341,11 +342,11 @@ export function useTaskDetailController({
       }
 
       if (!cancelled && attempts < TRANSCRIPTION_POLL_MAX_ATTEMPTS) {
-        timer = setTimeout(poll, TRANSCRIPTION_POLL_INTERVAL_MS)
+        timer = setTimeout(poll, pollIntervalMs)
       }
     }
 
-    timer = setTimeout(poll, TRANSCRIPTION_POLL_INTERVAL_MS)
+    timer = setTimeout(poll, pollIntervalMs)
 
     return () => {
       cancelled = true

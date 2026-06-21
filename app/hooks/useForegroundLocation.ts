@@ -1,5 +1,6 @@
 import * as Location from "expo-location"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useRemoteConfig } from "@/services/remoteConfig"
 
 type LatLng = { latitude: number; longitude: number }
 type LocationStatus = "idle" | "loading" | "ready" | "denied" | "error"
@@ -15,11 +16,22 @@ export function useForegroundLocation(options: LocationOptions = {}) {
   const [refreshToken, setRefreshToken] = useState(0)
   const autoRequest = options.autoRequest !== false
 
+  const { feature_location_capture_enabled: locationEnabled } = useRemoteConfig()
+
   const refresh = useCallback(() => {
     setRefreshToken((v) => v + 1)
   }, [])
 
   useEffect(() => {
+    if (!locationEnabled) {
+      setCoords(null)
+      setLastKnown(null)
+      setGranted(false)
+      setStatus("idle")
+      watcherRef.current?.remove()
+      watcherRef.current = null
+      return
+    }
     let cancelled = false
 
     async function bootstrap() {
@@ -104,7 +116,7 @@ export function useForegroundLocation(options: LocationOptions = {}) {
       watcherRef.current?.remove()
       watcherRef.current = null
     }
-  }, [refreshToken, autoRequest])
+  }, [refreshToken, autoRequest, locationEnabled])
 
   return { coords, lastKnown, granted, error, status, refresh, request: refresh }
 }

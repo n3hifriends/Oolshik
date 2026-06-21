@@ -116,6 +116,12 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+# Android Studio launched from macOS often does not inherit the shell PATH.
+# Expo/RN Gradle plugins invoke `node` during settings evaluation, so include
+# the common Node install locations before starting the Gradle JVM.
+PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:$PATH"
+export PATH
+
 
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then

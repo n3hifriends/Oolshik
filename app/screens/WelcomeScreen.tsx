@@ -7,7 +7,6 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuth } from "@/context/AuthContext" // @demo remove-current-line
 import { isRTL } from "@/i18n"
-import type { AppStackScreenProps } from "@/navigators/AppNavigator" // @demo remove-current-line
 import type { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -17,7 +16,11 @@ import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 const welcomeLogo = require("@assets/images/logo.png")
 const welcomeFace = require("@assets/images/welcome-face.png")
 
-interface WelcomeScreenProps extends AppStackScreenProps<"Welcome"> {} // @demo remove-current-line
+interface WelcomeScreenProps {
+  navigation: {
+    navigate: (name: "Demo", params: { screen: string; params: Record<string, unknown> }) => void
+  }
+} // @demo remove-current-line
 
 // @demo replace-next-line export const WelcomeScreen: FC = function WelcomeScreen(
 export const WelcomeScreen: FC<WelcomeScreenProps> = function WelcomeScreen(
