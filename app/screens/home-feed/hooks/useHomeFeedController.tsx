@@ -89,24 +89,31 @@ function buildFeedServiceState(
   error: AppApiError | null,
   hasVisibleTasks: boolean,
   lastNearbyLoadedAt: string | null,
+  t: TranslateFn,
 ): FeedServiceState | null {
   if (!error) return null
 
   const loadedAt = formatLoadedAt(lastNearbyLoadedAt)
   const staleLabel = hasVisibleTasks
-    ? `Showing saved results${loadedAt ? ` from ${loadedAt}` : ""}`
+    ? loadedAt
+      ? t("oolshik:homeScreen.serviceState.showingSavedResultsFrom", { time: loadedAt })
+      : t("oolshik:homeScreen.serviceState.showingSavedResults")
     : null
-  const supportText = error.requestId ? `Reference ID: ${error.requestId}` : null
+  const supportText = error.requestId
+    ? t("oolshik:homeScreen.serviceState.referenceId", { id: error.requestId })
+    : null
   const variant = hasVisibleTasks ? "inline" : "full"
 
   switch (error.kind) {
     case "network":
     case "timeout":
       return {
-        title: hasVisibleTasks ? "Connection interrupted" : "Unable to reach nearby requests",
+        title: hasVisibleTasks
+          ? t("oolshik:homeScreen.serviceState.networkInterruptedTitle")
+          : t("oolshik:homeScreen.serviceState.networkUnreachableTitle"),
         body: hasVisibleTasks
-          ? "Your last loaded requests are still visible. Pull to refresh or try again once the connection stabilizes."
-          : "Check your internet connection and try again. We could not reach the live nearby feed.",
+          ? t("oolshik:homeScreen.serviceState.networkInterruptedBody")
+          : t("oolshik:homeScreen.serviceState.networkUnreachableBody"),
         supportText,
         staleLabel,
         variant,
@@ -114,20 +121,20 @@ function buildFeedServiceState(
     case "upstream":
     case "server":
       return {
-        title: "Live feed temporarily unavailable",
+        title: t("oolshik:homeScreen.serviceState.serverUnavailableTitle"),
         body: hasVisibleTasks
-          ? "Showing the last loaded requests while the service recovers. Try again in a moment."
-          : "Nearby requests are temporarily unavailable right now. Please try again in a moment.",
+          ? t("oolshik:homeScreen.serviceState.serverUnavailableBodyStale")
+          : t("oolshik:homeScreen.serviceState.serverUnavailableBody"),
         supportText,
         staleLabel,
         variant,
       }
     case "rate-limited":
       return {
-        title: "Too many refresh attempts",
+        title: t("oolshik:homeScreen.serviceState.rateLimitedTitle"),
         body: hasVisibleTasks
-          ? "Showing the last loaded requests for now. Please wait a bit before trying again."
-          : "Please wait a moment before refreshing nearby requests again.",
+          ? t("oolshik:homeScreen.serviceState.rateLimitedBodyStale")
+          : t("oolshik:homeScreen.serviceState.rateLimitedBody"),
         supportText,
         staleLabel,
         variant,
@@ -135,10 +142,10 @@ function buildFeedServiceState(
     case "unauthorized":
     case "forbidden":
       return {
-        title: "Session needs attention",
+        title: t("oolshik:homeScreen.serviceState.sessionTitle"),
         body: hasVisibleTasks
-          ? "Your last loaded requests are still visible, but we could not refresh them with the current session."
-          : "We could not refresh nearby requests with the current session. Please sign in again if this continues.",
+          ? t("oolshik:homeScreen.serviceState.sessionBodyStale")
+          : t("oolshik:homeScreen.serviceState.sessionBody"),
         supportText,
         staleLabel,
         variant,
@@ -147,16 +154,16 @@ function buildFeedServiceState(
     case "conflict":
     case "rejected":
       return {
-        title: "Unable to load nearby requests",
-        body: error.message || "The request could not be completed with the current parameters.",
+        title: t("oolshik:homeScreen.serviceState.validationTitle"),
+        body: error.message || t("oolshik:homeScreen.serviceState.validationBody"),
         supportText,
         staleLabel,
         variant,
       }
     case "not-found":
       return {
-        title: "Nearby feed not available",
-        body: "The nearby requests endpoint could not be found. Please try again later.",
+        title: t("oolshik:homeScreen.serviceState.notFoundTitle"),
+        body: t("oolshik:homeScreen.serviceState.notFoundBody"),
         supportText,
         staleLabel,
         variant,
@@ -165,10 +172,10 @@ function buildFeedServiceState(
     case "unknown":
     default:
       return {
-        title: "Something went wrong while loading the feed",
+        title: t("oolshik:homeScreen.serviceState.unknownTitle"),
         body: hasVisibleTasks
-          ? "Showing the last loaded requests for now. Try refreshing again in a moment."
-          : "Please try again in a moment.",
+          ? t("oolshik:homeScreen.serviceState.unknownBodyStale")
+          : t("oolshik:homeScreen.serviceState.unknownBody"),
         supportText,
         staleLabel,
         variant,
@@ -835,8 +842,8 @@ export function useHomeFeedController({
   )
 
   const serviceState = useMemo(
-    () => buildFeedServiceState(nearbyError, hasVisibleTasks, lastNearbyLoadedAt),
-    [hasVisibleTasks, lastNearbyLoadedAt, nearbyError],
+    () => buildFeedServiceState(nearbyError, hasVisibleTasks, lastNearbyLoadedAt, t),
+    [hasVisibleTasks, lastNearbyLoadedAt, nearbyError, t],
   )
 
   const showInitialLoader = loading && !hasVisibleTasks

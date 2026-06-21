@@ -241,6 +241,41 @@ const mr: Translations = {
       showingCountSummary: "{{count}} दाखवले",
       statusControlA11y: "स्थिती फिल्टर उघडा",
       bannerDismissA11y: "बॅनर बंद करा",
+      notificationsA11y: "सूचना",
+      notificationsUnreadA11y: "सूचना, {{count}} न वाचलेल्या",
+      serviceState: {
+        showingSavedResults: "जतन केलेले निकाल दाखवत आहोत",
+        showingSavedResultsFrom: "{{time}} पासून जतन केलेले निकाल दाखवत आहोत",
+        referenceId: "संदर्भ क्रमांक: {{id}}",
+        networkInterruptedTitle: "कनेक्शन खंडित झाले",
+        networkUnreachableTitle: "जवळील विनंत्यांपर्यंत पोहोचता आले नाही",
+        networkInterruptedBody:
+          "तुमच्या शेवटच्या लोड केलेल्या विनंत्या अजूनही दिसत आहेत. रिफ्रेश करा किंवा कनेक्शन स्थिर झाल्यावर पुन्हा प्रयत्न करा.",
+        networkUnreachableBody:
+          "इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा. थेट जवळील फीड मिळाली नाही.",
+        serverUnavailableTitle: "थेट फीड तात्पुरती अनुपलब्ध",
+        serverUnavailableBodyStale:
+          "सेवा पुन्हा सुरू होईपर्यंत शेवटच्या लोड केलेल्या विनंत्या दाखवत आहोत. थोड्या वेळाने पुन्हा प्रयत्न करा.",
+        serverUnavailableBody:
+          "जवळील विनंत्या सध्या उपलब्ध नाहीत. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.",
+        rateLimitedTitle: "खूप जास्त रिफ्रेश प्रयत्न",
+        rateLimitedBodyStale:
+          "सध्यासाठी शेवटच्या लोड केलेल्या विनंत्या दाखवत आहोत. कृपया थोडा वेळ थांबा.",
+        rateLimitedBody: "कृपया जवळील विनंत्या पुन्हा रिफ्रेश करण्यापूर्वी थोडा वेळ थांबा.",
+        sessionTitle: "सत्राकडे लक्ष द्या",
+        sessionBodyStale:
+          "तुमच्या शेवटच्या लोड केलेल्या विनंत्या दिसत आहेत, पण सध्याच्या सत्राने त्या रिफ्रेश करता आल्या नाहीत.",
+        sessionBody:
+          "सध्याच्या सत्राने जवळील विनंत्या रिफ्रेश करता आल्या नाहीत. हे सुरूच राहिल्यास कृपया पुन्हा साइन इन करा.",
+        validationTitle: "जवळील विनंत्या लोड करता आल्या नाहीत",
+        validationBody: "सध्याच्या पॅरामीटर्ससह विनंती पूर्ण होऊ शकली नाही.",
+        notFoundTitle: "जवळील फीड उपलब्ध नाही",
+        notFoundBody: "जवळील विनंत्यांचे एंडपॉइंट सापडले नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
+        unknownTitle: "फीड लोड करताना काहीतरी चूक झाली",
+        unknownBodyStale:
+          "सध्यासाठी शेवटच्या लोड केलेल्या विनंत्या दाखवत आहोत. थोड्या वेळाने पुन्हा रिफ्रेश करा.",
+        unknownBody: "कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.",
+      },
     },
     profileScreen: {
       heading: "प्रोफाइल",
@@ -263,7 +298,8 @@ const mr: Translations = {
       notifications: "सूचना",
       notificationsHint: "फक्त स्थानिक टॉगल",
       notificationsToggleA11y: "सूचना टॉगल",
-      notificationsPermissionDeniedHint: "डिव्हाइसने सूचना अवरोधित केल्या आहेत. सेटिंग्ज उघडण्यासाठी टॅप करा.",
+      notificationsPermissionDeniedHint:
+        "डिव्हाइसने सूचना अवरोधित केल्या आहेत. सेटिंग्ज उघडण्यासाठी टॅप करा.",
       locationPermission: "स्थान परवानगी",
       locationEnabled: "सक्षम",
       locationDenied: "नाकारले",
@@ -283,7 +319,7 @@ const mr: Translations = {
       deleteAccountA11y: "खाते हटवा",
       safetyTipsHeading: "सुरक्षा टिप्स",
       safetyTip1: "स्वीकारण्यापूर्वी कामाचे तपशील पडताळा.",
-      safetyTip2: "इन-ॲप चॅट वापरा आणि संवेदनशील माहिती शेअर करू नका.",
+      safetyTip2: "संवेदनशील माहिती शेअर करू नका.",
       safetyTip3: "शक्य असल्यास सार्वजनिक ठिकाणी भेटा.",
       safetyTip4: "संशयास्पद वर्तन त्वरित कळवा.",
       close: "बंद करा",
@@ -722,14 +758,18 @@ const mr: Translations = {
       title: "पेमेंट प्रोफाइल",
       body: "तुमचा एक UPI आयडी जोडा, म्हणजे शेजारी तुम्हाला थेट पैसे पाठवू शकतील. पेमेंट मात्र तुमच्या UPI ॲपमधूनच होईल.",
       requiredTitle: "पुढे जाण्यासाठी पेमेंट प्रोफाइल जोडा",
-      requiredBody: "डायरेक्ट पेमेंटसाठी आधी तुमचा UPI आयडी आवश्यक आहे. एकदाच जोडा आणि गरज पडेल तेव्हा वापरा.",
+      requiredBody:
+        "डायरेक्ट पेमेंटसाठी आधी तुमचा UPI आयडी आवश्यक आहे. एकदाच जोडा आणि गरज पडेल तेव्हा वापरा.",
       onboardingTitle: "तुमचे पेमेंट प्रोफाइल जोडा",
-      onboardingBody: "हे आत्ता ऐच्छिक आहे. पुढे लोकांनी तुम्हाला सहज पैसे पाठवावेत असे वाटत असेल तर जोडा.",
+      onboardingBody:
+        "हे आत्ता ऐच्छिक आहे. पुढे लोकांनी तुम्हाला सहज पैसे पाठवावेत असे वाटत असेल तर जोडा.",
       onboardingCardTitle: "पैसे सहज मिळवा",
-      onboardingCardBody: "एक UPI आयडी आत्ताच जोडा किंवा नंतरसाठी सोडा. ऊलशिक फक्त तुमचे UPI ॲप उघडायला मदत करते.",
+      onboardingCardBody:
+        "एक UPI आयडी आत्ताच जोडा किंवा नंतरसाठी सोडा. ऊलशिक फक्त तुमचे UPI ॲप उघडायला मदत करते.",
       onboardingAdded: "जोडलेले: {{upiId}}",
       profileCardTitle: "पेमेंट प्रोफाइल",
-      profileCardBody: "थेट परतफेडीसाठी एक UPI आयडी तयार ठेवा. तुम्ही तो कधीही बदलू किंवा काढू शकता.",
+      profileCardBody:
+        "थेट परतफेडीसाठी एक UPI आयडी तयार ठेवा. तुम्ही तो कधीही बदलू किंवा काढू शकता.",
       addTitle: "पेमेंट प्रोफाइल जोडा",
       editTitle: "पेमेंट प्रोफाइल अपडेट करा",
       helper: "शेजाऱ्यांना तुम्हाला थेट पैसे पाठवता यावेत यासाठी लागणारे UPI तपशीलच आम्ही साठवतो.",
@@ -992,7 +1032,8 @@ const mr: Translations = {
       "Ignite आणखी चांगले करण्याची कल्पना आहे का? आम्हाला नक्की कळवा. सर्वोत्तम React Native टूलिंग तयार करण्यात मदत करणारे लोक आम्ही नेहमी शोधत असतो. भविष्यातील Ignite घडवण्यासाठी GitHub वर सामील व्हा.",
     contributeToIgniteLink: "Ignite मध्ये योगदान द्या",
     theLatestInReactNativeTitle: "React Native मधील नवे काय",
-    theLatestInReactNative: "React Native मधील नवीन गोष्टींबद्दल तुम्हाला अपडेट ठेवण्यासाठी आम्ही आहोत.",
+    theLatestInReactNative:
+      "React Native मधील नवीन गोष्टींबद्दल तुम्हाला अपडेट ठेवण्यासाठी आम्ही आहोत.",
     reactNativeRadioLink: "React Native Radio",
     reactNativeNewsletterLink: "React Native Newsletter",
     reactNativeLiveLink: "React Native Live",

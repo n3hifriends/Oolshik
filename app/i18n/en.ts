@@ -234,6 +234,42 @@ const en = {
       statusesSelectedSummary: "{{count}} selected",
       showingCountSummary: "{{count}} shown",
       statusControlA11y: "Open status filters",
+      notificationsA11y: "Notifications",
+      notificationsUnreadA11y: "Notifications, {{count}} unread",
+      serviceState: {
+        showingSavedResults: "Showing saved results",
+        showingSavedResultsFrom: "Showing saved results from {{time}}",
+        referenceId: "Reference ID: {{id}}",
+        networkInterruptedTitle: "Connection interrupted",
+        networkUnreachableTitle: "Unable to reach nearby requests",
+        networkInterruptedBody:
+          "Your last loaded requests are still visible. Pull to refresh or try again once the connection stabilizes.",
+        networkUnreachableBody:
+          "Check your internet connection and try again. We could not reach the live nearby feed.",
+        serverUnavailableTitle: "Live feed temporarily unavailable",
+        serverUnavailableBodyStale:
+          "Showing the last loaded requests while the service recovers. Try again in a moment.",
+        serverUnavailableBody:
+          "Nearby requests are temporarily unavailable right now. Please try again in a moment.",
+        rateLimitedTitle: "Too many refresh attempts",
+        rateLimitedBodyStale:
+          "Showing the last loaded requests for now. Please wait a bit before trying again.",
+        rateLimitedBody: "Please wait a moment before refreshing nearby requests again.",
+        sessionTitle: "Session needs attention",
+        sessionBodyStale:
+          "Your last loaded requests are still visible, but we could not refresh them with the current session.",
+        sessionBody:
+          "We could not refresh nearby requests with the current session. Please sign in again if this continues.",
+        validationTitle: "Unable to load nearby requests",
+        validationBody: "The request could not be completed with the current parameters.",
+        notFoundTitle: "Nearby feed not available",
+        notFoundBody:
+          "The nearby requests endpoint could not be found. Please try again later.",
+        unknownTitle: "Something went wrong while loading the feed",
+        unknownBodyStale:
+          "Showing the last loaded requests for now. Try refreshing again in a moment.",
+        unknownBody: "Please try again in a moment.",
+      },
     },
     profileScreen: {
       heading: "Profile",

@@ -130,7 +130,11 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
         <Pressable
           onPress={props.onOpenInbox}
           accessibilityRole="button"
-          accessibilityLabel={`Notifications${props.unreadCount > 0 ? `, ${badgeCount} unread` : ""}`}
+          accessibilityLabel={
+            props.unreadCount > 0
+              ? t("oolshik:homeScreen.notificationsUnreadA11y", { count: badgeCount })
+              : t("oolshik:homeScreen.notificationsA11y")
+          }
           hitSlop={8}
           style={({ pressed }) => [
             { alignItems: "center", justifyContent: "center" },
