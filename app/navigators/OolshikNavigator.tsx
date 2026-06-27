@@ -52,7 +52,14 @@ export type OolshikParamList = {
   OolshikFeedbackRating: { taskId?: string } | undefined
   OolshikFeedbackSafety: { taskId?: string } | undefined
   PaymentProfile: PaymentProfileParams | undefined
-  QrScanner: { taskId: string; amount?: number | null }
+  QrScanner: {
+    taskId: string
+    amount?: number | null
+    expectedPayeeName?: string | null
+    expectedPayeeVpa?: string | null
+    expectedTaskAmount?: number | null
+    collectIntent?: boolean
+  }
   PaymentPay: PaymentPayParams
   NotificationInbox: undefined
 }
@@ -83,6 +90,7 @@ export type PaymentTaskContext = {
   title?: string | null
   createdByName?: string | null
   createdByPhoneNumber?: string | null
+  helperName?: string | null
 }
 
 export type PaymentProfileParams = {
@@ -90,12 +98,19 @@ export type PaymentProfileParams = {
   required?: boolean
 }
 
+export type PaymentPayerRole = "REQUESTER" | "HELPER" | "VIEWER"
+
 export type PaymentPayParams = {
   taskId: string
   paymentRequestId?: string
   scanPayload: PaymentScanPayload
   taskContext?: PaymentTaskContext
   upiIntentOverride?: string
+  payerRole?: "REQUESTER" | "HELPER"
+  payerName?: string | null
+  payeeName?: string | null
+  payerUserId?: string | null
+  payeeUserId?: string | null
 }
 
 const Stack = createNativeStackNavigator<OolshikParamList>()

@@ -692,6 +692,11 @@ ${t("payment:notice.line2")}`,
         scanPayload: buildPaymentScanPayload(paymentRequest),
         taskContext: buildPaymentTaskContext(current),
         upiIntentOverride: paymentRequest.upiIntent,
+        payerRole: paymentRequest.payerRole,
+        payerName: paymentRequest.payerName ?? null,
+        payeeName: paymentRequest.payeeName ?? paymentRequest.snapshot?.payeeName ?? null,
+        payerUserId: paymentRequest.payerUserId ?? null,
+        payeeUserId: paymentRequest.payeeUserId ?? null,
       })
     }
 
@@ -736,14 +741,62 @@ ${t("payment:notice.line2")}`,
       return
     }
 
+    const taskAmount = Number(parsed.toFixed(2))
     setHelperPaymentAmountError(null)
     withPaymentNoticeGate(() => {
-      navigation.navigate("QrScanner", {
-        taskId: String(current.id),
-        amount: Number(parsed.toFixed(2)),
-      })
+      const requesterName = current.createdByName ?? t("payment:qr.requester")
+      Alert.alert(
+        t("payment:direct.choiceTitle"),
+        t("payment:direct.choiceBody"),
+        [
+          {
+            text: t("payment:qr.collectFromName", { name: requesterName }),
+            onPress: () => {
+              if (!myPaymentProfile.hasProfile) {
+                Alert.alert(
+                  t("payment:direct.profileRequiredTitle"),
+                  t("payment:direct.profileRequiredBody"),
+                  [
+                    { text: t("common:cancel"), style: "cancel" },
+                    {
+                      text: t("payment:direct.addProfileCta"),
+                      onPress: () =>
+                        navigation.navigate("PaymentProfile", {
+                          entryPoint: "task-payment",
+                          required: true,
+                        }),
+                    },
+                  ],
+                )
+                return
+              }
+              navigation.navigate("QrScanner", {
+                taskId: String(current.id),
+                amount: taskAmount,
+                expectedPayeeName: myPaymentProfile.payeeLabel ?? null,
+                expectedPayeeVpa: null,
+                expectedTaskAmount: taskAmount,
+                collectIntent: true,
+              })
+            },
+          },
+          {
+            text: t("payment:qr.payName", { name: requesterName }),
+            onPress: () =>
+              navigation.navigate("QrScanner", {
+                taskId: String(current.id),
+                amount: taskAmount,
+                expectedPayeeName: requesterName,
+                expectedPayeeVpa: null,
+                expectedTaskAmount: taskAmount,
+                collectIntent: false,
+              }),
+          },
+          { text: t("common:cancel"), style: "cancel" },
+        ],
+      )
     })
-  }, [current?.id, helperPaymentAmountInput, navigation, rawStatus, t, withPaymentNoticeGate])
+  }, [current, helperPaymentAmountInput, myPaymentProfile.hasProfile, myPaymentProfile.payeeLabel, navigation, rawStatus, t, withPaymentNoticeGate])
 
   const openDirectPaymentFlow = useCallback(() => {
     if (rawStatus !== "ASSIGNED" || !current?.id) return
@@ -797,6 +850,11 @@ ${t("payment:notice.line2")}`,
             scanPayload: buildPaymentScanPayload(createdPayment),
             taskContext: buildPaymentTaskContext(current),
             upiIntentOverride: createdPayment.upiIntent,
+            payerRole: createdPayment.payerRole,
+            payerName: createdPayment.payerName ?? null,
+            payeeName: createdPayment.payeeName ?? createdPayment.snapshot?.payeeName ?? null,
+            payerUserId: createdPayment.payerUserId ?? null,
+            payeeUserId: createdPayment.payeeUserId ?? null,
           })
           return
         }
@@ -1428,6 +1486,7 @@ ${t("payment:notice.line2")}`,
       title: task.title ?? task.description ?? null,
       createdByName: task.createdByName ?? null,
       createdByPhoneNumber: task.createdByPhoneNumber ? String(task.createdByPhoneNumber) : null,
+      helperName: task.helperName ?? null,
     }
   }
 

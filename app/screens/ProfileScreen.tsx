@@ -188,7 +188,11 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         } else {
           await disablePushNotifications()
         }
-      } catch {
+      } catch (err) {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.warn("push notification preference sync failed", err)
+        }
         // best-effort
       }
     },

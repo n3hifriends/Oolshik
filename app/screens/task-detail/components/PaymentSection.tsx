@@ -32,10 +32,6 @@ type PaymentSectionProps = {
   onRefreshPayment: () => void
   showHelperWaitingText: boolean
   helperWaitingText: string
-  neutral600: string
-  neutral700: string
-  primary100: string
-  primary200: string
   spacingXs: number
   spacingSm: number
 }
@@ -53,15 +49,15 @@ export function PaymentSection(props: PaymentSectionProps) {
             paddingHorizontal: props.spacingSm,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: props.primary200,
-            backgroundColor: props.primary100,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface,
             paddingBottom: 12,
             paddingTop: 12,
           }}
         >
           <Text text={props.paymentsTitle} preset="subheading" />
-          <Text text={props.paymentsHint} size="xs" style={{ color: props.neutral700 }} />
-          <Text text={props.amountInrLabel} size="xs" style={{ color: props.neutral600 }} />
+          <Text text={props.paymentsHint} size="xs" style={{ color: theme.colors.textDim }} />
+          <Text text={props.amountInrLabel} size="xs" style={{ color: theme.colors.textDim }} />
           <View style={{ flexDirection: "row", alignItems: "stretch", gap: props.spacingXs }}>
             <View style={{ flex: 1 }}>
               <TextField
@@ -99,8 +95,8 @@ export function PaymentSection(props: PaymentSectionProps) {
             paddingHorizontal: props.spacingSm,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: props.primary200,
-            backgroundColor: props.primary100,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface,
             marginHorizontal: 16,
             paddingBottom: 14,
             marginVertical: 5,
@@ -108,11 +104,11 @@ export function PaymentSection(props: PaymentSectionProps) {
           }}
         >
           <Text text={props.paymentUpdateTitle} preset="subheading" />
-          <Text text={props.paymentStatusText} size="xs" style={{ color: props.neutral700 }} />
-          {props.paymentAmountText ? <Text text={props.paymentAmountText} size="xs" style={{ color: props.neutral700 }} /> : null}
-          {props.paymentExpiryText ? <Text text={props.paymentExpiryText} size="xs" style={{ color: props.neutral600 }} /> : null}
+          <Text text={props.paymentStatusText} size="xs" style={{ color: theme.colors.textDim }} />
+          {props.paymentAmountText ? <Text text={props.paymentAmountText} size="xs" style={{ color: theme.colors.textDim }} /> : null}
+          {props.paymentExpiryText ? <Text text={props.paymentExpiryText} size="xs" style={{ color: theme.colors.textDim }} /> : null}
           {props.paymentLoading ? (
-            <Text text={props.refreshingPaymentStatusText} size="xs" style={{ color: props.neutral600 }} />
+            <Text text={props.refreshingPaymentStatusText} size="xs" style={{ color: theme.colors.textDim }} />
           ) : null}
 
           {props.canRequesterPay ? (
@@ -131,7 +127,7 @@ export function PaymentSection(props: PaymentSectionProps) {
           ) : null}
 
           {props.showHelperWaitingText ? (
-            <Text text={props.helperWaitingText} size="xs" style={{ color: props.neutral600 }} />
+            <Text text={props.helperWaitingText} size="xs" style={{ color: theme.colors.textDim }} />
           ) : null}
         </View>
       ) : null}

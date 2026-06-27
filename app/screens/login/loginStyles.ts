@@ -132,6 +132,7 @@ export const $phoneHintChip: ThemedStyle<ViewStyle> = ({ colors, spacing, isDark
   backgroundColor: isDark ? colors.palette.neutral200 : colors.palette.primary100,
   paddingHorizontal: spacing.md,
   paddingVertical: spacing.sm,
+  width: "100%",
 })
 
 export const $phoneHintChipPressed: ThemedStyle<ViewStyle> = ({ colors, isDark }) => ({

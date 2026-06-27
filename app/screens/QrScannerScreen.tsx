@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -31,7 +33,14 @@ import { parseUpiQr } from "@/utils/upiQr"
 import { useTranslation } from "react-i18next"
 
 interface QrScannerScreenProps extends OolshikStackScreenProps<"QrScanner"> {}
-type Params = { taskId?: string; amount?: number | null }
+type Params = {
+  taskId?: string
+  amount?: number | null
+  expectedPayeeName?: string | null
+  expectedPayeeVpa?: string | null
+  expectedTaskAmount?: number | null
+  collectIntent?: boolean
+}
 
 const defaultPaymentGuidelines = (t: (key: string) => string) => [
   t("payment:qr.defaultGuideline1"),
@@ -116,6 +125,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
   const styles = useMemo(() => createStyles(theme), [theme])
   const tasks = useTaskStore((state) => state.tasks)
   const [cameraActive, setCameraActive] = useState(false)
+  const [mismatchReview, setMismatchReview] = useState<{
+    scannedVpa: string
+    scannedName: string | null
+    expectedVpa: string | null
+    expectedName: string | null
+    collectIntent: boolean
+  } | null>(null)
+  const mismatchResumeRef = useRef<(() => Promise<void>) | null>(null)
   const appVersion = useMemo(() => buildAppVersionLabel(), [])
   const deviceIdRef = useRef<string | null>(null)
 
@@ -147,8 +164,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
     }, []),
   )
 
-  function whoWillPayConfirmation(otherPayerLabel: string) {
-    const label = otherPayerLabel?.trim().length ? otherPayerLabel.trim() : t("payment:qr.requester")
+  function whoWillPayConfirmation(payCtaLabel: string, collectCtaLabel: string) {
     return new Promise<"SELF" | "OTHER" | "CANCEL">((resolve) => {
       let resolved = false
       const safeResolve = (value: "SELF" | "OTHER" | "CANCEL") => {
@@ -161,8 +177,8 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         t("payment:qr.transactionFeeTitle"),
         t("payment:qr.transactionFeeBody"),
         [
-          { text: t("payment:qr.me"), onPress: () => safeResolve("SELF") },
-          { text: label, onPress: () => safeResolve("OTHER") },
+          { text: payCtaLabel, onPress: () => safeResolve("SELF") },
+          { text: collectCtaLabel, onPress: () => safeResolve("OTHER") },
           { text: t("payment:qr.cancel"), style: "cancel", onPress: () => safeResolve("CANCEL") },
         ],
         { cancelable: true, onDismiss: () => safeResolve("CANCEL") },
@@ -181,6 +197,12 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
       let hadError = false
       try {
         const parsed = parseUpiQr(data)
+        if (!parsed.payeeVpa) {
+          setErrorMessage(t("payment:qr.unsupportedQr"))
+          handledRef.current = false
+          setProcessing(false)
+          return
+        }
         const routeAmount =
           typeof params?.amount === "number" && Number.isFinite(params.amount) && params.amount > 0
             ? Number(params.amount.toFixed(2))
@@ -229,6 +251,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
               createdByPhoneNumber: task.createdByPhoneNumber
                 ? String(task.createdByPhoneNumber)
                 : null,
+              helperName: task.helperName ?? null,
             }
           : USE_QR_DEMO
             ? DEMO_TASK_CONTEXT
@@ -240,8 +263,19 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         const otherRole: PaymentPayerRole = yourRole === "REQUESTER" ? "HELPER" : "REQUESTER"
         const requesterLabel =
           taskContext?.createdByName ?? task?.createdByName ?? t("payment:qr.requester")
-        const otherPayerLabel = yourRole === "REQUESTER" ? t("payment:qr.helper") : requesterLabel
-        const payerChoice = await whoWillPayConfirmation(otherPayerLabel)
+        const helperLabel =
+          taskContext?.helperName ?? task?.helperName ?? t("payment:qr.helper")
+        const scannedPayeeName = parsed.payeeName?.trim() || requesterLabel
+        const otherPayerLabel = yourRole === "REQUESTER" ? helperLabel : requesterLabel
+
+        const payCtaLabel = t("payment:qr.payName", { name: scannedPayeeName })
+        const collectCtaLabel = t("payment:qr.collectFromName", { name: otherPayerLabel })
+        const payerChoice =
+          typeof params?.collectIntent === "boolean"
+            ? params.collectIntent
+              ? "OTHER"
+              : "SELF"
+            : await whoWillPayConfirmation(payCtaLabel, collectCtaLabel)
 
         if (payerChoice === "CANCEL") {
           handledRef.current = false
@@ -271,48 +305,76 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           payerRole,
         }
 
-        let requestId: string | undefined
-        let upiIntentOverride: string | undefined
+        const submitPaymentBody = async () => {
+          let requestId: string | undefined
+          let upiIntentOverride: string | undefined
+          let responsePayload: any = null
 
-        if (!USE_QR_DEMO) {
-          const res = await OolshikApi.createPaymentRequest(body)
-          if (!res?.ok || !res.data) {
-            const serverMessage =
-              (res?.data as any)?.message ?? res?.problem ?? t("payment:qr.serverRejected")
-            throw new Error(serverMessage)
+          if (!USE_QR_DEMO) {
+            const res = await OolshikApi.createPaymentRequest(body)
+            if (!res?.ok || !res.data) {
+              const serverMessage =
+                (res?.data as any)?.message ?? res?.problem ?? t("payment:qr.serverRejected")
+              throw new Error(serverMessage)
+            }
+            responsePayload = res.data as any
+            requestId = responsePayload.id ?? responsePayload?.snapshot?.id ?? undefined
+            upiIntentOverride = responsePayload.upiIntent ?? undefined
+            if (!requestId) {
+              throw new Error(t("payment:qr.missingRef"))
+            }
+          } else {
+            upiIntentOverride = data.startsWith("upi://") ? data : undefined
           }
-          const payload = res.data as any
-          requestId = payload.id ?? payload?.snapshot?.id ?? undefined
-          upiIntentOverride = payload.upiIntent ?? undefined
-          if (!requestId) {
-            throw new Error(t("payment:qr.missingRef"))
+
+          if (payerChoice === "SELF") {
+            setCameraActive(false)
+            navigation.replace("PaymentPay", {
+              taskId,
+              paymentRequestId: requestId,
+              scanPayload,
+              taskContext,
+              upiIntentOverride,
+              payerRole: payerRole as "REQUESTER" | "HELPER",
+              payerName: responsePayload?.payerName ?? null,
+              payeeName: responsePayload?.payeeName ?? null,
+              payerUserId: responsePayload?.payerUserId ? String(responsePayload.payerUserId) : null,
+              payeeUserId: responsePayload?.payeeUserId ? String(responsePayload.payeeUserId) : null,
+            })
+            return
           }
-        } else {
-          upiIntentOverride = data.startsWith("upi://") ? data : undefined
+
+          setStatusMessage(t("payment:qr.paymentGenerated"))
+          const message = requestId
+            ? t("payment:qr.shareRequestId", { name: otherPayerLabel, id: requestId })
+            : t("payment:qr.paymentCaptured")
+          Alert.alert(t("payment:qr.paymentRequestedTitle"), message, [
+            {
+              text: t("payment:qr.closeAndProceed"),
+              onPress: () => navigation.goBack(),
+            },
+          ])
         }
 
-        if (payerChoice === "SELF") {
-          setCameraActive(false)
-          navigation.replace("PaymentPay", {
-            taskId,
-            paymentRequestId: requestId,
-            scanPayload,
-            taskContext,
-            upiIntentOverride,
+        // VPA mismatch check: only relevant when expectedPayeeVpa is provided
+        const expectedVpa = params?.expectedPayeeVpa ?? null
+        if (payerChoice === "OTHER" && expectedVpa && parsed.payeeVpa !== expectedVpa) {
+          mismatchResumeRef.current = submitPaymentBody
+          setMismatchReview({
+            scannedVpa: parsed.payeeVpa!,
+            scannedName: parsed.payeeName ?? null,
+            expectedVpa,
+            expectedName: params?.expectedPayeeName ?? null,
+            collectIntent: true,
           })
+          handledRef.current = false
+          setProcessing(false)
+          setStatusMessage(t("payment:qr.alignHint"))
+          setErrorMessage(null)
           return
         }
 
-        setStatusMessage(t("payment:qr.paymentGenerated"))
-        const message = requestId
-          ? t("payment:qr.shareRequestId", { name: otherPayerLabel, id: requestId })
-          : t("payment:qr.paymentCaptured")
-        Alert.alert(t("payment:qr.paymentRequestedTitle"), message, [
-          {
-            text: t("payment:qr.closeAndProceed"),
-            onPress: () => navigation.goBack(),
-          },
-        ])
+        await submitPaymentBody()
       } catch (e: any) {
         hadError = true
         setErrorMessage(e?.message ?? t("payment:qr.serverRejected"))
@@ -329,7 +391,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         }
       }
     },
-    [processing, params?.taskId, params?.amount, navigation, tasks, appVersion, getDeviceId, userId, t],
+    [processing, params?.taskId, params?.amount, params?.expectedPayeeVpa, params?.expectedPayeeName, params?.collectIntent, navigation, tasks, appVersion, getDeviceId, userId, t],
   )
 
   // make hardcoded demo scan on load
@@ -446,6 +508,97 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           </View>
         ) : null}
       </View>
+
+      <Modal
+        visible={mismatchReview !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setMismatchReview(null)
+          mismatchResumeRef.current = null
+        }}
+      >
+        <View style={styles.mismatchBackdrop}>
+          <View style={styles.mismatchCard}>
+            <Text preset="subheading" style={styles.mismatchTitle} text={t("payment:qr.mismatchTitle")} />
+            <Text style={styles.mismatchBody}>{t("payment:qr.mismatchBody")}</Text>
+
+            <View style={styles.mismatchRow}>
+              <Text style={styles.mismatchLabel}>{t("payment:qr.mismatchExpected")}</Text>
+              <Text style={styles.mismatchValue}>{mismatchReview?.expectedName ?? mismatchReview?.expectedVpa ?? "—"}</Text>
+            </View>
+            <View style={styles.mismatchRow}>
+              <Text style={styles.mismatchLabel}>{t("payment:qr.mismatchFound")}</Text>
+              <Text style={styles.mismatchValue}>{mismatchReview?.scannedName ?? mismatchReview?.scannedVpa ?? "—"}</Text>
+            </View>
+
+            <Pressable
+              style={styles.mismatchPrimaryBtn}
+              onPress={async () => {
+                const resume = mismatchResumeRef.current
+                setMismatchReview(null)
+                mismatchResumeRef.current = null
+                if (resume) {
+                  setProcessing(true)
+                  try {
+                    await resume()
+                  } catch (e: any) {
+                    setErrorMessage(e?.message ?? t("payment:qr.serverRejected"))
+                  } finally {
+                    setProcessing(false)
+                  }
+                }
+              }}
+            >
+              <Text style={styles.mismatchPrimaryText}>{t("payment:qr.mismatchUseSaved")}</Text>
+            </Pressable>
+
+            {!mismatchReview?.collectIntent ? (
+              <Pressable
+                style={styles.mismatchSecondaryBtn}
+                onPress={async () => {
+                  const resume = mismatchResumeRef.current
+                  setMismatchReview(null)
+                  mismatchResumeRef.current = null
+                  if (resume) {
+                    setProcessing(true)
+                    try {
+                      await resume()
+                    } catch (e: any) {
+                      setErrorMessage(e?.message ?? t("payment:qr.serverRejected"))
+                    } finally {
+                      setProcessing(false)
+                    }
+                  }
+                }}
+              >
+                <Text style={styles.mismatchSecondaryText}>{t("payment:qr.mismatchUseScanned")}</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={styles.mismatchSecondaryBtn}
+              onPress={() => {
+                setMismatchReview(null)
+                mismatchResumeRef.current = null
+                handledRef.current = false
+              }}
+            >
+              <Text style={styles.mismatchSecondaryText}>{t("payment:qr.mismatchScanAgain")}</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setMismatchReview(null)
+                mismatchResumeRef.current = null
+                navigation.goBack()
+              }}
+            >
+              <Text style={styles.mismatchCancelText}>{t("payment:qr.cancel")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   )
 }
@@ -690,5 +843,65 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       color: theme.colors.palette.neutral100,
       fontFamily: theme.typography.primary.semiBold ?? theme.typography.primary.medium,
+    },
+    mismatchBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "flex-end",
+    },
+    mismatchCard: {
+      backgroundColor: theme.colors.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: theme.spacing.lg,
+      gap: theme.spacing.md,
+    },
+    mismatchTitle: {
+      color: theme.colors.text,
+    },
+    mismatchBody: {
+      color: theme.colors.textDim,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    mismatchRow: {
+      gap: 2,
+    },
+    mismatchLabel: {
+      color: theme.colors.textDim,
+      fontSize: 12,
+    },
+    mismatchValue: {
+      color: theme.colors.text,
+      fontFamily: theme.typography.primary.medium,
+      fontSize: 14,
+    },
+    mismatchPrimaryBtn: {
+      backgroundColor: theme.colors.palette.primary500,
+      borderRadius: 14,
+      paddingVertical: theme.spacing.sm,
+      alignItems: "center",
+    },
+    mismatchPrimaryText: {
+      color: theme.colors.palette.neutral100,
+      fontFamily: theme.typography.primary.medium,
+      fontSize: 15,
+    },
+    mismatchSecondaryBtn: {
+      backgroundColor: theme.colors.palette.neutral200,
+      borderRadius: 14,
+      paddingVertical: theme.spacing.sm,
+      alignItems: "center",
+    },
+    mismatchSecondaryText: {
+      color: theme.colors.text,
+      fontFamily: theme.typography.primary.medium,
+      fontSize: 15,
+    },
+    mismatchCancelText: {
+      color: theme.colors.textDim,
+      fontSize: 14,
+      textAlign: "center",
+      paddingVertical: theme.spacing.xs,
     },
   })

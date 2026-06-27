@@ -25,12 +25,12 @@ npm run start:cloud-dev      # EXPO_PUBLIC_API_URL=https://api-dev.oolshik.in
 
 ### EAS build profiles
 
-| EAS profile | `EXPO_PUBLIC_API_URL` | Intended target |
-|-------------|----------------------|-----------------|
-| `development` | `` (empty → devHost) | Local Expo dev client |
-| `development:device` | inherits `development` | Device via tunnel |
-| `preview` | `https://api-dev.oolshik.in` | Cloud-dev staging |
-| `production` | `https://www.oolshik.in` | Production |
+| EAS profile          | `EXPO_PUBLIC_API_URL`        | Intended target       |
+| -------------------- | ---------------------------- | --------------------- |
+| `development`        | `` (empty → devHost)         | Local Expo dev client |
+| `development:device` | inherits `development`       | Device via tunnel     |
+| `preview`            | `https://api-dev.oolshik.in` | Cloud-dev staging     |
+| `production`         | `https://www.oolshik.in`     | Production            |
 
 Build commands (local EAS):
 

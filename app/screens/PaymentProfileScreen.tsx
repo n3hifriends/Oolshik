@@ -47,6 +47,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannerError, setScannerError] = useState<string | null>(null)
+  const [pendingScan, setPendingScan] = useState<{ upiId: string; payeeName: string } | null>(null)
 
   const loadProfile = useCallback(async () => {
     setLoading(true)
@@ -180,23 +181,21 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
         setScannerError(t("payment:profile.scanUnsupported"))
         return
       }
-
       const extractedUpiId = normalizeUpiId(parsed.payeeVpa)
       setScannerOpen(false)
-      setUpiId(extractedUpiId)
-      setPayeeLabel((prev) => prev || parsed.payeeName || "")
-      setSourceType("QR_EXTRACTED")
       setScannerError(null)
-
-      Alert.alert(
-        t("payment:profile.reviewTitle"),
-        t("payment:profile.reviewBody", {
-          upiId: maskUpiId(extractedUpiId),
-        }),
-      )
+      setPendingScan({ upiId: extractedUpiId, payeeName: parsed.payeeName ?? "" })
     },
     [t],
   )
+
+  const applyPendingScan = useCallback(() => {
+    if (!pendingScan) return
+    setUpiId(pendingScan.upiId)
+    setPayeeLabel((prev) => prev || pendingScan.payeeName || "")
+    setSourceType("QR_EXTRACTED")
+    setPendingScan(null)
+  }, [pendingScan])
 
   const title =
     entryPoint === "onboarding"
@@ -325,6 +324,42 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
 
         <Text style={styles.inlineNote}>{t("payment:profile.inlineNote")}</Text>
       </SectionCard>
+
+      {pendingScan ? (
+        <SectionCard style={styles.card}>
+          <Text preset="subheading" text={t("payment:profile.scanReviewTitle")} />
+          <View style={styles.summaryRow}>
+            <Text style={styles.label} text={t("payment:profile.scanReviewUpi")} />
+            <Text style={styles.value} text={maskUpiId(pendingScan.upiId)} />
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.label} text={t("payment:profile.scanReviewName")} />
+            <Text
+              style={styles.value}
+              text={pendingScan.payeeName || t("payment:profile.scanReviewNameNone")}
+            />
+          </View>
+          {payeeLabel &&
+          pendingScan.payeeName &&
+          pendingScan.payeeName.trim().toLowerCase() !== payeeLabel.trim().toLowerCase() ? (
+            <Text style={styles.scanReviewWarning}>
+              {t("payment:profile.scanReviewNameMismatch")}
+            </Text>
+          ) : null}
+          <View style={styles.actions}>
+            <Button
+              text={t("payment:profile.scanReviewDiscard")}
+              onPress={() => setPendingScan(null)}
+              style={styles.secondaryButton}
+            />
+            <Button
+              text={t("payment:profile.scanReviewApply")}
+              onPress={applyPendingScan}
+              style={styles.primaryButton}
+            />
+          </View>
+        </SectionCard>
+      ) : null}
 
       {profile.hasProfile && entryPoint === "profile" ? (
         <View style={styles.actions}>
@@ -466,6 +501,11 @@ const createStyles = (theme: Theme) =>
     scannerError: {
       color: "#FCA5A5",
       fontSize: 13,
+    },
+    scanReviewWarning: {
+      color: theme.colors.error,
+      fontSize: 13,
+      lineHeight: 19,
     },
     scannerOverlay: {
       ...StyleSheet.absoluteFillObject,

@@ -15,6 +15,7 @@ import { OolshikApi } from "@/api/client"
 import { useTranslation } from "react-i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
 import { maskUpiId } from "@/utils/paymentProfile"
+import { useAuth } from "@/context/AuthContext"
 
 type PaymentBreakdownItem = {
   label: string
@@ -48,6 +49,13 @@ type PaymentSnapshot = {
 type PaymentRequestPayload = {
   upiIntent?: string
   supportLink?: string
+  payerRole?: "REQUESTER" | "HELPER"
+  payerName?: string | null
+  payeeName?: string | null
+  payerUserId?: string | null
+  payeeUserId?: string | null
+  validationStatus?: "MATCHED" | "NEEDS_REVIEW" | "MISMATCH" | null
+  validationWarnings?: string[]
   snapshot: PaymentSnapshot
 }
 
@@ -146,6 +154,13 @@ const mergePaymentPayload = (
   return {
     upiIntent: next.upiIntent ?? base.upiIntent,
     supportLink: next.supportLink ?? base.supportLink,
+    payerRole: next.payerRole ?? base.payerRole,
+    payerName: next.payerName ?? base.payerName ?? null,
+    payeeName: next.payeeName ?? base.payeeName ?? mergedSnapshot.payeeName ?? null,
+    payerUserId: next.payerUserId ?? base.payerUserId ?? null,
+    payeeUserId: next.payeeUserId ?? base.payeeUserId ?? null,
+    validationStatus: next.validationStatus ?? base.validationStatus ?? null,
+    validationWarnings: next.validationWarnings ?? base.validationWarnings,
     snapshot: mergedSnapshot,
   }
 }
@@ -153,17 +168,29 @@ const mergePaymentPayload = (
 interface PaymentPayScreenProps extends OolshikStackScreenProps<"PaymentPay"> {}
 
 export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navigation }) => {
-  const { taskId, paymentRequestId, scanPayload, taskContext, upiIntentOverride } = route.params
+  const {
+    taskId, paymentRequestId, scanPayload, taskContext, upiIntentOverride,
+    payerRole, payerName, payeeName: routePayeeName, payerUserId, payeeUserId,
+  } = route.params
   const { t, i18n } = useTranslation()
   const localeTag = normalizeLocaleTag(i18n.language)
   const { theme } = useAppTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
+  const { userId } = useAuth()
 
   const seedPayment = useMemo(() => {
     const labels = { task: t("payment:pay.highlightTask"), requester: t("payment:pay.highlightRequester") }
     const base = buildSeedPayment({ paymentRequestId, scanPayload, taskContext, labels })
-    return upiIntentOverride ? { ...base, upiIntent: upiIntentOverride } : base
-  }, [paymentRequestId, scanPayload, taskContext, upiIntentOverride, t])
+    return {
+      ...base,
+      payerRole,
+      payerName: payerName ?? null,
+      payeeName: routePayeeName ?? base.snapshot.payeeName ?? null,
+      payerUserId: payerUserId ?? null,
+      payeeUserId: payeeUserId ?? null,
+      upiIntent: upiIntentOverride ?? base.upiIntent,
+    }
+  }, [paymentRequestId, scanPayload, taskContext, upiIntentOverride, payerRole, payerName, routePayeeName, payerUserId, payeeUserId, t])
 
   const [payment, setPayment] = useState<PaymentRequestPayload | null>(seedPayment)
   const [loading, setLoading] = useState<boolean>(Boolean(paymentRequestId))
@@ -239,8 +266,18 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       Alert.alert(t("payment:pay.unavailableTitle"), t("payment:pay.noRequestIdBody"))
       return
     }
+    const confirmPayeeName =
+      payment?.payeeName ??
+      routePayeeName ??
+      payment?.snapshot.payeeName ??
+      seedPayment?.payeeName ??
+      seedPayment?.snapshot.payeeName ??
+      null
+    const confirmTitle = confirmPayeeName
+      ? t("payment:pay.confirmPaidNameTitle", { name: confirmPayeeName })
+      : t("payment:pay.confirmPaidTitle")
     Alert.alert(
-      t("payment:pay.confirmPaidTitle"),
+      confirmTitle,
       t("payment:pay.confirmPaidBody"),
       [
         { text: t("common:cancel"), style: "cancel" },
@@ -271,7 +308,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       ],
       { cancelable: true },
     )
-  }, [navigation, payment, paymentRequestId, seedPayment, t, taskId])
+  }, [navigation, payment, paymentRequestId, routePayeeName, seedPayment, t, taskId])
 
   const handleSupportPress = useCallback(async () => {
     const supportLink = payment?.supportLink ?? seedPayment?.supportLink
@@ -359,6 +396,17 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     snapshot.highlights?.find((item) => item.type === "requester")?.value ||
     snapshot.payeeName ||
     null
+
+  const effectivePayeeName = payment.payeeName ?? routePayeeName ?? snapshot.payeeName ?? requesterName ?? null
+  const effectivePayerName = payment.payerName ?? payerName ?? null
+  const effectivePayerUserId = payment.payerUserId ?? payerUserId ?? null
+  const effectivePayeeUserId = payment.payeeUserId ?? payeeUserId ?? null
+  const currentUserRoleInPayment: "PAYER" | "PAYEE" | "VIEWER" =
+    userId && effectivePayerUserId && String(userId) === String(effectivePayerUserId)
+      ? "PAYER"
+      : userId && effectivePayeeUserId && String(userId) === String(effectivePayeeUserId)
+        ? "PAYEE"
+        : "VIEWER"
   const displayReference = formatReference(snapshot.id ?? paymentRequestId ?? taskId)
   const technicalReference = snapshot.id ?? paymentRequestId ?? null
   const heroMessage = buildHeroMessage({
@@ -479,6 +527,16 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         ) : null}
       </View>
 
+      {currentUserRoleInPayment !== "VIEWER" ? (
+        <View style={styles.roleContextBanner}>
+          <Text style={styles.roleContextText}>
+            {currentUserRoleInPayment === "PAYER"
+              ? t("payment:pay.roleYouArePaying", { name: effectivePayeeName ?? "—" })
+              : t("payment:pay.roleYouReceiveFrom", { name: effectivePayerName ?? "—" })}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.card}>
         <Text style={styles.cardTitle} text={t("payment:pay.payeeDetails")} />
         <View style={styles.payeeHero}>
@@ -491,7 +549,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
           </View>
           <View style={styles.payeeHeroCopy}>
             <Text style={styles.payeeEyebrow} text={t("payment:pay.recipient")} />
-            <Text style={styles.payeeName} numberOfLines={1} text={snapshot.payeeName ?? "—"} />
+            <Text style={styles.payeeName} numberOfLines={1} text={effectivePayeeName ?? "—"} />
             <Text
               style={[styles.payeeUpi, styles.monoValue]}
               numberOfLines={1}
@@ -579,22 +637,40 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
           <Text style={styles.statusText}>{t("payment:pay.refreshing")}</Text>
         ) : null}
         {inlineError ? <Text style={styles.errorText}>{inlineError}</Text> : null}
-        <View style={styles.actions}>
-          <Button
-            text={isLaunchingPayment ? t("payment:pay.openingUpi") : t("payment:pay.openUpi")}
-            onPress={handleLaunchUpi}
-            style={styles.primaryButton}
-            textStyle={styles.primaryButtonText}
-            disabled={isLaunchingPayment}
-          />
-          <Button
-            text={isConfirming ? t("payment:pay.markingPaid") : t("payment:pay.markPaid")}
-            onPress={handleMarkPaid}
-            style={styles.secondaryButton}
-            textStyle={styles.secondaryButtonText}
-            disabled={isConfirming}
-          />
-        </View>
+        {currentUserRoleInPayment === "PAYER" ? (
+          <View style={styles.actions}>
+            <Button
+              text={isLaunchingPayment
+                ? t("payment:pay.openingUpi")
+                : effectivePayeeName
+                  ? t("payment:pay.payName", { name: effectivePayeeName })
+                  : t("payment:pay.openUpi")}
+              onPress={handleLaunchUpi}
+              style={styles.primaryButton}
+              textStyle={styles.primaryButtonText}
+              disabled={isLaunchingPayment}
+            />
+            <Button
+              text={isConfirming
+                ? t("payment:pay.markingPaid")
+                : effectivePayeeName
+                  ? t("payment:pay.iPaidName", { name: effectivePayeeName })
+                  : t("payment:pay.markPaid")}
+              onPress={handleMarkPaid}
+              style={styles.secondaryButton}
+              textStyle={styles.secondaryButtonText}
+              disabled={isConfirming}
+            />
+          </View>
+        ) : currentUserRoleInPayment === "PAYEE" ? (
+          <Text style={styles.waitingText}>
+            {t("payment:pay.waitingForPayer", { name: effectivePayerName ?? "—" })}
+          </Text>
+        ) : (
+          <Text style={styles.waitingText}>
+            {t("payment:pay.viewerReadOnly")}
+          </Text>
+        )}
       </View>
 
       {disclaimers.length ? (
@@ -674,6 +750,13 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
   return {
     upiIntent: candidate.upiIntent ?? response?.upiIntent ?? response?.data?.upiIntent,
     supportLink: candidate.supportLink ?? response?.supportLink ?? response?.data?.supportLink,
+    payerRole: candidate.payerRole ?? undefined,
+    payerName: candidate.payerName ?? null,
+    payeeName: candidate.payeeName ?? snapshotData.payeeName ?? null,
+    payerUserId: candidate.payerUserId ? String(candidate.payerUserId) : null,
+    payeeUserId: candidate.payeeUserId ? String(candidate.payeeUserId) : null,
+    validationStatus: candidate.validationStatus ?? null,
+    validationWarnings: Array.isArray(candidate.validationWarnings) ? candidate.validationWarnings : undefined,
     snapshot: {
       ...snapshotData,
       highlights,
@@ -1156,6 +1239,27 @@ const createStyles = (theme: Theme) =>
       fontSize: 14,
       color: theme.colors.textDim,
       fontFamily: theme.typography.primary.normal,
+    },
+    roleContextBanner: {
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : theme.colors.palette.accent100,
+      borderRadius: 14,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderWidth: 1,
+      borderColor: theme.isDark ? theme.colors.palette.neutral700 : theme.colors.palette.accent200,
+    },
+    roleContextText: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.primary.medium,
+      textAlign: "center",
+    },
+    waitingText: {
+      fontSize: 14,
+      color: theme.colors.textDim,
+      fontFamily: theme.typography.primary.medium,
+      textAlign: "center",
+      paddingVertical: theme.spacing.sm,
     },
     fallbackState: {
       flex: 1,

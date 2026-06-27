@@ -147,7 +147,11 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
         if (!active || !token) return
         await registerDeviceTokenWithRetry(token)
         setCachedPushToken(token)
-      } catch {
+      } catch (err) {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.warn("push token registration failed", err)
+        }
         // best-effort
       }
     })()
@@ -173,7 +177,11 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
           if (token === getCachedPushToken()) return
           await registerDeviceTokenWithRetry(token)
           setCachedPushToken(token)
-        } catch {
+        } catch (err) {
+          if (__DEV__) {
+            // eslint-disable-next-line no-console
+            console.warn("push token foreground registration failed", err)
+          }
           // best-effort
         }
       })()

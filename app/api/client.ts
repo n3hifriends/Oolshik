@@ -333,6 +333,7 @@ export type ServerTask = {
   updatedAt?: string
   createdByName?: string
   createdByPhoneNumber?: string
+  helperName?: string | null
   helperPhoneNumber?: string
   helperAcceptedAt?: string | null
   assignmentExpiresAt?: string | null
@@ -451,10 +452,15 @@ export type PaymentRequestApiResponse = {
   paymentMode?: PaymentMode
   upiIntent?: string
   payerUserId?: string
+  payeeUserId?: string
   requesterUserId?: string
   helperUserId?: string
   paymentProfileUserId?: string
   payerRole?: PaymentPayerRole
+  payerName?: string | null
+  payeeName?: string | null
+  validationStatus?: "MATCHED" | "NEEDS_REVIEW" | "MISMATCH" | null
+  validationWarnings?: string[]
   canPay?: boolean
   snapshot?: {
     taskId?: string

@@ -254,10 +254,6 @@ export default function TaskDetailScreen({ navigation }: Props) {
         onRefreshPayment={handlers.loadActivePayment}
         showHelperWaitingText={derived.paymentRequesterNotified}
         helperWaitingText={t("oolshik:taskDetailScreen.requesterNotifiedForPayment")}
-        neutral600={neutral600}
-        neutral700={neutral700}
-        primary100={colors.palette.primary100}
-        primary200={colors.palette.primary200}
         spacingXs={spacing.xs}
         spacingSm={spacing.sm}
       />
