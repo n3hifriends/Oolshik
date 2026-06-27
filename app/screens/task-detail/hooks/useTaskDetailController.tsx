@@ -156,6 +156,11 @@ function resolveDirectPaymentErrorCopy(
   }
 }
 
+function toFirstName(fullName: string, max = 12): string {
+  const first = fullName.split(" ")[0]
+  return first.length > max ? first.slice(0, 10) + "…" : first
+}
+
 export function useTaskDetailController({
   taskId,
   navigation,
@@ -744,7 +749,7 @@ ${t("payment:notice.line2")}`,
     const taskAmount = Number(parsed.toFixed(2))
     setHelperPaymentAmountError(null)
     withPaymentNoticeGate(() => {
-      const requesterName = current.createdByName ?? t("payment:qr.requester")
+      const requesterName = toFirstName(current.createdByName ?? t("payment:qr.requester"))
       Alert.alert(
         t("payment:direct.choiceTitle"),
         t("payment:direct.choiceBody"),
@@ -855,6 +860,7 @@ ${t("payment:notice.line2")}`,
             payeeName: createdPayment.payeeName ?? createdPayment.snapshot?.payeeName ?? null,
             payerUserId: createdPayment.payerUserId ?? null,
             payeeUserId: createdPayment.payeeUserId ?? null,
+            currentUserPaymentRole: "PAYER",
           })
           return
         }
@@ -881,13 +887,14 @@ ${t("payment:notice.line2")}`,
       }
     }
 
+    const requesterFirstName = toFirstName(current.createdByName ?? t("payment:qr.requester"))
     withPaymentNoticeGate(() => {
       Alert.alert(
         t("payment:direct.choiceTitle"),
         t("payment:direct.choiceBody"),
         [
           {
-            text: t("payment:direct.requestToMe"),
+            text: t("payment:direct.requestToMe", { name: requesterFirstName }),
             onPress: () => {
               if (!myPaymentProfile.hasProfile) {
                 Alert.alert(
@@ -912,7 +919,7 @@ ${t("payment:notice.line2")}`,
             },
           },
           {
-            text: t("payment:direct.payRequester"),
+            text: t("payment:direct.payRequester", { name: requesterFirstName }),
             onPress: () => {
               void startDirectPayment("HELPER")
             },

@@ -111,6 +111,7 @@ export type PaymentPayParams = {
   payeeName?: string | null
   payerUserId?: string | null
   payeeUserId?: string | null
+  currentUserPaymentRole?: "PAYER" | "PAYEE"
 }
 
 const Stack = createNativeStackNavigator<OolshikParamList>()

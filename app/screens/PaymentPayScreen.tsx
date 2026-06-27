@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, Alert, Linking, StyleSheet, View, ViewStyle } from "react-native"
+import { ActivityIndicator, Alert, Clipboard, Linking, Pressable, StyleSheet, View, ViewStyle } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import type {
   OolshikStackScreenProps,
@@ -171,6 +171,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const {
     taskId, paymentRequestId, scanPayload, taskContext, upiIntentOverride,
     payerRole, payerName, payeeName: routePayeeName, payerUserId, payeeUserId,
+    currentUserPaymentRole: routeCurrentUserPaymentRole,
   } = route.params
   const { t, i18n } = useTranslation()
   const localeTag = normalizeLocaleTag(i18n.language)
@@ -397,18 +398,25 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     snapshot.payeeName ||
     null
 
-  const effectivePayeeName = payment.payeeName ?? routePayeeName ?? snapshot.payeeName ?? requesterName ?? null
-  const effectivePayerName = payment.payerName ?? payerName ?? null
+  const effectivePayeeName = toTitleCase(payment.payeeName ?? routePayeeName ?? snapshot.payeeName ?? requesterName ?? null)
+  const effectivePayerName = toTitleCase(payment.payerName ?? payerName ?? null)
   const effectivePayerUserId = payment.payerUserId ?? payerUserId ?? null
   const effectivePayeeUserId = payment.payeeUserId ?? payeeUserId ?? null
   const currentUserRoleInPayment: "PAYER" | "PAYEE" | "VIEWER" =
-    userId && effectivePayerUserId && String(userId) === String(effectivePayerUserId)
-      ? "PAYER"
-      : userId && effectivePayeeUserId && String(userId) === String(effectivePayeeUserId)
-        ? "PAYEE"
-        : "VIEWER"
+    routeCurrentUserPaymentRole
+      ? routeCurrentUserPaymentRole
+      : userId && effectivePayerUserId && String(userId) === String(effectivePayerUserId)
+        ? "PAYER"
+        : userId && effectivePayeeUserId && String(userId) === String(effectivePayeeUserId)
+          ? "PAYEE"
+          : "VIEWER"
   const displayReference = formatReference(snapshot.id ?? paymentRequestId ?? taskId)
   const technicalReference = snapshot.id ?? paymentRequestId ?? null
+  const handleCopyReference = () => {
+    if (!displayReference) return
+    Clipboard.setString(technicalReference ?? displayReference)
+    Alert.alert(t("payment:pay.referenceCopiedTitle"), t("payment:pay.referenceCopiedBody"))
+  }
   const heroMessage = buildHeroMessage({
     note: snapshot.note,
     contextTitle,
@@ -558,16 +566,19 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
           </View>
         </View>
 
-        <View style={styles.detailGrid}>
-          <View style={styles.detailTile}>
-            <Text style={styles.detailTileLabel} text={t("payment:pay.upiId")} />
-            <Text style={[styles.detailTileValue, styles.monoValue]} numberOfLines={1} text={displayUpiId ?? "—"} />
-          </View>
-          <View style={styles.detailTile}>
-            <Text style={styles.detailTileLabel} text={t("payment:pay.reference")} />
-            <Text style={[styles.detailTileValue, styles.monoValue]} numberOfLines={1} text={displayReference ?? "—"} />
-          </View>
-        </View>
+        {displayReference ? (
+          <Pressable style={styles.referenceTile} onPress={handleCopyReference}>
+            <View style={styles.referenceTileInner}>
+              <Text style={styles.detailTileLabel} text={t("payment:pay.reference")} />
+              <Text style={[styles.detailTileValue, styles.monoValue]} text={displayReference} />
+            </View>
+            <MaterialCommunityIcons
+              name="content-copy"
+              size={16}
+              color={theme.colors.textDim}
+            />
+          </Pressable>
+        ) : null}
 
         {snapshot.paymentWindow ? (
           <View style={styles.row}>
@@ -576,20 +587,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
           </View>
         ) : null}
         {snapshot.contactNumber ? (
-          <View style={styles.row}>
+          <Pressable style={styles.row} onPress={() => Linking.openURL(`tel:${snapshot.contactNumber}`)}>
             <Text style={styles.rowLabel} text={t("payment:pay.contact")} />
-            <Text
-              style={styles.rowValue}
-              numberOfLines={1}
-              text={snapshot.contactNumber ?? undefined}
-            />
-          </View>
-        ) : null}
-        {technicalReference ? (
-          <View style={styles.row}>
-            <Text style={styles.rowLabel} text={t("payment:pay.requestId")} />
-            <Text style={[styles.rowValue, styles.monoSubtle]} numberOfLines={1} text={technicalReference} />
-          </View>
+            <Text style={[styles.rowValue, styles.contactLink]} numberOfLines={1} text={snapshot.contactNumber} />
+          </Pressable>
         ) : null}
         {highlights.length ? (
           <View style={styles.highlightsWrap}>
@@ -783,6 +784,13 @@ const formatReference = (value?: string | null) => {
   if (!compact) return undefined
   const tail = compact.slice(-8).toUpperCase()
   return `#${tail}`
+}
+
+const toTitleCase = (value?: string | null): string | null => {
+  if (!value) return null
+  return value
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 const buildInitials = (value?: string | null) => {
@@ -1055,19 +1063,22 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textDim,
       fontFamily: theme.typography.primary.medium,
     },
-    detailGrid: {
+    referenceTile: {
       flexDirection: "row",
-      gap: theme.spacing.sm,
-      marginBottom: theme.spacing.xs,
-    },
-    detailTile: {
-      flex: 1,
+      alignItems: "center",
+      justifyContent: "space-between",
       borderRadius: 16,
       padding: theme.spacing.sm,
       backgroundColor: theme.isDark ? "rgba(255,255,255,0.04)" : theme.colors.palette.neutral200,
       borderWidth: 1,
       borderColor: theme.isDark ? theme.colors.palette.neutral700 : theme.colors.palette.neutral200,
+      marginBottom: theme.spacing.xs,
+    },
+    referenceTileInner: {
       gap: 4,
+    },
+    contactLink: {
+      color: theme.colors.palette.primary500,
     },
     detailTileLabel: {
       fontSize: 11,
