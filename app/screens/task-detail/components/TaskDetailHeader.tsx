@@ -23,10 +23,13 @@ type TaskDetailHeaderProps = {
 export function TaskDetailHeader(props: TaskDetailHeaderProps) {
   return (
     <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
-      <Text preset="heading" text={props.title} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text preset="heading" text={props.title} numberOfLines={1} />
+      </View>
       <View
         style={{
-          marginLeft: "auto",
+          marginLeft: props.spacingXs,
+          flexShrink: 0,
           flexDirection: "row",
           alignItems: "center",
           gap: props.spacingXs,
@@ -38,10 +41,9 @@ export function TaskDetailHeader(props: TaskDetailHeaderProps) {
           accessibilityRole="button"
           accessibilityLabel={props.refreshA11yLabel}
           style={({ pressed }) => ({
-            minHeight: 32,
-            paddingHorizontal: props.spacingSm,
-            paddingVertical: props.spacingXxxs,
-            borderRadius: 999,
+            width: 32,
+            height: 32,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: props.neutral300,
             backgroundColor: props.neutral100,
@@ -54,24 +56,22 @@ export function TaskDetailHeader(props: TaskDetailHeaderProps) {
           {props.refreshing ? (
             <ActivityIndicator size="small" color={props.primaryColor} />
           ) : (
-            <Text
-              text={props.refreshLabel}
-              size="xs"
-              weight="medium"
-              style={{ color: props.textDimColor }}
-            />
+            <Text text="↻" size="sm" weight="medium" style={{ color: props.textDimColor }} />
           )}
         </Pressable>
         <Button
-          text={props.reportLabel}
+          text="🚩"
           onPress={props.onReport}
+          accessibilityLabel={props.reportLabel}
           style={{
+            width: 32,
+            height: 32,
             minHeight: 32,
-            paddingHorizontal: props.spacingSm,
-            paddingVertical: props.spacingXxxs,
-            borderRadius: 999,
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+            borderRadius: 16,
           }}
-          textStyle={{ fontSize: 12, lineHeight: 16 }}
+          textStyle={{ fontSize: 14, lineHeight: 18 }}
         />
       </View>
     </View>
