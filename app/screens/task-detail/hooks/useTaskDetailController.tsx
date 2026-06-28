@@ -261,6 +261,7 @@ export function useTaskDetailController({
 
   const rawStatus = current?.status
   const normalizedStatus = normalizeTaskStatus(rawStatus)
+  const isPaymentEligible = rawStatus === "ASSIGNED"
 
   useEffect(() => {
     if (rawStatus !== "PENDING_AUTH") {
@@ -405,7 +406,16 @@ export function useTaskDetailController({
         )
       }
 
-      await Promise.all([loadActivePayment(), loadMyPaymentProfile()])
+      if (res.ok && res.data) {
+        if (res.data.status === "ASSIGNED") {
+          await Promise.all([loadActivePayment(), loadMyPaymentProfile()])
+        } else {
+          setActivePayments([])
+          await loadMyPaymentProfile()
+        }
+      } else {
+        await loadMyPaymentProfile()
+      }
     } finally {
       refreshInFlightRef.current = false
       setRefreshing(false)
@@ -543,7 +553,7 @@ export function useTaskDetailController({
       setActivePayments([])
       return
     }
-    if (rawStatus === "CANCELLED" || rawStatus === "COMPLETED" || rawStatus === "OPEN") {
+    if (!isPaymentEligible) {
       setActivePayments([])
       return
     }
@@ -567,6 +577,7 @@ export function useTaskDetailController({
   )
 
   const activePayment = useMemo(() => {
+    if (!isPaymentEligible) return null
     if (isRequester) {
       return payablePayments[0] ?? activePayments[0] ?? null
     }
@@ -579,7 +590,7 @@ export function useTaskDetailController({
       )
     }
     return activePayments[0] ?? null
-  }, [activePayments, isHelper, isRequester, payablePayments])
+  }, [activePayments, isHelper, isPaymentEligible, isRequester, payablePayments])
 
   const activePaymentStatus = (activePayment?.status ?? activePayment?.snapshot?.status ?? "").toUpperCase()
   const paymentAwaitingUser = activePaymentStatus === "PENDING" || activePaymentStatus === "INITIATED"

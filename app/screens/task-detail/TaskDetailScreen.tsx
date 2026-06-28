@@ -239,7 +239,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         paymentButtonLabel={t("oolshik:taskDetailScreen.payments")}
         directPaymentLabel={t("payment:direct.helperCta")}
         PaymentAmountPrefix={payment.PaymentAmountPrefix}
-        showActivePayment={(role.isRequester || role.isHelper) && !!state.activePayment}
+        showActivePayment={(role.isRequester || role.isHelper) && statusInfo.rawStatus === "ASSIGNED" && !!state.activePayment}
         paymentUpdateTitle={t("oolshik:taskDetailScreen.paymentUpdate")}
         paymentStatusText={payment.paymentStatusText}
         paymentAmountText={payment.paymentAmountText}
