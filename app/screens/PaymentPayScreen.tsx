@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
 import { maskUpiId } from "@/utils/paymentProfile"
 import { useAuth } from "@/context/AuthContext"
+import { getInstalledUpiApps, openUpiApp } from "@/services/upiLauncher"
 
 type PaymentBreakdownItem = {
   label: string
@@ -36,11 +37,13 @@ type PaymentSnapshot = {
   payeeMaskedVpa?: string | null
   amountRequested?: number | null
   note?: string | null
+  txnRef?: string | null
   dueDate?: string | null
   status?: string | null
   lastUpdated?: string | null
   contactNumber?: string | null
   paymentWindow?: string | null
+  payeePhoneNumber?: string | null
   breakdown?: PaymentBreakdownItem[]
   highlights?: PaymentHighlight[]
   disclaimers?: string[]
@@ -198,6 +201,8 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const [error, setError] = useState<string | null>(null)
   const [isLaunchingPayment, setIsLaunchingPayment] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
+  const [hasLaunchedUpi, setHasLaunchedUpi] = useState(false)
+  const [isFallbackExpanded, setIsFallbackExpanded] = useState(false)
   const requestIdRef = useRef(0)
 
   const loadPayment = useCallback(async () => {
@@ -249,6 +254,8 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         await OolshikApi.initiatePayment(identifier)
       }
       await Linking.openURL(upiIntent)
+      setHasLaunchedUpi(true)
+      setIsFallbackExpanded(true)
     } catch {
       // openURL throws when no app can handle the upi:// intent (no UPI app installed).
       Alert.alert(
@@ -259,6 +266,29 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       setIsLaunchingPayment(false)
     }
   }, [payment, paymentRequestId, seedPayment, t])
+
+  const handleOpenUpiAppOnly = useCallback(async () => {
+    const installedApps = await getInstalledUpiApps()
+    if (installedApps.length === 0) {
+      Alert.alert(t("payment:pay.noUpiAppTitle"), t("payment:pay.noUpiAppBody", { upiLink: "" }))
+      return
+    }
+    if (installedApps.length === 1) {
+      await openUpiApp(installedApps[0].packageName)
+      return
+    }
+    Alert.alert(
+      t("payment:pay.openUpi"),
+      undefined,
+      [
+        ...installedApps.map((app) => ({
+          text: app.name,
+          onPress: () => openUpiApp(app.packageName),
+        })),
+        { text: t("payment:pay.close"), style: "cancel" as const },
+      ],
+    )
+  }, [t])
 
   const handleMarkPaid = useCallback(async () => {
     const identifier =
@@ -277,9 +307,12 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     const confirmTitle = confirmPayeeName
       ? t("payment:pay.confirmPaidNameTitle", { name: confirmPayeeName })
       : t("payment:pay.confirmPaidTitle")
+    const confirmBody = confirmPayeeName
+      ? t("payment:pay.confirmPaidNameBody", { name: confirmPayeeName })
+      : t("payment:pay.confirmPaidBody")
     Alert.alert(
       confirmTitle,
-      t("payment:pay.confirmPaidBody"),
+      confirmBody,
       [
         { text: t("common:cancel"), style: "cancel" },
         {
@@ -674,6 +707,98 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         )}
       </View>
 
+      {hasLaunchedUpi && currentUserRoleInPayment === "PAYER" ? (
+        <View style={styles.fallbackCard}>
+          <Pressable
+            style={styles.fallbackHeader}
+            onPress={() => setIsFallbackExpanded((v) => !v)}
+          >
+            <MaterialCommunityIcons
+              name="alert-circle-outline"
+              size={18}
+              color={theme.colors.palette.primary500}
+            />
+            <Text style={styles.fallbackCardTitle} text={t("payment:pay.blockedPanelTitle")} />
+            <MaterialCommunityIcons
+              name={isFallbackExpanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color={theme.colors.textDim}
+            />
+          </Pressable>
+          {isFallbackExpanded ? (
+            <View style={styles.fallbackBody}>
+              <Text style={styles.fallbackHint} text={t("payment:pay.blockedPanelHint")} />
+              <View style={styles.fallbackActions}>
+                {snapshot.payeeVpa ? (
+                  <Pressable
+                    style={styles.fallbackAction}
+                    onPress={() => {
+                      Clipboard.setString(snapshot.payeeVpa!)
+                      Alert.alert(t("payment:pay.copiedToClipboard"), snapshot.payeeVpa!, [
+                        { text: t("payment:pay.close"), style: "cancel" },
+                        { text: t("payment:pay.openUpi"), style: "default", onPress: handleOpenUpiAppOnly },
+                      ])
+                    }}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={16} color={theme.colors.palette.primary500} />
+                    <Text style={styles.fallbackActionText} text={t("payment:pay.copyUpiId")} />
+                  </Pressable>
+                ) : null}
+                {typeof snapshot.amountRequested === "number" ? (
+                  <Pressable
+                    style={styles.fallbackAction}
+                    onPress={() => {
+                      Clipboard.setString(String(snapshot.amountRequested))
+                      Alert.alert(t("payment:pay.copiedToClipboard"), amountDisplay)
+                    }}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={16} color={theme.colors.palette.primary500} />
+                    <Text style={styles.fallbackActionText} text={t("payment:pay.copyAmount")} />
+                  </Pressable>
+                ) : null}
+                {snapshot.note || snapshot.txnRef ? (
+                  <Pressable
+                    style={styles.fallbackAction}
+                    onPress={() => {
+                      const value = snapshot.note ?? snapshot.txnRef ?? ""
+                      Clipboard.setString(value)
+                      Alert.alert(t("payment:pay.copiedToClipboard"), value)
+                    }}
+                  >
+                    <MaterialCommunityIcons name="content-copy" size={16} color={theme.colors.palette.primary500} />
+                    <Text style={styles.fallbackActionText} text={t("payment:pay.copyNote")} />
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={styles.fallbackAction}
+                  onPress={handleLaunchUpi}
+                  disabled={isLaunchingPayment}
+                >
+                  <MaterialCommunityIcons name="refresh" size={16} color={theme.colors.palette.primary500} />
+                  <Text style={styles.fallbackActionText} text={t("payment:pay.tryAgainUpi")} />
+                </Pressable>
+                {snapshot.payeePhoneNumber ? (
+                  <Pressable
+                    style={styles.fallbackAction}
+                    onPress={() => {
+                      const phone = snapshot.payeePhoneNumber!
+                      Clipboard.setString(phone)
+                      Alert.alert(t("payment:pay.copiedToClipboard"), `${phone}\n\n${t("payment:pay.payByMobileCopied")}`, [
+                        { text: t("payment:pay.close"), style: "cancel" },
+                        { text: t("payment:pay.openUpi"), style: "default", onPress: handleOpenUpiAppOnly },
+                      ])
+                    }}
+                  >
+                    <MaterialCommunityIcons name="phone-outline" size={16} color={theme.colors.palette.primary500} />
+                    <Text style={styles.fallbackActionText} text={t("payment:pay.payByMobile")} />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {disclaimers.length ? (
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle} text={t("payment:pay.beforePaid")} />
@@ -762,6 +887,7 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
       ...snapshotData,
       highlights,
       payeeMaskedVpa: snapshotData.payeeMaskedVpa ?? null,
+      payeePhoneNumber: snapshotData.payeePhoneNumber ?? null,
       disclaimers: ensureStringArray(disclaimers),
     },
   }
@@ -839,7 +965,9 @@ const createStyles = (theme: Theme) =>
       gap: theme.spacing.lg,
     },
     hero: {
-      backgroundColor: theme.colors.palette.primary500,
+      backgroundColor: theme.isDark
+        ? theme.colors.palette.primary200
+        : theme.colors.palette.primary500,
       borderRadius: 24,
       padding: theme.spacing.xl,
       gap: theme.spacing.md,
@@ -1012,14 +1140,12 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.typography.primary.medium,
     },
     card: {
-      backgroundColor: theme.isDark
-        ? theme.colors.palette.neutral800
-        : theme.colors.palette.neutral100,
+      backgroundColor: theme.colors.surface,
       borderRadius: 20,
       padding: theme.spacing.lg,
       gap: theme.spacing.xs,
       borderWidth: 1,
-      borderColor: theme.isDark ? theme.colors.palette.neutral700 : theme.colors.palette.neutral200,
+      borderColor: theme.colors.border,
     },
     cardTitle: {
       fontSize: 18,
@@ -1069,9 +1195,9 @@ const createStyles = (theme: Theme) =>
       justifyContent: "space-between",
       borderRadius: 16,
       padding: theme.spacing.sm,
-      backgroundColor: theme.isDark ? "rgba(255,255,255,0.04)" : theme.colors.palette.neutral200,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : theme.colors.palette.neutral200,
       borderWidth: 1,
-      borderColor: theme.isDark ? theme.colors.palette.neutral700 : theme.colors.palette.neutral200,
+      borderColor: theme.colors.border,
       marginBottom: theme.spacing.xs,
     },
     referenceTileInner: {
@@ -1187,7 +1313,9 @@ const createStyles = (theme: Theme) =>
     },
     primaryButton: {
       borderRadius: 16,
-      backgroundColor: theme.colors.palette.primary500,
+      backgroundColor: theme.isDark
+        ? theme.colors.palette.primary200
+        : theme.colors.palette.primary500,
     },
     primaryButtonText: {
       color: theme.colors.palette.neutral100,
@@ -1195,7 +1323,9 @@ const createStyles = (theme: Theme) =>
     },
     secondaryButton: {
       borderRadius: 16,
-      backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : theme.colors.palette.neutral200,
+      backgroundColor: theme.isDark
+        ? theme.colors.palette.neutral300
+        : theme.colors.palette.neutral200,
     },
     secondaryButtonText: {
       color: theme.colors.text,
@@ -1290,5 +1420,52 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textDim,
       fontFamily: theme.typography.primary.normal,
       maxWidth: 280,
+    },
+    fallbackCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.isDark ? theme.colors.palette.neutral700 : theme.colors.palette.neutral300,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.04)" : theme.colors.palette.neutral100,
+      overflow: "hidden",
+    },
+    fallbackHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing.sm,
+      padding: theme.spacing.md,
+    },
+    fallbackCardTitle: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.colors.text,
+      fontFamily: theme.typography.primary.medium,
+    },
+    fallbackBody: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: theme.spacing.md,
+      gap: theme.spacing.sm,
+    },
+    fallbackHint: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: theme.colors.textDim,
+      fontFamily: theme.typography.primary.normal,
+    },
+    fallbackActions: {
+      gap: theme.spacing.xs,
+    },
+    fallbackAction: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing.sm,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: 12,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : theme.colors.palette.neutral200,
+    },
+    fallbackActionText: {
+      fontSize: 14,
+      color: theme.colors.palette.primary500,
+      fontFamily: theme.typography.primary.medium,
     },
   })

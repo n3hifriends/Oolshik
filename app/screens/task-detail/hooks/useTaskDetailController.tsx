@@ -127,10 +127,10 @@ function resolveDirectPaymentErrorCopy(
   const message = (rawMessage || "").trim()
   const normalized = message.toLowerCase()
   const missingProfile =
-    normalized === "errors.paymentprofile.missing" ||
+    normalized.includes("errors.paymentprofile.missing") ||
     normalized.includes("add your payment profile before using direct payments")
   const targetUnavailable =
-    normalized === "errors.paymentprofile.targetunavailable" ||
+    normalized.includes("errors.paymentprofile.targetunavailable") ||
     normalized.includes("targetunavailable")
 
   if (payerRole === "HELPER" && (missingProfile || targetUnavailable)) {
@@ -1010,7 +1010,10 @@ ${t("payment:notice.line2")}`,
       return
     }
 
-    Alert.alert(t("oolshik:taskDetailScreen.acceptError"))
+    Alert.alert(
+      t("oolshik:taskDetailScreen.acceptErrorTitle"),
+      t("oolshik:taskDetailScreen.acceptErrorBody"),
+    )
   }, [accept, coords, current, isRequester, refresh, status, t])
 
   const onAuthorize = useCallback(async () => {

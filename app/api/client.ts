@@ -467,6 +467,7 @@ export type PaymentRequestApiResponse = {
     payeeVpa?: string | null
     payeeMaskedVpa?: string | null
     payeeName?: string | null
+    payeePhoneNumber?: string | null
     mcc?: string | null
     merchantId?: string | null
     txnRef?: string | null

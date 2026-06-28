@@ -8,6 +8,7 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
 import com.oolshik.aan.phonenumberhint.PhoneNumberHintPackage
+import com.oolshik.aan.upilauncher.UpiLauncherPackage
 import com.facebook.react.ReactHost
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactNativeHost
@@ -27,6 +28,7 @@ class MainApplication : Application(), ReactApplication {
             // Packages that cannot be autolinked yet can be added manually here, for example:
             // packages.add(MyReactNativePackage())
             packages.add(PhoneNumberHintPackage())
+            packages.add(UpiLauncherPackage())
             return packages
           }
 

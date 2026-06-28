@@ -307,6 +307,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
             text={t("payment:profile.scanCta")}
             onPress={openScanner}
             style={styles.secondaryButton}
+            textStyle={styles.secondaryButtonText}
           />
           <Button
             text={
@@ -319,6 +320,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
             onPress={handleSave}
             disabled={saving}
             style={styles.primaryButton}
+            textStyle={styles.primaryButtonText}
           />
         </View>
 
@@ -351,11 +353,13 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
               text={t("payment:profile.scanReviewDiscard")}
               onPress={() => setPendingScan(null)}
               style={styles.secondaryButton}
+              textStyle={styles.secondaryButtonText}
             />
             <Button
               text={t("payment:profile.scanReviewApply")}
               onPress={applyPendingScan}
               style={styles.primaryButton}
+              textStyle={styles.primaryButtonText}
             />
           </View>
         </SectionCard>
@@ -378,6 +382,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
           text={t("payment:profile.skipCta")}
           onPress={() => navigation.goBack()}
           style={styles.skipButton}
+          textStyle={styles.skipButtonText}
         />
       ) : null}
 
@@ -408,7 +413,8 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
               <Button
                 text={t("payment:profile.closeScanner")}
                 onPress={() => setScannerOpen(false)}
-                style={styles.secondaryButton}
+                style={styles.scannerButton}
+                textStyle={styles.scannerButtonText}
               />
             </View>
           </View>
@@ -483,10 +489,23 @@ const createStyles = (theme: Theme) =>
       borderRadius: 12,
       flex: 1,
       minHeight: 46,
+      backgroundColor: theme.colors.palette.primary500,
+    },
+    primaryButtonText: {
+      color: theme.colors.palette.neutral100,
     },
     scannerBody: {
       color: "rgba(255,255,255,0.78)",
       lineHeight: 20,
+    },
+    scannerButton: {
+      borderRadius: 12,
+      flex: 1,
+      minHeight: 46,
+      backgroundColor: "rgba(255,255,255,0.14)",
+    },
+    scannerButtonText: {
+      color: "#FFFFFF",
     },
     scannerCard: {
       backgroundColor: "rgba(11,12,16,0.92)",
@@ -531,10 +550,18 @@ const createStyles = (theme: Theme) =>
       borderRadius: 12,
       flex: 1,
       minHeight: 46,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.10)" : theme.colors.palette.neutral200,
+    },
+    secondaryButtonText: {
+      color: theme.colors.text,
     },
     skipButton: {
       borderRadius: 12,
       minHeight: 46,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : theme.colors.palette.neutral200,
+    },
+    skipButtonText: {
+      color: theme.colors.text,
     },
     summaryRow: {
       gap: 4,
