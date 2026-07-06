@@ -279,14 +279,14 @@ const $helperStyle: ThemedStyle<TextStyle> = ({ spacing }) => ({
 
 const $rightAccessoryStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginEnd: spacing.xs,
-  height: 40,
+  minHeight: 40,
   justifyContent: "center",
   alignItems: "center",
 })
 
 const $leftAccessoryStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginStart: spacing.xs,
-  height: 40,
+  minHeight: 40,
   justifyContent: "center",
   alignItems: "center",
 })

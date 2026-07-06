@@ -4,18 +4,15 @@ import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
-import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 
 import { PhoneHintAction } from "./PhoneHintAction"
+import { PhoneInputRow } from "./PhoneInputRow"
 import {
-  $ccBadge,
-  $inputWrapperDense,
   $stepBadge,
   $supportingText,
   $surfaceCard,
   $surfaceHeader,
-  $validationMessageSlot,
 } from "./loginStyles"
 
 interface GoogleLoginCardProps {
@@ -41,6 +38,11 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
   const { t } = useTranslation()
   const { themed, theme } = useAppTheme()
   const { spacing, colors, isDark } = theme
+  const phoneError = props.shouldShowGooglePhoneError
+    ? props.googlePhoneError === "phone_required"
+      ? t("oolshik:login.phoneRequired")
+      : t("oolshik:login.phoneDigits")
+    : null
 
   return (
     <View style={themed($surfaceCard)}>
@@ -49,6 +51,7 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
           <Text
             text="G"
             weight="bold"
+            maxFontSizeMultiplier={1}
             style={{ color: isDark ? colors.palette.neutral100 : colors.palette.neutral900 }}
           />
         </View>
@@ -66,52 +69,18 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
             disabled={props.phoneHintLoading || props.isGoogleLoading}
           />
 
-          <View
-            style={{
-              flexDirection: "row",
-              gap: spacing.sm,
-              alignItems: "center",
-              marginTop: spacing.md,
-            }}
-          >
-            <View style={themed($ccBadge)}>
-              <Text text="+91" weight="bold" style={{ color: colors.palette.neutral800 }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <TextField
-                value={props.phone}
-                onChangeText={props.onPhoneChange}
-                onBlur={props.onGooglePhoneBlur}
-                onFocus={props.onPhoneFocus}
-                containerStyle={{ marginBottom: 0 }}
-                keyboardType="phone-pad"
-                placeholder={t("oolshik:login.phonePlaceholder")}
-                status={props.shouldShowGooglePhoneError ? "error" : undefined}
-                maxLength={10}
-                inputWrapperStyle={themed($inputWrapperDense)}
-                style={{ height: 50, paddingVertical: 0 }}
-              />
-            </View>
-          </View>
-
-          <View style={themed($validationMessageSlot)}>
-            {props.shouldShowGooglePhoneError ? (
-              <Text
-                text={
-                  props.googlePhoneError === "phone_required"
-                    ? t("oolshik:login.phoneRequired")
-                    : t("oolshik:login.phoneDigits")
-                }
-                size="xs"
-                style={{ color: colors.palette.angry500 }}
-              />
-            ) : (
-              <Text
-                text={t("oolshik:login.phonePaymentBindingNote")}
-                size="xs"
-                style={themed($supportingText)}
-              />
-            )}
+          <View style={{ marginTop: spacing.md }}>
+            <PhoneInputRow
+              value={props.phone}
+              onChangeText={props.onPhoneChange}
+              onBlur={props.onGooglePhoneBlur}
+              onFocus={props.onPhoneFocus}
+              placeholder={t("oolshik:login.phonePlaceholder")}
+              error={phoneError}
+              hint={t("oolshik:login.phonePaymentBindingNote")}
+              disabled={props.isGoogleLoading}
+              keyboardAppearance={isDark ? "dark" : "light"}
+            />
           </View>
         </>
       ) : null}

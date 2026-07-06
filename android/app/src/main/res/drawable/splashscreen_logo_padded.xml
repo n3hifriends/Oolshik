@@ -2,8 +2,9 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:drawable="@drawable/splashscreen_logo"
-        android:top="24dp"
-        android:bottom="24dp"
-        android:left="24dp"
-        android:right="24dp" />
+        android:top="20dp"
+        android:bottom="20dp"
+        android:left="20dp"
+        android:right="20dp" />
+        
 </layer-list>

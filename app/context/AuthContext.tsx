@@ -84,6 +84,9 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const setUserPhone = useCallback((phone?: string) => setUserPhoneMMKV(phone ?? ""), [setUserPhoneMMKV])
 
   const logout = useCallback(() => {
+    crashReporting.breadcrumb("auth:logout")
+    crashReporting.clearUserId()
+    crashReporting.setAuthContext({ authHasToken: false })
     // ✅ clear persisted state
     setAuthTokenMMKV("")
     setAuthEmailMMKV("")
@@ -196,9 +199,11 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     if (authToken && userId) {
       analyticsService.setUserId(userId)
       crashReporting.setUserId(userId)
+      crashReporting.setAuthContext({ authHasToken: true, authStepLast: "session_hydrated" })
     } else {
       analyticsService.setUserId(null)
       crashReporting.clearUserId()
+      crashReporting.setAuthContext({ authHasToken: false })
     }
   }, [authToken, userId])
 

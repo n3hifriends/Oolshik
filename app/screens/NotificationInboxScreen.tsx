@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react"
-import { ActivityIndicator, Pressable, RefreshControl, View } from "react-native"
+import { ActivityIndicator, Pressable, RefreshControl, useWindowDimensions, View } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
@@ -22,6 +22,8 @@ type State = {
 }
 
 const PAGE_SIZE = 50
+const COLLAPSED_ROW_HEIGHT = 92
+const STACKED_COLLAPSED_ROW_HEIGHT = 108
 
 type NotifGroup = {
   label: string
@@ -77,6 +79,9 @@ function NotifRow({
   neutral600,
   neutral700,
   separator,
+  stackedMeta,
+  expanded,
+  onToggleExpanded,
 }: {
   item: UserNotification
   isLast: boolean
@@ -85,16 +90,27 @@ function NotifRow({
   neutral600: string
   neutral700: string
   separator: string
+  stackedMeta: boolean
+  expanded: boolean
+  onToggleExpanded: (id: string) => void
 }) {
+  const relativeTime = formatRelativeTime(item.createdAt, t)
+  const collapsedHeight = stackedMeta ? STACKED_COLLAPSED_ROW_HEIGHT : COLLAPSED_ROW_HEIGHT
+
   return (
     <View>
-      <View
+      <Pressable
+        onPress={() => onToggleExpanded(item.id)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
         style={{
+          height: expanded ? undefined : collapsedHeight,
           flexDirection: "row",
           alignItems: "flex-start",
           paddingHorizontal: 12,
           paddingVertical: 12,
           gap: 10,
+          overflow: "hidden",
         }}
       >
         <View style={{ width: 10, marginTop: 4 }}>
@@ -112,30 +128,58 @@ function NotifRow({
           )}
         </View>
 
-        <View style={{ flex: 1, gap: 3 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text
-              text={item.title}
-              numberOfLines={1}
-              style={{
-                flex: 1,
-                fontSize: 14,
-                fontWeight: item.read ? "400" : "600",
-                color: neutral700,
-              }}
-            />
-            <Text
-              text={formatRelativeTime(item.createdAt, t)}
-              style={{ fontSize: 11, color: neutral600, flexShrink: 0 }}
-            />
-          </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          {stackedMeta ? (
+            <View style={{ gap: 2, minWidth: 0 }}>
+              <Text
+                text={item.title}
+                numberOfLines={expanded ? 2 : 1}
+                ellipsizeMode="tail"
+                style={{
+                  color: neutral700,
+                  fontSize: 14,
+                  fontWeight: item.read ? "400" : "600",
+                  lineHeight: 19,
+                }}
+              />
+              <Text
+                text={relativeTime}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={{ color: neutral600, fontSize: 11, lineHeight: 15 }}
+              />
+            </View>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+              <Text
+                text={item.title}
+                numberOfLines={expanded ? 2 : 1}
+                ellipsizeMode="tail"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  color: neutral700,
+                  fontSize: 14,
+                  fontWeight: item.read ? "400" : "600",
+                  lineHeight: 19,
+                }}
+              />
+              <Text
+                text={relativeTime}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={{ color: neutral600, flexShrink: 0, fontSize: 11, lineHeight: 15, maxWidth: 88 }}
+              />
+            </View>
+          )}
           <Text
             text={item.body}
-            numberOfLines={2}
-            style={{ fontSize: 13, color: neutral600, lineHeight: 18 }}
+            numberOfLines={expanded ? undefined : 2}
+            ellipsizeMode="tail"
+            style={{ color: neutral600, fontSize: 13, lineHeight: 18 }}
           />
         </View>
-      </View>
+      </Pressable>
 
       {!isLast && (
         <View style={{ height: 1, backgroundColor: separator, marginLeft: 32 }} />
@@ -152,6 +196,9 @@ function NotifSection({
   neutral700,
   separator,
   textDim,
+  stackedMeta,
+  expandedIds,
+  onToggleExpanded,
 }: {
   group: NotifGroup
   t: (key: string, opts?: Record<string, unknown>) => string
@@ -160,6 +207,9 @@ function NotifSection({
   neutral700: string
   separator: string
   textDim: string
+  stackedMeta: boolean
+  expandedIds: Set<string>
+  onToggleExpanded: (id: string) => void
 }) {
   return (
     <View style={{ gap: 6 }}>
@@ -180,6 +230,9 @@ function NotifSection({
             neutral600={neutral600}
             neutral700={neutral700}
             separator={separator}
+            stackedMeta={stackedMeta}
+            expanded={expandedIds.has(item.id)}
+            onToggleExpanded={onToggleExpanded}
           />
         ))}
       </SectionCard>
@@ -210,6 +263,8 @@ export default function NotificationInboxScreen({ navigation }: Props) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { palette } = colors
+  const { width, fontScale } = useWindowDimensions()
+  const stackedMeta = width < 360 || fontScale >= 1.2
 
   const [state, setState] = useState<State>({
     items: [],
@@ -219,6 +274,19 @@ export default function NotificationInboxScreen({ navigation }: Props) {
     refreshing: false,
     loadingMore: false,
   })
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
 
   const load = useCallback(async (opts: { page: number; refresh?: boolean }) => {
     const { page, refresh } = opts
@@ -315,6 +383,9 @@ export default function NotificationInboxScreen({ navigation }: Props) {
           neutral700={palette.neutral700}
           separator={colors.separator}
           textDim={colors.textDim}
+          stackedMeta={stackedMeta}
+          expandedIds={expandedIds}
+          onToggleExpanded={toggleExpanded}
         />
       ))}
 

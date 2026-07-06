@@ -2,6 +2,7 @@ import React from "react"
 import { Pressable, View } from "react-native"
 import { Text } from "@/components/Text"
 import { RatingBadge } from "@/components/RatingBadge"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 type TaskSummaryCardProps = {
   initials: string
@@ -38,14 +39,17 @@ type TaskSummaryCardProps = {
 }
 
 export function TaskSummaryCard(props: TaskSummaryCardProps) {
+  const { scaleIcon } = useResponsiveLayout()
+  const avatarSize = scaleIcon(36)
+
   return (
     <View style={{ gap: props.spacingMd }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: props.spacingSm }}>
         <View
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
+            width: avatarSize,
+            height: avatarSize,
+            borderRadius: avatarSize / 2,
             backgroundColor: props.neutral200,
             alignItems: "center",
             justifyContent: "center",
@@ -53,9 +57,9 @@ export function TaskSummaryCard(props: TaskSummaryCardProps) {
         >
           <Text text={props.initials} weight="bold" />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text text={props.createdByName} weight="medium" />
-          <Text text={props.createdAtLabel} size="xs" style={{ color: props.neutral600 }} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text text={props.createdByName} weight="medium" numberOfLines={2} />
+          <Text text={props.createdAtLabel} size="xs" numberOfLines={1} style={{ color: props.neutral600 }} />
         </View>
 
         {props.voiceAvailable ? (

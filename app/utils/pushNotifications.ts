@@ -17,6 +17,7 @@ const messagingInstance = getMessaging(getApp())
 import { OolshikApi } from "@/api/client"
 import { navigate, navigationRef, resetRoot } from "@/navigators/navigationUtilities"
 import { loadString, saveString, remove } from "@/utils/storage"
+import { breadcrumb } from "@/utils/crashReporting"
 
 const PUSH_TOKEN_KEY = "push.token"
 const PUSH_PERMISSION_REQUESTED_KEY = "push.permission.requested"
@@ -231,8 +232,12 @@ function handleNotificationResponse(resp: Notifications.NotificationResponse) {
     target = { route: "TaskDetail", taskId }
   }
 
-  if (!target) return
+  if (!target) {
+    breadcrumb(`nav:notification_open_failed route=${route || "none"} type=${type || "none"}`)
+    return
+  }
 
+  breadcrumb(`nav:notification_open target=${target.route} has_payment=${!!paymentRequestId}`)
   pendingTarget = target
   navRetryCount = 0
   flushPendingTarget()
@@ -383,6 +388,7 @@ function scheduleNavRetry() {
   if (navRetryTimer) return
 
   if (navRetryCount >= NAV_READY_MAX_RETRIES) {
+    breadcrumb(`nav:notification_routing_failed target=${pendingTarget?.route ?? "none"}`)
     pendingTarget = null
     return
   }

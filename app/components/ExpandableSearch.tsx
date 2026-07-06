@@ -93,7 +93,7 @@ export const ExpandableSearch: React.FC<Props> = ({
         accessibilityLabel={t("oolshik:search.open")}
         style={({ pressed }) => ({
           flex: 1,
-          height: 36,
+          minHeight: 36,
           borderRadius: 18,
           backgroundColor: colors.separator,
           borderWidth: 1,
@@ -165,7 +165,7 @@ export const ExpandableSearch: React.FC<Props> = ({
               }
             }}
             style={{
-              height: 42,
+              minHeight: 42,
               paddingVertical: 0,
               paddingHorizontal: 0,
               fontSize: 15,

@@ -51,6 +51,10 @@ export interface RemoteConfigFlags {
   // Privacy / Observability
   analytics_debug_logging_enabled: boolean
   crashlytics_user_context_enabled: boolean
+  crashlytics_breadcrumbs_enabled: boolean
+  crashlytics_api_error_context_enabled: boolean
+  crashlytics_payment_context_enabled: boolean
+  crashlytics_location_context_enabled: boolean
 
   // Debug flags — dev/staging only; never enable in production Console
   mock_nearby_enabled: boolean
@@ -90,6 +94,10 @@ const DEFAULTS: RemoteConfigFlags = {
 
   analytics_debug_logging_enabled: false,
   crashlytics_user_context_enabled: true,
+  crashlytics_breadcrumbs_enabled: true,
+  crashlytics_api_error_context_enabled: true,
+  crashlytics_payment_context_enabled: true,
+  crashlytics_location_context_enabled: true,
 
   mock_nearby_enabled: false,
   mock_upload_create_enabled: false,

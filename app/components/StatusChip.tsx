@@ -52,6 +52,8 @@ export const StatusChip: React.FC<{ s: Status; active: boolean; onPress: () => v
       <Text
         text={label}
         size="xxs"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1}
         style={{ color: active ? activeFg : fg }}
       />
     </Pressable>

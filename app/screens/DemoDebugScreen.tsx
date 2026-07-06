@@ -20,6 +20,7 @@ import { DemoTabScreenProps } from "@/navigators/DemoNavigator"
 import type { ThemedStyle } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
+import { breadcrumb, recordHandledError } from "@/utils/crashReporting"
 
 /**
  * @param {string} url - The URL to open in the browser.
@@ -58,6 +59,21 @@ export const DemoDebugScreen: FC<DemoTabScreenProps<"DemoDebug">> = function Dem
     },
     [],
   )
+
+  const testFatalCrash = useCallback(() => {
+    if (!__DEV__) return
+    breadcrumb("debug:crash_test_fatal")
+    throw new Error("DEV_CRASH_TEST: intentional fatal crash")
+  }, [])
+
+  const testHandledError = useCallback(() => {
+    if (!__DEV__) return
+    breadcrumb("debug:crash_test_handled")
+    recordHandledError(new Error("DEV_CRASH_TEST: intentional handled error"), {
+      errorKind: "test",
+      retryable: false,
+    })
+  }, [])
 
   const toggleTheme = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut) // Animate the transition
@@ -148,6 +164,12 @@ export const DemoDebugScreen: FC<DemoTabScreenProps<"DemoDebug">> = function Dem
       <View style={themed($buttonContainer)}>
         <Button style={themed($button)} tx="common:logOut" onPress={logout} />
       </View>
+      {__DEV__ ? (
+        <View style={themed($buttonContainer)}>
+          <Button style={themed($button)} text="Test Fatal Crash (DEV)" onPress={testFatalCrash} />
+          <Button style={themed($button)} text="Test Handled Error (DEV)" onPress={testHandledError} />
+        </View>
+      ) : null}
     </Screen>
   )
 }

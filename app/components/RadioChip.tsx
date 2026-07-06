@@ -40,6 +40,8 @@ export const RadioChip = memo(function RadioChip({
       <Text
         text={label}
         preset="default"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.1}
         style={S.label}
       />
     </Pressable>
@@ -59,7 +61,7 @@ function styles(size: "md" | "lg", selected: boolean, disabled: boolean, theme: 
 
   return StyleSheet.create({
     base: {
-      height,
+      minHeight: height,
       paddingHorizontal: padH,
       borderRadius: 999,
       borderWidth: 1,
@@ -92,6 +94,7 @@ function styles(size: "md" | "lg", selected: boolean, disabled: boolean, theme: 
     label: {
       color: fg,
       fontWeight: selected ? "600" : "500",
+      flexShrink: 1,
     },
   })
 }

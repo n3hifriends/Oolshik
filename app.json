@@ -52,7 +52,10 @@
     [
       "expo-splash-screen",
       {
-        "backgroundColor": "#FF6B2C"
+        "backgroundColor": "#FF6B2C",
+        "image": "./assets/images/ic_launcher_round.webp",
+        "imageWidth": 200,
+        "resizeMode": "contain"
       }
     ],
     [

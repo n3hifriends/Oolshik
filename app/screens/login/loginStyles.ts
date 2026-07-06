@@ -98,23 +98,6 @@ export const $supportingText: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
 })
 
-export const $ccBadge: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingHorizontal: spacing.sm,
-  height: 50,
-  borderRadius: spacing.sm,
-  borderWidth: 1,
-  borderColor: colors.palette.neutral300,
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: colors.palette.neutral100,
-})
-
-export const $inputWrapperDense: ThemedStyle<ViewStyle> = () => ({
-  height: 50,
-  minHeight: 50,
-  alignItems: "center",
-  paddingVertical: 0,
-})
 
 export const $phoneHintBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,

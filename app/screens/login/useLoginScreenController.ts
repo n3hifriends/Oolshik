@@ -8,6 +8,7 @@ import { setLoginTokens } from "@/api/client"
 import Config from "@/config"
 import { useRemoteConfig } from "@/services/remoteConfig"
 import { useAuth } from "@/context/AuthContext"
+import { breadcrumb, setAuthContext } from "@/utils/crashReporting"
 import {
   getProfileExtras,
   updateProfileExtras,
@@ -335,6 +336,8 @@ export function useLoginScreenController() {
   }, [hydrateProfile, setAuthToken])
 
   const sendOtp = useCallback(async () => {
+    breadcrumb("auth:login_started method=otp")
+    setAuthContext({ authHasToken: false, authMethodLast: "otp", authStepLast: "otp_requested" })
     setLoading("send")
     const response = await OolshikApi.requestOtp(toIndianE164(phone))
     setLoading(null)
@@ -345,6 +348,8 @@ export function useLoginScreenController() {
       setResendIn(30)
       return
     }
+    setAuthContext({ authHasToken: false, authMethodLast: "otp", authErrorKindLast: "otp_send_failed" })
+    breadcrumb("auth:login_failed method=otp error=send_failed")
     Alert.alert(t("oolshik:login.otpSendFailed"))
   }, [phone, t])
 
@@ -368,9 +373,14 @@ export function useLoginScreenController() {
       }
       setPendingTokens(session)
       setOtpVerified(true)
+      breadcrumb("auth:login_success method=otp")
+      setAuthContext({ authHasToken: true, authMethodLast: "otp", authStepLast: "otp_verified" })
       return session
     }
 
+    const errorKind = isNetworkFailure(response?.problem) ? "network_error" : "invalid_otp"
+    breadcrumb(`auth:login_failed method=otp error=${errorKind}`)
+    setAuthContext({ authHasToken: false, authMethodLast: "otp", authErrorKindLast: errorKind })
     Alert.alert(
       t(
         isNetworkFailure(response?.problem)
@@ -398,6 +408,9 @@ export function useLoginScreenController() {
         response?.data && typeof response.data === "object" && "message" in response.data
           ? response.data.message
           : null
+      const errorKind = isNetworkFailure(response?.problem) ? "network_error" : "backend_auth_failed"
+      breadcrumb(`auth:login_failed method=google error=${errorKind}`)
+      setAuthContext({ authHasToken: false, authMethodLast: "google", authErrorKindLast: errorKind })
       setGoogleServerMessage(typeof backendMessage === "string" ? backendMessage : null)
       setGoogleFlowState(
         isNetworkFailure(response?.problem) ? "network-failure" : "backend-auth-failed",
@@ -409,10 +422,14 @@ export function useLoginScreenController() {
     try {
       await finalizeBackendSession(response.data)
       if (activeGoogleAttemptRef.current !== attemptId) return
+      breadcrumb("auth:login_success method=google")
+      setAuthContext({ authHasToken: true, authMethodLast: "google", authStepLast: "session_finalized" })
       setGoogleServerMessage(null)
       setGoogleFlowState("success")
     } catch {
       if (activeGoogleAttemptRef.current !== attemptId) return
+      breadcrumb("auth:login_failed method=google error=token_exchange_failed")
+      setAuthContext({ authHasToken: false, authMethodLast: "google", authErrorKindLast: "token_exchange_failed" })
       setGoogleFlowState("token-exchange-failed")
     } finally {
       if (activeGoogleAttemptRef.current === attemptId) {
@@ -512,6 +529,8 @@ export function useLoginScreenController() {
       setGoogleFlowState("backend-auth-failed")
       return
     }
+    breadcrumb("auth:login_started method=google")
+    setAuthContext({ authHasToken: false, authMethodLast: "google", authStepLast: "google_prompt" })
     setGoogleServerMessage(null)
     setGoogleFlowState("idle")
     setGooglePhoneTouched(true)

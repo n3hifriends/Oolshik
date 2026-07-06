@@ -185,7 +185,7 @@ export function Button(props: ButtonProps) {
             />
           ) : null}
 
-          <Text tx={tx} text={text} txOptions={txOptions} style={$textStyle(state)}>
+          <Text tx={tx} text={text} txOptions={txOptions} maxFontSizeMultiplier={1.2} style={$textStyle(state)}>
             {children}
           </Text>
 

@@ -8,6 +8,7 @@ import Config from "@/config"
 import i18n from "i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
 import { ApiResult, normalizeApiError, requestWithRetry } from "@/api/apiResult"
+import { setApiFailureContext, clearApiFailureContext, mapUrlToDomain } from "@/utils/crashReporting"
 
 // ---------- Toggleable API logs (default: true) ----------
 export let API_LOGS_ENABLED = true
@@ -98,6 +99,20 @@ function logError(prefix: string, cfg: any, err: any) {
       message: err?.message,
     })
   } catch {}
+}
+
+function httpStatusToErrorKind(status?: number | null, axiosCode?: string): string {
+  if (axiosCode === "ECONNABORTED" || axiosCode === "ETIMEDOUT") return "timeout"
+  if (!status || status === 0) return "network_error"
+  if (status === 401) return "auth_unauthorized"
+  if (status === 403) return "auth_forbidden"
+  if (status === 404) return "not_found"
+  if (status === 409) return "conflict"
+  if (status === 422) return "validation_failed"
+  if (status === 429) return "rate_limited"
+  if (status >= 500) return "server_error"
+  if (status >= 400) return "bad_request"
+  return "unknown"
 }
 
 function isErrorRecord(value: unknown): value is Record<string, unknown> {
@@ -213,6 +228,14 @@ axiosInstance.interceptors.response.use(
     try {
       logResponse("AXIOS", (res?.config as any) ?? {}, res)
     } catch {}
+    // Clear stale API failure context on a successful response in the same domain.
+    try {
+      const url = (res?.config as any)?.url ?? ""
+      const domain = mapUrlToDomain(url)
+      if (url && domain !== "auth") {
+        clearApiFailureContext(domain)
+      }
+    } catch {}
     return res
   },
   async (error: AxiosError) => {
@@ -242,6 +265,19 @@ axiosInstance.interceptors.response.use(
         tokens.clear()
         authEvents.emit("logout")
       }
+      // Record API failure context for Crashlytics (not gated on user context — HTTP data is not PII)
+      try {
+        const tsStart = (original as any)?._tsStart
+        const durationMs = typeof tsStart === "number" ? Date.now() - tsStart : undefined
+        setApiFailureContext({
+          url: original?.url,
+          method: original?.method,
+          status: status || null,
+          errorKind: httpStatusToErrorKind(status, (error as any)?.code),
+          retryable: false,
+          durationMs,
+        })
+      } catch {}
       return Promise.reject(error)
     }
 
@@ -378,7 +414,7 @@ export type Page<T> = {
 export type ReportPayload = {
   taskId?: string
   targetUserId?: string
-  reason: "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
+  reason: "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER" | "CHILD_SAFETY"
   text?: string
 }
 

@@ -9,6 +9,7 @@ import { RatingBadge } from "./RatingBadge"
 import { useAudioPlaybackForUri } from "@/audio/audioPlayback"
 import { formatDistanceLabel } from "@/utils/distance"
 import { getStatusColors } from "@/theme/statusColors"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 type Props = {
   id: string
@@ -80,6 +81,8 @@ export function TaskCard({
   const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
+  const { scaleIcon } = useResponsiveLayout()
+  const avatarSize = scaleIcon(28)
 
   // Normalize backend statuses to UI statuses
   // Backend may send OPEN; map it to PENDING visually. Handle CANCELLED/CANCELED gracefully.
@@ -137,9 +140,9 @@ export function TaskCard({
       {/* Avatar with initials */}
       <View
         style={{
-          width: 28,
-          height: 28,
-          borderRadius: 14,
+          width: avatarSize,
+          height: avatarSize,
+          borderRadius: avatarSize / 2,
           backgroundColor: colors.separator,
           alignItems: "center",
           justifyContent: "center",
@@ -153,11 +156,11 @@ export function TaskCard({
         <Text text={getInitials(createdByName)} size="xs" weight="bold" />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         {/* Poster name */}
-        <Text text={createdByName ?? t("oolshik:taskCard.someoneNearby")} weight="medium" />
+        <Text text={createdByName ?? t("oolshik:taskCard.someoneNearby")} weight="medium" numberOfLines={2} />
         {/* When posted */}
-        <Text text={minsAgo(createdAt, t)} size="xs" />
+        <Text text={minsAgo(createdAt, t)} size="xs" numberOfLines={1} />
       </View>
       {normalizedVoiceUrl ? <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} /> : undefined}
       {canAccept ? (
@@ -201,7 +204,7 @@ export function TaskCard({
       {HeaderRow}
 
       {/* Title */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, minWidth: 0 }}>
         {onTitleRefresh ? (
           <Pressable
             onPress={onTitleRefresh}
@@ -213,7 +216,12 @@ export function TaskCard({
             <Text text={t("oolshik:taskCard.refreshTitle")} style={{ color: primary }} />
           </Pressable>
         ) : (
-          <Text text={title || t("oolshik:taskCard.voiceTask")} weight="bold" style={{ color: colors.text, flex: 1 }} />
+          <Text
+            text={title || t("oolshik:taskCard.voiceTask")}
+            weight="bold"
+            numberOfLines={2}
+            style={{ color: colors.text, flex: 1, minWidth: 0 }}
+          />
         )}
       </View>
 
@@ -224,9 +232,15 @@ export function TaskCard({
           alignItems: "center",
           justifyContent: "space-between",
           gap: spacing.sm,
+          minWidth: 0,
         }}
       >
-        {<Text text={t("oolshik:taskCard.distanceAway", { distance })} size="xs" style={{ color: colors.textDim }} />}
+        <Text
+          text={t("oolshik:taskCard.distanceAway", { distance })}
+          size="xs"
+          numberOfLines={1}
+          style={{ color: colors.textDim, flex: 1, minWidth: 0 }}
+        />
 
         <View
           style={{
@@ -234,9 +248,11 @@ export function TaskCard({
             paddingVertical: spacing.xxs,
             borderRadius: 999,
             backgroundColor: statusBg,
+            flexShrink: 1,
+            minWidth: 0,
           }}
         >
-          <Text text={statusLabel} size="xs" weight="medium" style={{ color: statusFg }} />
+          <Text text={statusLabel} size="xs" weight="medium" numberOfLines={1} style={{ color: statusFg }} />
         </View>
         <RatingBadge value={avgRating} />
       </View>

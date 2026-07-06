@@ -6,6 +6,7 @@ import { Text } from "@/components/Text"
 import { ExpandableSearch } from "@/components/ExpandableSearch"
 import { Segmented, ViewMode } from "@/components/Segmented"
 import { useAppTheme } from "@/theme/context"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 type HomeFeedHeaderProps = {
   searchOpen: boolean
@@ -32,16 +33,17 @@ type HomeFeedHeaderProps = {
 export function HomeFeedHeader(props: HomeFeedHeaderProps) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
-  const avatarSize = props.condensed ? 34 : 38
-  const avatarInnerSize = props.condensed ? 26 : 30
-  const bellSize = props.condensed ? 22 : 24
+  const { scaleIcon, screenPaddingH } = useResponsiveLayout()
+  const avatarSize = scaleIcon(props.condensed ? 34 : 38)
+  const avatarInnerSize = scaleIcon(props.condensed ? 26 : 30)
+  const bellSize = scaleIcon(props.condensed ? 22 : 24)
   const badgeCount = Math.min(props.unreadCount, 99)
 
   if (props.searchOpen) {
     return (
       <View
         style={{
-          paddingHorizontal: 16,
+          paddingHorizontal: screenPaddingH,
           paddingTop: props.condensed ? 4 : 8,
           paddingBottom: props.condensed ? 8 : 12,
           zIndex: 100,
@@ -63,7 +65,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
   return (
     <View
       style={{
-        paddingHorizontal: 16,
+        paddingHorizontal: screenPaddingH,
         paddingTop: props.condensed ? 4 : 8,
         paddingBottom: props.condensed ? 8 : 12,
       }}
@@ -80,7 +82,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
           accessibilityRole="button"
           accessibilityLabel={t("oolshik:homeScreen.openProfile")}
           accessibilityHint={t("oolshik:homeScreen.openProfileHint")}
-          hitSlop={8}
+          hitSlop={10}
           style={({ pressed }) => [
             {
               width: avatarSize,
@@ -116,7 +118,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
           </View>
         </Pressable>
 
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <ExpandableSearch
             open={props.searchOpen}
             setOpen={props.setSearchOpen}
@@ -135,7 +137,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
               ? t("oolshik:homeScreen.notificationsUnreadA11y", { count: badgeCount })
               : t("oolshik:homeScreen.notificationsA11y")
           }
-          hitSlop={8}
+          hitSlop={10}
           style={({ pressed }) => [
             { alignItems: "center", justifyContent: "center" },
             pressed && { opacity: 0.6 },

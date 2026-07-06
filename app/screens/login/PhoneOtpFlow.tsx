@@ -9,12 +9,11 @@ import { useAppTheme } from "@/theme/context"
 
 import { PhoneHintAction } from "./PhoneHintAction"
 import { OtpBoxes } from "./OtpBoxes"
+import { PhoneInputRow } from "./PhoneInputRow"
 import {
   $cardHeader,
-  $ccBadge,
   $disclosure,
   $footerCard,
-  $inputWrapperDense,
   $progressEyebrow,
   $progressFill,
   $progressHeader,
@@ -93,6 +92,7 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
               text={`${props.activePhoneStep}/3`}
               size="xxs"
               weight="bold"
+              maxFontSizeMultiplier={1}
               style={{ color: colors.palette.neutral100 }}
             />
           </View>
@@ -113,6 +113,7 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
             <Text
               text="1"
               weight="bold"
+              maxFontSizeMultiplier={1}
               style={{ color: isDark ? colors.palette.neutral100 : colors.palette.neutral900 }}
             />
           </View>
@@ -132,44 +133,21 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
           disabled={props.phoneHintLoading || props.loading !== null}
         />
 
-        <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
-          <View style={themed($ccBadge)}>
-            <Text text="+91" weight="bold" style={{ color: colors.palette.neutral800 }} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <TextField
-              value={props.phone}
-              onChangeText={props.onPhoneChange}
-              onFocus={props.onPhoneFocus}
-              containerStyle={{ marginBottom: 0 }}
-              keyboardType="phone-pad"
-              placeholder={t("oolshik:login.phonePlaceholder")}
-              status={props.phoneShouldShowError ? "error" : undefined}
-              maxLength={10}
-              editable={!props.otpVerified}
-              inputWrapperStyle={themed($inputWrapperDense)}
-              keyboardAppearance={isDark ? "dark" : "light"}
-              style={{ height: 50, paddingVertical: 0 }}
-            />
-          </View>
-        </View>
-
-        {props.phoneShouldShowError ? (
-          <Text
-            text={
-              props.phoneError === "phone_required"
+        <PhoneInputRow
+          value={props.phone}
+          onChangeText={props.onPhoneChange}
+          onFocus={props.onPhoneFocus}
+          placeholder={t("oolshik:login.phonePlaceholder")}
+          error={
+            props.phoneShouldShowError
+              ? props.phoneError === "phone_required"
                 ? t("oolshik:login.phoneRequired")
                 : t("oolshik:login.phoneDigits")
-            }
-            size="xs"
-            style={{ color: colors.palette.angry500, marginTop: spacing.xs }}
-          />
-        ) : null}
-
-        <Text
-          text={t("oolshik:login.phonePaymentBindingNote")}
-          size="xs"
-          style={[themed($supportingText), { marginTop: spacing.xs }]}
+              : null
+          }
+          hint={t("oolshik:login.phonePaymentBindingNote")}
+          disabled={props.otpVerified}
+          keyboardAppearance={isDark ? "dark" : "light"}
         />
 
         <Button
@@ -197,6 +175,7 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
             <Text
               text="2"
               weight="bold"
+              maxFontSizeMultiplier={1}
               style={{ color: isDark ? colors.palette.neutral100 : colors.palette.neutral900 }}
             />
           </View>
@@ -235,6 +214,7 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
             <Text
               text="3"
               weight="bold"
+              maxFontSizeMultiplier={1}
               style={{ color: isDark ? colors.palette.neutral100 : colors.palette.neutral900 }}
             />
           </View>

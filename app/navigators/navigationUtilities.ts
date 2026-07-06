@@ -11,7 +11,7 @@ import type { PersistNavigationConfig } from "@/config/config.base"
 import * as storage from "@/utils/storage"
 import { useIsMounted } from "@/utils/useIsMounted"
 import { logScreenView } from "@/services/analytics"
-import { log as crashLog } from "@/utils/crashReporting"
+import { breadcrumb, setSessionContext } from "@/utils/crashReporting"
 
 import type { AppStackParamList, NavigationProps } from "./AppNavigator"
 
@@ -134,7 +134,13 @@ export function useNavigationPersistence(storage: Storage, persistenceKey: strin
 
       if (previousRouteName !== currentRouteName) {
         logScreenView(currentRouteName as string)
-        crashLog(`screen:${currentRouteName}`)
+        breadcrumb(
+          `nav:screen current=${currentRouteName}${previousRouteName ? ` previous=${previousRouteName}` : ""}`,
+        )
+        setSessionContext({
+          screenCurrent: currentRouteName as string,
+          screenPrevious: previousRouteName as string | undefined,
+        })
         if (__DEV__) {
           console.log(currentRouteName)
         }

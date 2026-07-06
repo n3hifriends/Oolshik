@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { setRequestContext, clearRequestContext, breadcrumb } from "@/utils/crashReporting"
 import { Alert, Linking, Platform, View, ActivityIndicator } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Text } from "@/components/Text"
@@ -344,6 +345,26 @@ export function useTaskDetailController({
   const isRequester = isRequesterForTask(current?.requesterId, userId)
   const isHelper = isHelperForTask(current?.helperId, userId)
   const isPendingHelper = isPendingHelperForTask(current?.pendingHelperId, userId)
+
+  // Set task Crashlytics context whenever the loaded task changes; clear on unmount.
+  useEffect(() => {
+    if (!current) return
+    const taskRole = isRequester ? "requester" : isHelper ? "helper" : "viewer"
+    setRequestContext({
+      taskContext: "detail",
+      taskStatus: current.status ?? undefined,
+      taskRole,
+      taskIdShort: String(current.id ?? "").slice(0, 8) || undefined,
+      taskHasAudio: !!(current.voiceUrl),
+      taskHasPayment: false,
+    })
+  }, [current, isRequester, isHelper])
+
+  useEffect(() => {
+    return () => {
+      clearRequestContext()
+    }
+  }, [])
 
   const loadActivePayment = useCallback(async () => {
     if (!taskId || (!isRequester && !isHelper)) {
@@ -1743,7 +1764,10 @@ ${t("payment:notice.line2")}`,
       toggleCsatTag: (tag: string) => setCsatTag((prev) => (prev === tag ? null : tag)),
       renderLocationState,
       goBack: () => navigation.goBack(),
-      openReport: () => navigation.navigate("OolshikReport", { taskId: current?.id }),
+      openReport: () => {
+        breadcrumb(`task:report_opened id=${String(current?.id ?? "").slice(0, 8)}`)
+        navigation.navigate("OolshikReport", { taskId: current?.id })
+      },
     },
   }
 }

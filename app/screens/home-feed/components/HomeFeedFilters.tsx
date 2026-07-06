@@ -5,6 +5,7 @@ import { SectionCard } from "@/components/SectionCard"
 import { StatusChip } from "@/components/StatusChip"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 import type {
   HomeFeedSortKey,
   HomeFeedSortState,
@@ -59,6 +60,7 @@ function SummaryChip({ text }: SummaryChipProps) {
         size="xxs"
         weight="medium"
         numberOfLines={1}
+        maxFontSizeMultiplier={1.1}
         style={{ color: theme.colors.palette.neutral700 }}
       />
     </View>
@@ -98,8 +100,11 @@ function SortControlButton({ label, active, direction, onPress }: SortControlBut
         size="xs"
         weight="medium"
         numberOfLines={1}
+        maxFontSizeMultiplier={1.1}
         style={{
           color: active ? theme.colors.palette.primary600 : theme.colors.palette.neutral700,
+          flex: 1,
+          minWidth: 0,
         }}
       />
       <View
@@ -119,6 +124,7 @@ function SortControlButton({ label, active, direction, onPress }: SortControlBut
           text={indicator}
           size="xxs"
           weight="bold"
+          maxFontSizeMultiplier={1.1}
           style={{
             color: active
               ? theme.colors.palette.neutral100
@@ -133,6 +139,7 @@ function SortControlButton({ label, active, direction, onPress }: SortControlBut
 export function HomeFeedFilters(props: HomeFeedFiltersProps) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
+  const { screenPaddingH } = useResponsiveLayout()
 
   const isNearbyView = props.viewMode === "forYou"
   const allStatusesSelected =
@@ -181,7 +188,7 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
   if (props.isSearchActive) return null
 
   return (
-    <View style={{ paddingHorizontal: 16, marginBottom: props.condensed ? 6 : 10 }}>
+    <View style={{ paddingHorizontal: screenPaddingH, marginBottom: props.condensed ? 6 : 10 }}>
       <SectionCard
         style={{
           paddingHorizontal: compactPadding,
@@ -220,6 +227,8 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                       text={t("oolshik:homeScreen.radiusOption", { km })}
                       size="xs"
                       weight="medium"
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={1.1}
                       style={{
                         color: active
                           ? theme.colors.palette.neutral100
@@ -231,8 +240,8 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
               })}
             </View>
 
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", gap: 8, minWidth: 0 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <SortControlButton
                   label={t("oolshik:homeScreen.sortTime")}
                   active={props.sort.key === "time"}
@@ -240,7 +249,7 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                   onPress={() => props.onToggleSort("time")}
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <SortControlButton
                   label={t("oolshik:homeScreen.sortDistance")}
                   active={props.sort.key === "distance"}
@@ -271,6 +280,7 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                   size="xxs"
                   weight="bold"
                   numberOfLines={1}
+                  maxFontSizeMultiplier={1.1}
                   style={{ color: theme.colors.palette.neutral700 }}
                 />
                 <Text
@@ -278,13 +288,14 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                   size="xxs"
                   numberOfLines={1}
                   ellipsizeMode="tail"
+                  maxFontSizeMultiplier={1.1}
                   style={{ color: theme.colors.palette.neutral600 }}
                 />
               </Pressable>
             </View>
           </>
         ) : (
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flexDirection: "row", gap: 8, minWidth: 0 }}>
             <Pressable
               onPress={props.onToggleExpanded}
               accessibilityRole="button"
@@ -308,6 +319,7 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                 size="xxs"
                 weight="bold"
                 numberOfLines={1}
+                maxFontSizeMultiplier={1.1}
                 style={{ color: theme.colors.palette.primary600 }}
               />
               <Text
@@ -316,11 +328,12 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                 weight="medium"
                 numberOfLines={1}
                 ellipsizeMode="tail"
+                maxFontSizeMultiplier={1.1}
                 style={{ color: theme.colors.palette.neutral700 }}
               />
             </Pressable>
 
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <SortControlButton
                 label={t("oolshik:homeScreen.sortTime")}
                 active
@@ -390,6 +403,8 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                     text={t("oolshik:homeScreen.allStatuses")}
                     size="xxs"
                     weight="medium"
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.1}
                     style={{ color: theme.colors.palette.neutral700 }}
                   />
                 </Pressable>

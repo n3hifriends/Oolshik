@@ -273,7 +273,7 @@ function HeaderAction(props: HeaderActionProps) {
 }
 
 const $wrapper: ViewStyle = {
-  height: 56,
+  minHeight: 56,
   alignItems: "center",
   justifyContent: "space-between",
 }

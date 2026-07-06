@@ -19,6 +19,7 @@ import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { minsAgo } from "@/screens/task-detail/helpers/taskDetailFormatters"
 import { getStatusColors } from "@/theme/statusColors"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 type Props = OolshikStackScreenProps<"OolshikMy">
 type LoadOptions = { refreshing?: boolean; liveRef?: { current: boolean } }
@@ -84,7 +85,8 @@ function getStatusMeta(theme: Theme, t: (key: string) => string, rawStatus: stri
 export default function MyTasksScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
-  const styles = useMemo(() => createStyles(theme), [theme])
+  const { scaleDisplayText } = useResponsiveLayout()
+  const styles = useMemo(() => createStyles(theme, scaleDisplayText), [theme, scaleDisplayText])
   const [requests, setRequests] = useState<ActiveRequestSummaryItem[]>([])
   const [activeCount, setActiveCount] = useState(0)
   const [cap, setCap] = useState<number | null>(null)
@@ -259,7 +261,7 @@ export default function MyTasksScreen({ navigation }: Props) {
   )
 }
 
-const createStyles = (theme: Theme) =>
+const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) =>
   StyleSheet.create({
     backLink: {
       alignSelf: "flex-start",
@@ -334,8 +336,8 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textDim,
     },
     requestTitle: {
-      fontSize: 22,
-      lineHeight: 30,
+      fontSize: scaleDisplayText(22),
+      lineHeight: scaleDisplayText(30),
     },
     stateBody: {
       color: theme.colors.textDim,

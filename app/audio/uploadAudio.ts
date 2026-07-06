@@ -12,6 +12,7 @@ import {
 import { api as Api } from "@/api/client"
 import Config from "@/config"
 import { getRemoteFlag } from "@/services/remoteConfig"
+import { breadcrumb } from "@/utils/crashReporting"
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
 const PRESIGN_RETRY_COOLDOWN_MS = 10 * 60 * 1000
@@ -51,10 +52,19 @@ type AudioFileResponse = {
  * - otherwise falls back to server-buffered chunk upload (works on media.storage=local).
  * Returns the registered AudioFile id plus a playback URL.
  */
+function bucketFileSize(bytes: number): string {
+  if (bytes < 200_000) return "lt_200kb"
+  if (bytes < 1_000_000) return "200kb_1mb"
+  if (bytes < 5_000_000) return "1mb_5mb"
+  if (bytes < 20_000_000) return "5mb_20mb"
+  return "20mb_plus"
+}
+
 export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
   if (!getRemoteFlag("feature_audio_upload_enabled")) {
     throw new Error("Audio upload is temporarily unavailable. Please try again later.")
   }
+  breadcrumb("audio:upload_started")
 
   const mimeType = opts.mimeType ?? "audio/m4a"
   const filename = opts.filename ?? `recording_${Date.now()}.m4a`
@@ -115,10 +125,12 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
       }
     } catch (error) {
       presignFailureMessage = formatThrownErrorMessage(error)
+      breadcrumb("audio:upload_failed kind=presign_error")
     }
   }
 
   if (audioUploadPresigned) {
+    breadcrumb("audio:upload_failed kind=presign_required")
     throw new Error(presignFailureMessage ?? PRESIGNED_UPLOAD_REQUIRED_MESSAGE)
   }
 
@@ -126,7 +138,11 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
   // 1) stat
   const st = await RNFS.stat(filePath)
   const size = Number(st.size)
-  if (!Number.isFinite(size) || size <= 0) throw new Error("File not found or empty")
+  if (!Number.isFinite(size) || size <= 0) {
+    breadcrumb("audio:upload_failed kind=file_missing")
+    throw new Error("File not found or empty")
+  }
+  breadcrumb(`audio:upload_started size_bucket=${bucketFileSize(size)}`)
 
   // 2) init
   const initRes = await initUpload({ filename, mimeType, size, requestId })

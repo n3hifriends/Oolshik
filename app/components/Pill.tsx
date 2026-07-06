@@ -39,6 +39,8 @@ export const Pill: React.FC<{
       />
       <Text
         size="xxs"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1}
         style={{ color: active ? activeText : inactiveText, fontWeight: "600" }}
         text={label}
       />

@@ -9,10 +9,11 @@ import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import { OolshikApi } from "@/api"
 import { useRoute, useNavigation } from "@react-navigation/native"
+import { breadcrumb } from "@/utils/crashReporting"
 
 type Params = { taskId?: string; userId?: string; targetUserId?: string }
 
-type Reason = "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER"
+type Reason = "SPAM" | "INAPPROPRIATE" | "UNSAFE" | "OTHER" | "CHILD_SAFETY"
 
 export default function ReportScreen() {
   const { t } = useTranslation()
@@ -21,7 +22,7 @@ export default function ReportScreen() {
   const { theme } = useAppTheme()
   const { spacing, colors, isDark } = theme
 
-  const [reason, setReason] = React.useState<Reason>("SPAM")
+  const [reason, setReason] = React.useState<Reason>("UNSAFE")
   const [text, setText] = React.useState("")
   const [loading, setLoading] = React.useState(false)
 
@@ -34,6 +35,9 @@ export default function ReportScreen() {
     }
     if (reason === "OTHER" && !text.trim()) {
       return { ok: false, message: t("oolshik:reportScreen.addDetailsForOther") }
+    }
+    if (reason === "CHILD_SAFETY" && !text.trim()) {
+      return { ok: false, message: t("oolshik:reportScreen.addDetailsForChildSafety") }
     }
     if (text.length > 1000) {
       return { ok: false, message: t("oolshik:reportScreen.detailsTooLong") }
@@ -48,6 +52,7 @@ export default function ReportScreen() {
       return
     }
 
+    breadcrumb(`task:report_submitted reason=${reason.toLowerCase()}`)
     setLoading(true)
     try {
       const targetUserId = params?.targetUserId || params?.userId
@@ -59,14 +64,17 @@ export default function ReportScreen() {
       })
 
       if (res?.ok) {
+        breadcrumb(`task:report_success reason=${reason.toLowerCase()}`)
         Alert.alert(t("oolshik:reportScreen.thanksTitle"), t("oolshik:reportScreen.thanksBody"))
         nav.goBack()
       } else {
+        breadcrumb(`task:report_failed reason=${reason.toLowerCase()} kind=api_error`)
         const message =
           (res?.data as any)?.message ?? (res as any)?.problem ?? t("oolshik:homeScreen.tryAgain")
         Alert.alert(t("oolshik:reportScreen.failedTitle"), message)
       }
     } catch (e: any) {
+      breadcrumb(`task:report_failed reason=${reason.toLowerCase()} kind=exception`)
       Alert.alert(t("oolshik:reportScreen.failedTitle"), e?.message ?? t("oolshik:homeScreen.tryAgain"))
     } finally {
       setLoading(false)
@@ -74,11 +82,20 @@ export default function ReportScreen() {
   }
 
   const reasons = [
-    { label: t("oolshik:reportScreen.spam"), value: "SPAM" },
-    { label: t("oolshik:reportScreen.inappropriate"), value: "INAPPROPRIATE" },
     { label: t("oolshik:reportScreen.unsafe"), value: "UNSAFE" },
+    { label: t("oolshik:reportScreen.childSafety"), value: "CHILD_SAFETY" },
+    { label: t("oolshik:reportScreen.inappropriate"), value: "INAPPROPRIATE" },
+    { label: t("oolshik:reportScreen.spam"), value: "SPAM" },
     { label: t("oolshik:reportScreen.other"), value: "OTHER" },
   ]
+
+  const detailsRequired = reason === "CHILD_SAFETY" || reason === "OTHER"
+  const detailsLabel = detailsRequired
+    ? t("oolshik:reportScreen.detailsRequired")
+    : t("oolshik:reportScreen.detailsOptional")
+  const detailsPlaceholder = reason === "CHILD_SAFETY"
+    ? t("oolshik:reportScreen.placeholderChildSafety")
+    : t("oolshik:reportScreen.placeholder")
   const activeBg = isDark ? colors.tint : "#111827"
   const inactiveBg = isDark ? colors.separator : "#F2F4F7"
   const activeText = isDark ? colors.background : "#fff"
@@ -141,14 +158,14 @@ export default function ReportScreen() {
       </View>
 
       <View style={{ height: spacing.md }} />
-      <Text text={t("oolshik:reportScreen.detailsOptional")} weight="medium" />
+      <Text text={detailsLabel} weight="medium" />
       <View style={{ height: spacing.xs }} />
       <TextField
         multiline
         numberOfLines={6}
         value={text}
         onChangeText={(t) => setText(t.slice(0, MAX_DESC))}
-        placeholder={t("oolshik:reportScreen.placeholder")}
+        placeholder={detailsPlaceholder}
         style={{ minHeight: 120 }}
         editable={!loading}
       />

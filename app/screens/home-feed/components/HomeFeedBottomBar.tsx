@@ -156,13 +156,17 @@ export function HomeFeedBottomBar(props: HomeFeedBottomBarProps) {
             flexDirection: "row",
             alignItems: "center",
             marginLeft: 8,
+            minWidth: 0,
             opacity: labelOpacity,
           }}
         >
           <Text
             text={t("oolshik:create")}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.1}
             style={{
               flex: 1,
+              minWidth: 0,
               fontSize: 15,
               fontWeight: "600",
               color: createTextColor,

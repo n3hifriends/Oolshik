@@ -27,6 +27,7 @@ import {
 import { fromLanguageCode, normalizeLocaleTag, toLanguageCode } from "@/i18n/locale"
 import type { PaymentProfileApiResponse } from "@/api/client"
 import { useRemoteConfig } from "@/services/remoteConfig"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 const FALLBACK_supportEmail = "support@oolshik.in"
 
@@ -41,6 +42,8 @@ function getInitials(name?: string, fallback?: string) {
 export default function ProfileScreen({ navigation }: { navigation: any }) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
+  const { scaleIcon } = useResponsiveLayout()
+  const avatarSize = scaleIcon(64)
   const { t, i18n } = useTranslation()
   const { logout, userName, authEmail, userId } = useAuth()
   const { support_contact_email: remoteEmail, support_contact_whatsapp: remoteWhatsapp } = useRemoteConfig()
@@ -231,9 +234,9 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
           <View
             style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
               backgroundColor: colors.palette.primary200,
               alignItems: "center",
               justifyContent: "center",
@@ -243,7 +246,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             <Text text={initials} style={{ fontSize: 20, fontWeight: "700" }} />
           </View>
 
-          <View style={{ flex: 1, gap: 4 }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
             <Text
               preset="heading"
               text={nameToShow}

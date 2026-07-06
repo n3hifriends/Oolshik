@@ -20,6 +20,7 @@ import { parseOfferInput } from "@/utils/offerRules"
 import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 import { useAppTheme } from "@/theme/context"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 type Radius = 1 | 2 | 5
 
@@ -36,6 +37,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { colors } = theme
+  const { scaleDisplayText } = useResponsiveLayout()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [radiusKm, setRadiusKm] = useState<Radius>(1)
@@ -374,10 +376,10 @@ export default function CreateTaskScreen({ navigation }: any) {
                 <Text
                   text={String(countdown)}
                   style={{
-                    fontSize: 56,
+                    fontSize: scaleDisplayText(56),
                     fontWeight: "800",
                     color: countdown <= 3 ? colors.error : countdown <= 6 ? colors.palette.warning500 : colors.text,
-                    lineHeight: 64,
+                    lineHeight: scaleDisplayText(64),
                   }}
                 />
                 <Text

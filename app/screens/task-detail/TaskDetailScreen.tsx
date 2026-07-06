@@ -33,6 +33,9 @@ export default function TaskDetailScreen({ navigation }: Props) {
 
   const { spacing, colors, primary, success, successSoft, neutral600, neutral700 } = controller.theme
   const { current, state, handlers, role, statusInfo, offer, contact, payment, rating, derived } = controller
+  const reportBgColor = colors.errorBackground
+  const reportBorderColor = colors.errorBackground
+  const reportIconColor = colors.error
   const hasVoiceUrl = current?.voiceUrl != null && String(current.voiceUrl).trim().length > 0
   const completedFooterMessage = role.isRequester
     ? t("oolshik:taskDetailScreen.thanksForConfirmingCompletion")
@@ -52,6 +55,9 @@ export default function TaskDetailScreen({ navigation }: Props) {
         neutral100={colors.palette.neutral100}
         neutral300={colors.palette.neutral300}
         textDimColor={colors.textDim}
+        reportBgColor={reportBgColor}
+        reportBorderColor={reportBorderColor}
+        reportIconColor={reportIconColor}
         spacingXs={spacing.xs}
         spacingSm={spacing.sm}
         spacingXxxs={spacing.xxxs}

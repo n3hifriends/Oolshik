@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next"
 import { useAuth } from "@/context/AuthContext"
 import { parseUpiQr } from "@/utils/upiQr"
 import { isValidUpiId, maskUpiId, normalizeUpiId } from "@/utils/paymentProfile"
+import { breadcrumb, setPaymentContext, clearPaymentContext } from "@/utils/crashReporting"
 
 type Props = OolshikStackScreenProps<"PaymentProfile">
 
@@ -60,17 +61,24 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
           setPayeeLabel(response.data.payeeLabel ?? "")
           setSourceType(response.data.sourceType ?? "MANUAL")
         }
+        setPaymentContext({
+          paymentContext: "profile_setup",
+          paymentFlow: entryPoint,
+          paymentStatus: response.data.hasProfile ? "has_profile" : "no_profile",
+        })
       } else {
         setProfile({ hasProfile: false })
+        setPaymentContext({ paymentContext: "profile_setup", paymentFlow: entryPoint, paymentStatus: "no_profile" })
       }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [entryPoint])
 
   useFocusEffect(
     useCallback(() => {
       void loadProfile()
+      return () => clearPaymentContext()
     }, [loadProfile]),
   )
 
@@ -88,6 +96,8 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
 
     setError(null)
     setSaving(true)
+    const saveAction = profile.hasProfile ? "update" : "add"
+    breadcrumb(`payment:profile_save_started action=${saveAction} source=${sourceType.toLowerCase()}`)
     try {
       const body = {
         upiId: normalizedUpiId,
@@ -105,6 +115,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
         throw new Error(message)
       }
 
+      breadcrumb(`payment:profile_saved action=${saveAction}`)
       setProfile(response.data)
       setUpiId(response.data.upiId ?? normalizedUpiId)
       setPayeeLabel(response.data.payeeLabel ?? payeeLabel.trim())
@@ -125,6 +136,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
         ],
       )
     } catch (err) {
+      breadcrumb(`payment:profile_save_failed action=${saveAction}`)
       const message = err instanceof Error ? err.message : t("payment:profile.saveFailed")
       setError(message)
     } finally {
@@ -171,6 +183,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
         return
       }
     }
+    breadcrumb("payment:qr_scanner_opened")
     setScannerOpen(true)
   }, [permission?.granted, requestPermission, t])
 
@@ -178,9 +191,11 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
     ({ data }: { data: string }) => {
       const parsed = parseUpiQr(data)
       if (!parsed.payeeVpa) {
+        breadcrumb("payment:qr_parse_failed kind=not_upi")
         setScannerError(t("payment:profile.scanUnsupported"))
         return
       }
+      breadcrumb("payment:qr_parsed")
       const extractedUpiId = normalizeUpiId(parsed.payeeVpa)
       setScannerOpen(false)
       setScannerError(null)

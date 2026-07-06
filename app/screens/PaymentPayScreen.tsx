@@ -17,6 +17,7 @@ import { normalizeLocaleTag } from "@/i18n/locale"
 import { maskUpiId } from "@/utils/paymentProfile"
 import { useAuth } from "@/context/AuthContext"
 import { getInstalledUpiApps, openUpiApp } from "@/services/upiLauncher"
+import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
 
 type PaymentBreakdownItem = {
   label: string
@@ -179,7 +180,8 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const { t, i18n } = useTranslation()
   const localeTag = normalizeLocaleTag(i18n.language)
   const { theme } = useAppTheme()
-  const styles = useMemo(() => createStyles(theme), [theme])
+  const { scaleDisplayText } = useResponsiveLayout()
+  const styles = useMemo(() => createStyles(theme, scaleDisplayText), [theme, scaleDisplayText])
   const { userId } = useAuth()
 
   const seedPayment = useMemo(() => {
@@ -590,10 +592,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
           </View>
           <View style={styles.payeeHeroCopy}>
             <Text style={styles.payeeEyebrow} text={t("payment:pay.recipient")} />
-            <Text style={styles.payeeName} numberOfLines={1} text={effectivePayeeName ?? "—"} />
+            <Text style={styles.payeeName} numberOfLines={2} text={effectivePayeeName ?? "—"} />
             <Text
               style={[styles.payeeUpi, styles.monoValue]}
-              numberOfLines={1}
+              numberOfLines={2}
               text={displayUpiId ?? "—"}
             />
           </View>
@@ -957,7 +959,7 @@ const buildHeroMessage = ({
   return t("payment:pay.defaultHeroBody")
 }
 
-const createStyles = (theme: Theme) =>
+const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) =>
   StyleSheet.create({
     content: {
       paddingHorizontal: theme.spacing.sm,
@@ -1002,8 +1004,8 @@ const createStyles = (theme: Theme) =>
     },
     heroAmount: {
       color: theme.colors.palette.neutral100,
-      fontSize: 38,
-      lineHeight: 44,
+      fontSize: scaleDisplayText(38),
+      lineHeight: scaleDisplayText(44),
       fontFamily: theme.typography.primary.bold,
     },
     heroStatusPill: {
@@ -1169,6 +1171,7 @@ const createStyles = (theme: Theme) =>
     },
     payeeHeroCopy: {
       flex: 1,
+      minWidth: 0,
       gap: 2,
     },
     payeeEyebrow: {
@@ -1230,12 +1233,15 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textDim,
       fontFamily: theme.typography.primary.normal,
       flexShrink: 1,
+      minWidth: 0,
     },
     rowValue: {
       fontSize: 16,
       color: theme.colors.text,
       fontFamily: theme.typography.primary.medium,
-      flexShrink: 0,
+      flex: 1,
+      minWidth: 0,
+      textAlign: "right",
     },
     monoValue: {
       fontFamily: theme.typography.code?.normal ?? theme.typography.primary.medium,

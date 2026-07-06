@@ -1,6 +1,7 @@
 import * as Location from "expo-location"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRemoteConfig } from "@/services/remoteConfig"
+import { breadcrumb, setLocationContext } from "@/utils/crashReporting"
 
 type LatLng = { latitude: number; longitude: number }
 type LocationStatus = "idle" | "loading" | "ready" | "denied" | "error"
@@ -48,8 +49,12 @@ export function useForegroundLocation(options: LocationOptions = {}) {
           const perm = await Location.getForegroundPermissionsAsync()
           ok = perm.status === Location.PermissionStatus.GRANTED
         } else {
+          breadcrumb("location:permission_requested")
           const perm = await Location.requestForegroundPermissionsAsync()
           ok = perm.status === Location.PermissionStatus.GRANTED
+          const permResult = ok ? "granted" : perm.canAskAgain === false ? "blocked" : "denied"
+          breadcrumb(`location:permission_result status=${permResult}`)
+          setLocationContext({ permission: permResult })
         }
         if (!cancelled) setGranted(ok)
         if (!ok) {
@@ -60,6 +65,7 @@ export function useForegroundLocation(options: LocationOptions = {}) {
           }
           return
         }
+        setLocationContext({ permission: "granted" })
 
         const lastKnown = await Location.getLastKnownPositionAsync()
         if (!cancelled && lastKnown?.coords) {
@@ -105,6 +111,8 @@ export function useForegroundLocation(options: LocationOptions = {}) {
           setLastKnown(null)
           setError(e?.message ?? "Location error")
           setStatus("error")
+          breadcrumb("location:refresh_failed kind=exception")
+          setLocationContext({ permission: "unknown" })
         }
       }
     }
