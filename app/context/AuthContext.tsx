@@ -64,7 +64,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
   const [userName, setUserNameMMKV] = useMMKVString(MMKV_USER_NAME)
   const [userPhone, setUserPhoneMMKV] = useMMKVString(MMKV_USER_PHONE)
-  const [onboardingComplete] = useMMKVString("onboarding.v1.completed")
+  const [onboardingComplete, setOnboardingComplete] = useMMKVString("onboarding.v1.completed")
   const [onboardingPhaseRaw, setOnboardingPhaseMMKV] = useMMKVString(MMKV_ONBOARDING_PHASE)
 
   // Defaults for local/dev use
@@ -93,10 +93,12 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
 
   const setOnboardingPhase = useCallback(
     (phase: OnboardingPhase) => {
+      setOnboardingPhaseMMKV(phase)
       if (phase === "FIRST_ACTION") logEvent(AnalyticsEvent.ONBOARDING_FIRST_ACTION)
       if (phase === "GRADUATED") logEvent(AnalyticsEvent.ONBOARDING_GRADUATED)
-      setOnboardingPhaseMMKV(phase)
-      OolshikApi.setOnboardingPhase(phase).catch(() => {})
+      OolshikApi.setOnboardingPhase(phase).catch(() => {
+        crashReporting.breadcrumb(`auth:set_onboarding_phase_failed phase=${phase}`)
+      })
     },
     [setOnboardingPhaseMMKV],
   )
@@ -151,10 +153,16 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       .then((res) => {
         if (res.ok && res.data?.onboardingPhase) {
           setOnboardingPhaseMMKV(res.data.onboardingPhase)
+          // Backfill the completion flag for sessions that predate this MMKV key
+          // (users who installed before onboarding v1 was introduced). Without this,
+          // the push-registration effect is permanently blocked for those users.
+          if (res.data.onboardingPhase !== "FRESH" && !onboardingComplete) {
+            setOnboardingComplete("true")
+          }
         }
       })
       .catch(() => {})
-  }, [authToken, onboardingPhaseRaw, setOnboardingPhaseMMKV])
+  }, [authToken, onboardingPhaseRaw, onboardingComplete, setOnboardingPhaseMMKV, setOnboardingComplete])
 
   useEffect(() => {
     const handler = () => {

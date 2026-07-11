@@ -516,6 +516,9 @@ const mr: Translations = {
       markDoneFailed: "हे काम पूर्ण झाले म्हणून चिन्हांकित करता आले नाही.",
       markDoneNotAllowed: "फक्त नेमलेला कार्यकर्ता हे काम पूर्ण झाले म्हणून चिन्हांकित करू शकतो.",
       confirmCompletion: "पूर्णतेची पुष्टी करा",
+      confirmCompletionConfirmTitle: "कार्य पूर्ण झाल्याची पुष्टी करायची का?",
+      confirmCompletionConfirmBody:
+        "यामुळे हे काम आपल्या समाधानाने पूर्ण झाले असे नोंदवले जाईल. हे पूर्ववत करता येणार नाही.",
       confirmCompletionProgressTitle: "पूर्णतेची पुष्टी करत आहोत",
       confirmCompletionProgressBody: "कृपया थोडा वेळ थांबा. आम्ही कामाची स्थिती अपडेट करत आहोत.",
       confirmCompletionFailed:
@@ -738,6 +741,15 @@ const mr: Translations = {
       section5Title: "5. कायदेशीर पालन",
       section5Item1: "ऊलशिक लागू भारतीय IT कायद्यांचे पालन करते.",
       section5Item2: "अधिकारक्षेत्र: पुणे, महाराष्ट्र, भारत.",
+    },
+    zone: {
+      title: "ऊलशिक अजून तुमच्या भागात नाही",
+      body: "आम्ही लवकरच विस्तारत आहोत. प्रतीक्षा यादीत सामील व्हा आणि ऊलशिक तुमच्याजवळ आल्यावर आम्ही तुम्हाला सूचित करू.",
+      checkAgain: "पुन्हा तपासा",
+      joinWaitlist: "प्रतीक्षा यादीत सामील व्हा",
+      waitlistJoined: "तुम्ही यादीत आहात! आम्ही उपलब्ध झाल्यावर तुम्हाला सूचित करू.",
+      nowAvailable: "आनंदाची बातमी — ऊलशिक आता तुमच्या भागात उपलब्ध आहे!",
+      continuing: "तुम्हाला आत घेऊन जात आहे…",
     },
   },
   task: {

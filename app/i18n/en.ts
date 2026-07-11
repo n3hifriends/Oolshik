@@ -511,6 +511,9 @@ const en = {
       markDoneFailed: "Couldn't mark this task as done.",
       markDoneNotAllowed: "Only the assigned helper can mark this task as done.",
       confirmCompletion: "Confirm Completion",
+      confirmCompletionConfirmTitle: "Confirm task completion?",
+      confirmCompletionConfirmBody:
+        "This confirms that the task has been completed to your satisfaction. This action cannot be undone.",
       confirmCompletionProgressTitle: "Confirming completion",
       confirmCompletionProgressBody: "Please wait while we update the task status.",
       confirmCompletionFailed: "Couldn't confirm completion. Please refresh and try again.",
@@ -732,6 +735,15 @@ const en = {
       section5Title: "5. Legal compliance",
       section5Item1: "Oolshik complies with applicable Indian IT laws.",
       section5Item2: "Jurisdiction: Pune, Maharashtra, India.",
+    },
+    zone: {
+      title: "Oolshik isn't in your area yet",
+      body: "We're expanding soon. Join the waitlist and we'll notify you when Oolshik reaches your location.",
+      checkAgain: "Check again",
+      joinWaitlist: "Join waitlist",
+      waitlistJoined: "You're on the list! We'll notify you when we're available near you.",
+      nowAvailable: "Great news — Oolshik is now available in your area!",
+      continuing: "Taking you in…",
     },
   },
   common: {

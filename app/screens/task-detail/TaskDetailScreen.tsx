@@ -31,8 +31,10 @@ export default function TaskDetailScreen({ navigation }: Props) {
     t: t as (key: string, options?: Record<string, unknown>) => string,
   })
 
-  const { spacing, colors, primary, success, successSoft, neutral600, neutral700 } = controller.theme
-  const { current, state, handlers, role, statusInfo, offer, contact, payment, rating, derived } = controller
+  const { spacing, colors, primary, success, successSoft, neutral600, neutral700 } =
+    controller.theme
+  const { current, state, handlers, role, statusInfo, offer, contact, payment, rating, derived } =
+    controller
   const reportBgColor = colors.errorBackground
   const reportBorderColor = colors.errorBackground
   const reportIconColor = colors.error
@@ -45,10 +47,12 @@ export default function TaskDetailScreen({ navigation }: Props) {
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       <TaskDetailHeader
         title={t("oolshik:taskDetail")}
+        backLabel={t("oolshik:taskDetailScreen.goBack")}
         refreshLabel={t("oolshik:taskDetailScreen.refresh")}
         reportLabel={t("oolshik:taskDetailScreen.report")}
         refreshA11yLabel={t("oolshik:taskDetailScreen.refreshTaskDetailsA11y")}
         refreshing={state.refreshing}
+        onBack={handlers.goBack}
         onRefresh={handlers.refreshTask}
         onReport={handlers.openReport}
         primaryColor={primary}
@@ -66,7 +70,11 @@ export default function TaskDetailScreen({ navigation }: Props) {
       <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 32 }}>
         {state.loading || !current ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            {state.loading ? <ActivityIndicator /> : <Text text={t("oolshik:taskDetailScreen.taskNotFound")} />}
+            {state.loading ? (
+              <ActivityIndicator />
+            ) : (
+              <Text text={t("oolshik:taskDetailScreen.taskNotFound")} />
+            )}
           </View>
         ) : state.status !== "ready" ? (
           handlers.renderLocationState()
@@ -180,7 +188,9 @@ export default function TaskDetailScreen({ navigation }: Props) {
         onOpenReason={handlers.openReasonSheet}
         onReassign={handlers.onReassign}
         onGoBack={handlers.goBack}
-        helperRequestedAuthorizationText={t("oolshik:taskDetailScreen.helperRequestedAuthorization")}
+        helperRequestedAuthorizationText={t(
+          "oolshik:taskDetailScreen.helperRequestedAuthorization",
+        )}
         requesterLabelText={t("oolshik:taskDetailScreen.requesterLabel", {
           name: derived.requesterName,
         })}
@@ -245,7 +255,11 @@ export default function TaskDetailScreen({ navigation }: Props) {
         paymentButtonLabel={t("oolshik:taskDetailScreen.payments")}
         directPaymentLabel={t("payment:direct.helperCta")}
         PaymentAmountPrefix={payment.PaymentAmountPrefix}
-        showActivePayment={(role.isRequester || role.isHelper) && statusInfo.rawStatus === "ASSIGNED" && !!state.activePayment}
+        showActivePayment={
+          (role.isRequester || role.isHelper) &&
+          statusInfo.rawStatus === "ASSIGNED" &&
+          !!state.activePayment
+        }
         paymentUpdateTitle={t("oolshik:taskDetailScreen.paymentUpdate")}
         paymentStatusText={payment.paymentStatusText}
         paymentAmountText={payment.paymentAmountText}
@@ -360,6 +374,24 @@ export default function TaskDetailScreen({ navigation }: Props) {
             text: state.actionLoading ? "..." : t("oolshik:taskDetailScreen.markDone"),
             tone: "primary",
             onPress: handlers.confirmMarkDone,
+          },
+        ]}
+      />
+
+      <AlertDialog
+        visible={state.confirmCompletionDialogVisible}
+        title={t("oolshik:taskDetailScreen.confirmCompletionConfirmTitle")}
+        message={t("oolshik:taskDetailScreen.confirmCompletionConfirmBody")}
+        onDismiss={handlers.closeConfirmCompletionDialog}
+        actions={[
+          {
+            text: t("common:cancel"),
+            onPress: handlers.closeConfirmCompletionDialog,
+          },
+          {
+            text: state.actionLoading ? "..." : t("oolshik:taskDetailScreen.confirmCompletion"),
+            tone: "primary",
+            onPress: handlers.doConfirmCompletion,
           },
         ]}
       />

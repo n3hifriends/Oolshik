@@ -24,6 +24,10 @@ export function useForegroundLocation(options: LocationOptions = {}) {
     setRefreshToken((v) => v + 1)
   }, [])
 
+  // Track whether we have already established a location so foreground refreshes
+  // don't flash the "loading" / "error" state while silently re-acquiring.
+  const hasLocationRef = useRef(false)
+
   // Only refresh on foreground if we previously had a location.
   // If we've never acquired one (e.g. emulator with no location source), let the
   // 12s timeout run to completion so the user reaches the error state and can retry.
@@ -36,10 +40,6 @@ export function useForegroundLocation(options: LocationOptions = {}) {
   }, [])
 
   useOnForeground(foregroundRefresh)
-
-  // Track whether we have already established a location so foreground refreshes
-  // don't flash the "loading" / "error" state while silently re-acquiring.
-  const hasLocationRef = useRef(false)
 
   useEffect(() => {
     if (!locationEnabled) {

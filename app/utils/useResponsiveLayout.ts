@@ -26,6 +26,7 @@ export function useResponsiveLayout() {
     width,
     height,
     isSmall: width < 375,
+    isCompact: width < 380,
     isLarge: width >= 414,
     scaleDisplayText,
     scaleIcon,

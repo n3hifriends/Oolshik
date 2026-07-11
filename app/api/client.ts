@@ -8,7 +8,11 @@ import Config from "@/config"
 import i18n from "i18next"
 import { normalizeLocaleTag } from "@/i18n/locale"
 import { ApiResult, normalizeApiError, requestWithRetry } from "@/api/apiResult"
-import { setApiFailureContext, clearApiFailureContext, mapUrlToDomain } from "@/utils/crashReporting"
+import {
+  setApiFailureContext,
+  clearApiFailureContext,
+  mapUrlToDomain,
+} from "@/utils/crashReporting"
 
 // ---------- Toggleable API logs (default: true) ----------
 export let API_LOGS_ENABLED = true
@@ -129,7 +133,11 @@ function isSpringSecurityForbidden(data: unknown) {
   )
 }
 
-const devHost = Platform.select({ ios: "http://localhost:8080", android: "http://10.0.2.2:8080" })
+const devHost = Platform.select({
+  ios: "http://localhost:8080",
+  android: "http://10.0.2.2:8080",
+  web: "http://localhost:8080",
+})
 const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API_URL : devHost)!
   .trim()
   .replace(/\/+$/, "")
@@ -442,6 +450,11 @@ export type UserStats = {
 }
 
 export type OnboardingPhase = "FRESH" | "INTENT_SET" | "FIRST_ACTION" | "GRADUATED"
+
+export type ZoneCheckResponse = {
+  eligible: boolean
+  zoneName: string | null
+}
 
 export type AuthMeResponse = {
   id?: string | number
@@ -789,7 +802,12 @@ export const OolshikApi = {
     api.post("/auth/complete", { displayName, email }),
   me: () => api.get<AuthMeResponse>("/auth/me"),
   updateMe: (patch: Record<string, unknown>) => api.put<AuthMeResponse>("/auth/me", patch),
-  setOnboardingPhase: (phase: OnboardingPhase) => api.put<AuthMeResponse>("/auth/me", { onboardingPhase: phase }),
+  setOnboardingPhase: (phase: OnboardingPhase) =>
+    api.put<AuthMeResponse>("/auth/me", { onboardingPhase: phase }),
+  checkZone: (lat: number, lng: number) =>
+    api.post<ZoneCheckResponse>("/zone/check", { lat, lng }),
+  joinWaitlist: (lat: number, lng: number) =>
+    api.post<{ queued: boolean }>("/zone/waitlist", { lat, lng }),
   getPreferredLanguage: () => api.get<{ preferredLanguage?: string }>("/auth/me/language"),
   updatePreferredLanguage: (preferredLanguage: string) =>
     api.put<{ preferredLanguage?: string; message?: string }>("/auth/me/language", {

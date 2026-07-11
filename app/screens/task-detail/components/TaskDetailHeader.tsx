@@ -5,10 +5,12 @@ import { Text } from "@/components/Text"
 
 type TaskDetailHeaderProps = {
   title: string
+  backLabel: string
   refreshLabel: string
   reportLabel: string
   refreshA11yLabel: string
   refreshing: boolean
+  onBack: () => void
   onRefresh: () => void
   onReport: () => void
   primaryColor: string
@@ -26,6 +28,26 @@ type TaskDetailHeaderProps = {
 export function TaskDetailHeader(props: TaskDetailHeaderProps) {
   return (
     <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
+      <Pressable
+        onPress={props.onBack}
+        accessibilityRole="button"
+        accessibilityLabel={props.backLabel}
+        hitSlop={6}
+        style={({ pressed }) => ({
+          width: 40,
+          height: 40,
+          marginRight: props.spacingXs,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: props.neutral300,
+          backgroundColor: props.neutral100,
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+          alignItems: "center",
+          justifyContent: "center",
+        })}
+      >
+        <MaterialCommunityIcons name="chevron-left" size={24} color={props.textDimColor} />
+      </Pressable>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text preset="heading" text={props.title} numberOfLines={2} />
       </View>

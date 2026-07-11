@@ -11,13 +11,15 @@ This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way 
 
 ## Environments
 
-`EXPO_PUBLIC_API_URL` controls which backend the app talks to. `app/config/config.dev.ts` reads it at Metro startup; when it is empty the `devHost` fallback kicks in (`localhost:8080` on iOS sim / `10.0.2.2:8080` on Android emulator).
+`EXPO_PUBLIC_API_URL` controls which backend the app talks to. `app/config/config.dev.ts` reads it at Metro startup; when it is empty the `devHost` fallback kicks in (`localhost:8080` on iOS sim/web / `10.0.2.2:8080` on Android emulator).
 
 ### Local dev (Expo Go / dev client)
 
 ```bash
 # API URL intentionally empty → uses devHost Platform.select fallback
 npm run start:local          # same as expo start --dev-client
+npm run web                  # web app at localhost, API at localhost:8080
+npm run web:local            # explicit local web + clear Metro cache
 
 # Point to cloud-dev backend instead
 npm run start:cloud-dev      # EXPO_PUBLIC_API_URL=https://api-dev.oolshik.in

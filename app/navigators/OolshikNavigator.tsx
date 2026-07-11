@@ -21,6 +21,7 @@ import { storage } from "@/utils/storage"
 import { QrScannerScreen } from "@/screens/QrScannerScreen"
 import { PaymentPayScreen } from "@/screens/PaymentPayScreen"
 import NotificationInboxScreen from "@/screens/NotificationInboxScreen"
+import ZoneGateScreen from "@/screens/ZoneGateScreen"
 
 /**
  * IMPORTANT
@@ -62,6 +63,7 @@ export type OolshikParamList = {
   }
   PaymentPay: PaymentPayParams
   NotificationInbox: undefined
+  OolshikZoneGate: undefined
 }
 
 export type OolshikStackScreenProps<T extends keyof OolshikParamList> = NativeStackScreenProps<
@@ -162,6 +164,7 @@ export function OolshikNavigator() {
       <Stack.Screen name="QrScanner" component={QrScannerScreen} />
       <Stack.Screen name="PaymentPay" component={PaymentPayScreen} />
       <Stack.Screen name="NotificationInbox" component={NotificationInboxScreen} />
+      <Stack.Screen name="OolshikZoneGate" component={ZoneGateScreen} />
     </Stack.Navigator>
   )
 }

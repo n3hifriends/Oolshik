@@ -37,7 +37,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
   const { colors } = theme
-  const { scaleDisplayText } = useResponsiveLayout()
+  const { scaleDisplayText, isCompact } = useResponsiveLayout()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [radiusKm, setRadiusKm] = useState<Radius>(1)
@@ -437,9 +437,11 @@ export default function CreateTaskScreen({ navigation }: any) {
                   text={`${playbackSecs}s / ${Math.max(durationSec, Math.ceil(playbackSecs))}s`}
                 />
               </View>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flexDirection: isCompact ? "column" : "row", gap: 8 }}>
                 {!audioAccepted && (
-                  <Button text={t("task:create.useAudio")} onPress={() => setAudioAccepted(true)} />
+                  <View style={isCompact ? undefined : { flex: 1 }}>
+                    <Button text={t("task:create.useAudio")} onPress={() => setAudioAccepted(true)} />
+                  </View>
                 )}
                 {audioAccepted && (
                   <Text
@@ -447,7 +449,9 @@ export default function CreateTaskScreen({ navigation }: any) {
                     style={{ color: colors.palette.success500, fontWeight: "600", paddingVertical: 10 }}
                   />
                 )}
-                <Button text={t("task:create.discardAudio")} onPress={discardRecording} />
+                <View style={isCompact ? undefined : { flex: 1 }}>
+                  <Button text={t("task:create.discardAudio")} onPress={discardRecording} />
+                </View>
               </View>
               {!audioAccepted && (
                 <Text text={t("task:create.audioHint")} style={{ opacity: 0.7 }} />

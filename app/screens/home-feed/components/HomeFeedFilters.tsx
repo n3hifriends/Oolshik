@@ -139,7 +139,7 @@ function SortControlButton({ label, active, direction, onPress }: SortControlBut
 export function HomeFeedFilters(props: HomeFeedFiltersProps) {
   const { t } = useTranslation()
   const { theme } = useAppTheme()
-  const { screenPaddingH } = useResponsiveLayout()
+  const { screenPaddingH, isCompact } = useResponsiveLayout()
 
   const isNearbyView = props.viewMode === "forYou"
   const allStatusesSelected =
@@ -184,6 +184,44 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
         : t("oolshik:homeScreen.sortFarthestFirst")
 
   const compactPadding = props.condensed ? 8 : 10
+
+  const nearbyStatusControl = (
+    <Pressable
+      onPress={props.onToggleExpanded}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: props.expanded }}
+      accessibilityLabel={t("oolshik:homeScreen.statusControlA11y")}
+      style={({ pressed }) => ({
+        minHeight: 38,
+        ...(isCompact ? {} : { minWidth: 88 }),
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.palette.neutral200,
+        backgroundColor: theme.colors.palette.neutral100,
+        justifyContent: "center",
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        opacity: pressed ? 0.92 : 1,
+      })}
+    >
+      <Text
+        text={t("oolshik:statusFilter")}
+        size="xxs"
+        weight="bold"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.1}
+        style={{ color: theme.colors.palette.neutral700 }}
+      />
+      <Text
+        text={selectedStatusLabel}
+        size="xxs"
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        maxFontSizeMultiplier={1.1}
+        style={{ color: theme.colors.palette.neutral600 }}
+      />
+    </Pressable>
+  )
 
   if (props.isSearchActive) return null
 
@@ -240,58 +278,27 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
               })}
             </View>
 
-            <View style={{ flexDirection: "row", gap: 8, minWidth: 0 }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <SortControlButton
-                  label={t("oolshik:homeScreen.sortTime")}
-                  active={props.sort.key === "time"}
-                  direction={props.sort.key === "time" ? props.sort.direction : "asc"}
-                  onPress={() => props.onToggleSort("time")}
-                />
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8, minWidth: 0 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <SortControlButton
+                    label={t("oolshik:homeScreen.sortTime")}
+                    active={props.sort.key === "time"}
+                    direction={props.sort.key === "time" ? props.sort.direction : "asc"}
+                    onPress={() => props.onToggleSort("time")}
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <SortControlButton
+                    label={t("oolshik:homeScreen.sortDistance")}
+                    active={props.sort.key === "distance"}
+                    direction={props.sort.key === "distance" ? props.sort.direction : "asc"}
+                    onPress={() => props.onToggleSort("distance")}
+                  />
+                </View>
+                {!isCompact && nearbyStatusControl}
               </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <SortControlButton
-                  label={t("oolshik:homeScreen.sortDistance")}
-                  active={props.sort.key === "distance"}
-                  direction={props.sort.key === "distance" ? props.sort.direction : "asc"}
-                  onPress={() => props.onToggleSort("distance")}
-                />
-              </View>
-              <Pressable
-                onPress={props.onToggleExpanded}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: props.expanded }}
-                accessibilityLabel={t("oolshik:homeScreen.statusControlA11y")}
-                style={({ pressed }) => ({
-                  minHeight: 38,
-                  minWidth: 88,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: theme.colors.palette.neutral200,
-                  backgroundColor: theme.colors.palette.neutral100,
-                  justifyContent: "center",
-                  paddingHorizontal: 10,
-                  paddingVertical: 8,
-                  opacity: pressed ? 0.92 : 1,
-                })}
-              >
-                <Text
-                  text={t("oolshik:statusFilter")}
-                  size="xxs"
-                  weight="bold"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.1}
-                  style={{ color: theme.colors.palette.neutral700 }}
-                />
-                <Text
-                  text={selectedStatusLabel}
-                  size="xxs"
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  maxFontSizeMultiplier={1.1}
-                  style={{ color: theme.colors.palette.neutral600 }}
-                />
-              </Pressable>
+              {isCompact && nearbyStatusControl}
             </View>
           </>
         ) : (

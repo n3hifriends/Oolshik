@@ -82,7 +82,7 @@ export function TaskCard({
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { scaleIcon } = useResponsiveLayout()
-  const avatarSize = scaleIcon(28)
+  const avatarSize = scaleIcon(24)
 
   // Normalize backend statuses to UI statuses
   // Backend may send OPEN; map it to PENDING visually. Handle CANCELLED/CANCELED gracefully.
@@ -117,27 +117,10 @@ export function TaskCard({
   const canAccept = !!onAccept && (status === "OPEN" || status === "PENDING")
   const normalizedVoiceUrl = typeof voiceUrl === "string" ? voiceUrl.trim() : ""
 
-  // Footer: type as ReactElement | undefined to satisfy Card's prop
-  const FooterComponent = canAccept ? (
-    <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-      <Button
-        text={t("oolshik:taskCard.accept")}
-        onPress={onAccept}
-        style={{
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.xs,
-          borderRadius: spacing.sm,
-          minWidth: 100,
-        }}
-      />
-    </View>
-  ) : undefined // <-- important
-
   const distance = formatDistanceLabel(distanceMtr ?? 0, t) ?? `0${t("oolshik:units.mShort")}`
 
   const HeaderRow = (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-      {/* Avatar with initials */}
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.xs }}>
       <View
         style={{
           width: avatarSize,
@@ -153,57 +136,54 @@ export function TaskCard({
             : t("oolshik:taskCard.userAvatarA11y")
         }
       >
-        <Text text={getInitials(createdByName)} size="xs" weight="bold" />
+        <Text text={getInitials(createdByName)} size="xxs" weight="bold" />
       </View>
 
-      <View style={{ flex: 1, minWidth: 0 }}>
-        {/* Poster name */}
-        <Text text={createdByName ?? t("oolshik:taskCard.someoneNearby")} weight="medium" numberOfLines={2} />
-        {/* When posted */}
-        <Text text={minsAgo(createdAt, t)} size="xs" numberOfLines={1} />
+      <View style={{ flex: 1, minWidth: 0, paddingTop: 1 }}>
+        <Text
+          text={createdByName ?? t("oolshik:taskCard.someoneNearby")}
+          size="xs"
+          weight="medium"
+          numberOfLines={1}
+        />
+        <Text text={minsAgo(createdAt, t)} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
       </View>
-      {normalizedVoiceUrl ? <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} /> : undefined}
-      {canAccept ? (
-        <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-          <Button
-            text={t("oolshik:taskCard.accept")}
-            onPress={onAccept}
-            style={{
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.xs,
-              borderRadius: spacing.sm,
-              minWidth: 100,
-            }}
-          />
+
+      {normalizedVoiceUrl || canAccept ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: spacing.xxs,
+            flexShrink: 0,
+          }}
+        >
+          {normalizedVoiceUrl ? <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} /> : undefined}
+          {canAccept ? (
+            <Button
+              text={t("oolshik:taskCard.accept")}
+              onPress={onAccept}
+              hitSlop={8}
+              style={{
+                minHeight: 32,
+                minWidth: 78,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: spacing.xxs,
+                borderRadius: spacing.xs,
+              }}
+              textStyle={{ fontSize: 13, lineHeight: 18 }}
+            />
+          ) : undefined}
         </View>
       ) : undefined}
     </View>
   )
-  // Left component: small, pressable play control
-  // const LeftComponent = voiceUrl ? (
-  //   <Pressable
-  //     onPress={play}
-  //     style={{
-  //       width: 30,
-  //       height: 30,
-  //       borderRadius: 20,
-  //       backgroundColor: primary,
-  //       justifyContent: "center",
-  //       alignItems: "center",
-  //       marginRight: spacing.md,
-  //     }}
-  //     accessibilityRole="button"
-  //     accessibilityLabel={playing ? "Playing" : "Play voice"}
-  //   >
-  //     <Text text={playing ? "…" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
-  //   </Pressable>
-  // ) : undefined // <-- undefined, not null
 
   const ContentComponent = (
-    <View style={{ gap: spacing.xs }}>
+    <View style={{ gap: spacing.xs, minWidth: 0 }}>
       {HeaderRow}
 
-      {/* Title */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, minWidth: 0 }}>
         {onTitleRefresh ? (
           <Pressable
@@ -218,14 +198,14 @@ export function TaskCard({
         ) : (
           <Text
             text={title || t("oolshik:taskCard.voiceTask")}
-            weight="bold"
+            size="xs"
+            weight="medium"
             numberOfLines={2}
-            style={{ color: colors.text, flex: 1, minWidth: 0 }}
+            style={{ color: colors.text, flex: 1, minWidth: 0, lineHeight: 20 }}
           />
         )}
       </View>
 
-      {/* Distance + Status side-by-side */}
       <View
         style={{
           flexDirection: "row",
@@ -244,8 +224,8 @@ export function TaskCard({
 
         <View
           style={{
-            paddingHorizontal: spacing.sm,
-            paddingVertical: spacing.xxs,
+            paddingHorizontal: spacing.xs,
+            paddingVertical: spacing.xxxs,
             borderRadius: 999,
             backgroundColor: statusBg,
             flexShrink: 1,
@@ -261,9 +241,8 @@ export function TaskCard({
 
   return (
     <Card
-      style={{ marginVertical: spacing.xs, elevation: 2 }}
+      style={{ marginVertical: spacing.xs, elevation: 2, padding: spacing.sm }}
       verticalAlignment="force-footer-bottom"
-      // LeftComponent={LeftComponent}
       ContentComponent={ContentComponent}
       onPress={onPress}
       activeOpacity={onPress ? 0.85 : undefined}
@@ -280,7 +259,7 @@ const VoicePlayButton = React.memo(function VoicePlayButton({
 }) {
   const { theme } = useAppTheme()
   const { t } = useTranslation()
-  const { spacing, colors } = theme
+  const { colors } = theme
   const primary = colors.palette.primary500
   const { status: playbackStatus, toggle } = useAudioPlaybackForUri(uri, playKey)
   const audioLoading = playbackStatus === "loading"
@@ -289,14 +268,14 @@ const VoicePlayButton = React.memo(function VoicePlayButton({
   return (
     <Pressable
       onPress={() => toggle()}
+      hitSlop={8}
       style={{
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: primary,
         justifyContent: "center",
         alignItems: "center",
-        marginRight: spacing.md,
         opacity: audioLoading ? 0.7 : 1,
       }}
       accessibilityRole="button"
@@ -312,7 +291,7 @@ const VoicePlayButton = React.memo(function VoicePlayButton({
       {audioLoading ? (
         <ActivityIndicator color="#fff" size="small" />
       ) : (
-        <Text text={playing ? "⏸" : "▶︎"} style={{ color: "white", fontWeight: "bold" }} />
+        <Text text={playing ? "⏸" : "▶︎"} size="xxs" style={{ color: "white", fontWeight: "bold" }} />
       )}
     </Pressable>
   )

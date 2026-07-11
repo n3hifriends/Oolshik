@@ -23,6 +23,7 @@ import {
 } from "@/features/profile/storage/profileExtrasStore"
 import { OolshikApi, type PaymentProfileApiResponse } from "@/api"
 import { getFcmTokenAsync } from "@/utils/pushNotifications"
+import { useAuth } from "@/context/AuthContext"
 
 const CONSENT_VERSION = "v1"
 
@@ -30,6 +31,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
   const { t, i18n } = useTranslation()
+  const { setOnboardingPhase } = useAuth()
 
   const [onboardingComplete, setOnboardingComplete] = useMMKVString(
     "onboarding.v1.completed",
@@ -37,7 +39,8 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   )
   const [, setConsentMeta] = useMMKVString("consent.v1.meta", storage)
 
-  const { granted, request } = useForegroundLocation({ autoRequest: false }) as {
+  const { coords, granted, request } = useForegroundLocation({ autoRequest: false }) as {
+    coords?: { latitude: number; longitude: number } | null
     granted?: boolean
     request?: () => void
   }
@@ -118,7 +121,10 @@ export default function OnboardingConsentScreen({ navigation }: any) {
     }
   }
 
-  const canContinue = useMemo(() => Boolean(accepted && granted), [accepted, granted])
+  const canContinue = useMemo(
+    () => Boolean(accepted && granted && coords),
+    [accepted, granted, coords],
+  )
 
   const consentSections = [
     {
@@ -341,14 +347,31 @@ export default function OnboardingConsentScreen({ navigation }: any) {
           onPress={async () => {
             if (!canContinue || submitting) return
             setSubmitting(true)
+            // Kick off FCM permission request in the background so it doesn't block
+            // navigation — AuthContext handles the actual backend token registration
+            // once onboarding.v1.completed is written below.
+            getFcmTokenAsync().catch(() => {})
             try {
-              await getFcmTokenAsync()
-            } catch {
-              // best-effort — proceed even if permission denied or unavailable
-            }
-            try {
-              setOnboardingComplete("true")
-              navigation.replace("OolshikHome")
+              let eligible = true
+              if (coords) {
+                try {
+                  const zoneRes = await OolshikApi.checkZone(coords.latitude, coords.longitude)
+                  if (zoneRes.ok && zoneRes.data) {
+                    eligible = zoneRes.data.eligible
+                  }
+                } catch {
+                  // network error — fail open so a blip doesn't permanently block the user
+                }
+              }
+
+              if (eligible) {
+                setOnboardingPhase("INTENT_SET")
+                setOnboardingComplete("true")
+                navigation.replace("OolshikHome")
+              } else {
+                setSubmitting(false)
+                navigation.navigate("OolshikZoneGate")
+              }
             } catch {
               setSubmitting(false)
             }

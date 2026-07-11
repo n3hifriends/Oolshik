@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { setRequestContext, clearRequestContext, breadcrumb } from "@/utils/crashReporting"
-import { Alert, Linking, Platform, View, ActivityIndicator } from "react-native"
+import { Alert, InteractionManager, Linking, Platform, View, ActivityIndicator } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -210,6 +210,7 @@ export function useTaskDetailController({
   const refreshInFlightRef = useRef(false)
   const paymentNoticeDialogOpenRef = useRef(false)
   const [markDoneConfirmVisible, setMarkDoneConfirmVisible] = useState(false)
+  const [confirmCompletionDialogVisible, setConfirmCompletionDialogVisible] = useState(false)
 
   const [csatRating, setCsatRating] = useState(4)
   const [csatTag, setCsatTag] = useState<string | null>(null)
@@ -486,8 +487,7 @@ export function useTaskDetailController({
   const canConfirmCompletion =
     current?.canConfirm ?? (isRequester && rawStatus === "WORK_DONE_PENDING_CONFIRMATION")
   const canReportIssue =
-    current?.canReportIssue ??
-    (isRequester && (rawStatus === "ASSIGNED" || rawStatus === "WORK_DONE_PENDING_CONFIRMATION"))
+    current?.canReportIssue ?? (isRequester && rawStatus === "WORK_DONE_PENDING_CONFIRMATION")
   const canEditOffer = canEditOfferForTask(isRequester, rawStatus, current?.helperId ?? null)
 
   const currentOfferAmount = typeof current?.offerAmount === "number" ? current.offerAmount : null
@@ -705,7 +705,7 @@ ${t("payment:notice.line2")}`,
             onPress: () => {
               markPaymentNoticeSeen(userId)
               paymentNoticeDialogOpenRef.current = false
-              setTimeout(onContinue, 350)
+              InteractionManager.runAfterInteractions(onContinue)
             },
           },
         ],
@@ -791,21 +791,23 @@ ${t("payment:notice.line2")}`,
             text: t("payment:qr.collectFromName", { name: requesterName }),
             onPress: () => {
               if (!myPaymentProfile.hasProfile) {
-                Alert.alert(
-                  t("payment:direct.profileRequiredTitle"),
-                  t("payment:direct.profileRequiredBody"),
-                  [
-                    { text: t("common:cancel"), style: "cancel" },
-                    {
-                      text: t("payment:direct.addProfileCta"),
-                      onPress: () =>
-                        navigation.navigate("PaymentProfile", {
-                          entryPoint: "task-payment",
-                          required: true,
-                        }),
-                    },
-                  ],
-                )
+                InteractionManager.runAfterInteractions(() => {
+                  Alert.alert(
+                    t("payment:direct.profileRequiredTitle"),
+                    t("payment:direct.profileRequiredBody"),
+                    [
+                      { text: t("common:cancel"), style: "cancel" },
+                      {
+                        text: t("payment:direct.addProfileCta"),
+                        onPress: () =>
+                          navigation.navigate("PaymentProfile", {
+                            entryPoint: "task-payment",
+                            required: true,
+                          }),
+                      },
+                    ],
+                  )
+                })
                 return
               }
               navigation.navigate("QrScanner", {
@@ -1153,9 +1155,20 @@ ${t("payment:notice.line2")}`,
     }
   }, [actionLoading, current?.id, t])
 
-  const onComplete = useCallback(async () => {
+  const onComplete = useCallback(() => {
+    if (!current?.id || actionLoading) return
+    setConfirmCompletionDialogVisible(true)
+  }, [actionLoading, current?.id])
+
+  const closeConfirmCompletionDialog = useCallback(() => {
+    if (actionLoading) return
+    setConfirmCompletionDialogVisible(false)
+  }, [actionLoading])
+
+  const doConfirmCompletion = useCallback(async () => {
     if (!current?.id || actionLoading) return
 
+    setConfirmCompletionDialogVisible(false)
     const nextActionKind =
       rawStatus === "WORK_DONE_PENDING_CONFIRMATION" ? "confirmCompletion" : "completeTask"
 
@@ -1608,6 +1621,7 @@ ${t("payment:notice.line2")}`,
       recoveryNotice,
       authDecision,
       markDoneConfirmVisible,
+      confirmCompletionDialogVisible,
       csatRating,
       csatTag,
       csatSubmitting,
@@ -1741,6 +1755,8 @@ ${t("payment:notice.line2")}`,
       closeMarkDoneConfirm,
       confirmMarkDone,
       onComplete,
+      closeConfirmCompletionDialog,
+      doConfirmCompletion,
       onSubmitRating,
       onSubmitCsat,
       openReasonSheet,

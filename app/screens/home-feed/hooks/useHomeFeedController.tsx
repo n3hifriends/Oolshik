@@ -329,8 +329,15 @@ export function useHomeFeedController({
     }
   }, [])
 
+  const helperDefaultsLastLoadRef = useRef(0)
   useFocusEffect(
     useCallback(() => {
+      // Skip if we loaded less than 500ms ago — rapid re-focus (e.g. Face ID,
+      // notification banner) should not issue redundant AsyncStorage reads.
+      const now = Date.now()
+      if (now - helperDefaultsLastLoadRef.current < 500) return
+      helperDefaultsLastLoadRef.current = now
+
       let active = true
       loadHelperDefaults()
         .then((defaults) => {
