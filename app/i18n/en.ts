@@ -863,9 +863,9 @@ const en = {
     },
     direct: {
       helperCta: "Request / Pay",
-      choiceTitle: "Choose direct payment",
+      choiceTitle: "How do you want to pay?",
       choiceBody:
-        "Decide who should receive this money. We'll still open the transfer in a UPI app.",
+        "Choose whether to collect or pay — transfer opens in your UPI app.",
       requestToMe: "{{name}} pays me",
       payRequester: "I pay {{name}}",
       requestedTitle: "Direct payment is ready",
@@ -881,10 +881,10 @@ const en = {
       createFailed: "We couldn't prepare the direct payment right now.",
     },
     notice: {
-      title: "Payment Notice",
-      line1: "Payment happens in your UPI app. Oolshik does not process or store your payment.",
-      line2: "Pay at your own discretion. Verify payee details before paying.",
-      primaryCta: "I Understand",
+      title: "Before you pay",
+      line1: "Payment goes directly to your neighbour via your UPI app. Oolshik does not process or hold your payment.",
+      line2: "Check that the payee name matches who you know from this request. If unsure, do not pay and contact support.",
+      primaryCta: "Continue",
       cancelCta: "Cancel",
     },
     pay: {
