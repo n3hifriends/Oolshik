@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react"
+import React, { useCallback, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Pressable,
@@ -8,13 +8,15 @@ import {
   type ViewStyle,
 } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
+import { useOnForeground } from "@/hooks/useOnForeground"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { SectionCard } from "@/components/SectionCard"
-import { OolshikApi, type ActiveRequestSummaryItem } from "@/api/client"
+import type { ActiveRequestSummaryItem } from "@/api/client"
+import { useTaskStore } from "@/store/taskStore"
 import { useAppTheme } from "@/theme/context"
 import type { Theme } from "@/theme/types"
 import { minsAgo } from "@/screens/task-detail/helpers/taskDetailFormatters"
@@ -87,13 +89,21 @@ export default function MyTasksScreen({ navigation }: Props) {
   const { theme } = useAppTheme()
   const { scaleDisplayText } = useResponsiveLayout()
   const styles = useMemo(() => createStyles(theme, scaleDisplayText), [theme, scaleDisplayText])
-  const [requests, setRequests] = useState<ActiveRequestSummaryItem[]>([])
-  const [activeCount, setActiveCount] = useState(0)
-  const [cap, setCap] = useState<number | null>(null)
-  const [blocked, setBlocked] = useState(false)
-  const [loading, setLoading] = useState(true)
+
+  const activeSummary = useTaskStore((s) => s.activeSummary)
+  const fetchActiveSummary = useTaskStore((s) => s.fetchActiveSummary)
+  // Read at effect time without re-triggering the focus effect when data arrives
+  const activeSummaryRef = useRef(activeSummary)
+  activeSummaryRef.current = activeSummary
+
+  const [loading, setLoading] = useState(activeSummary === null)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const requests: ActiveRequestSummaryItem[] = activeSummary?.activeRequests ?? []
+  const activeCount = activeSummary?.activeCount ?? 0
+  const cap = activeSummary?.cap ?? null
+  const blocked = activeSummary?.blocked ?? false
 
   const loadRequests = useCallback(
     async ({ refreshing = false, liveRef }: LoadOptions = {}) => {
@@ -107,16 +117,8 @@ export default function MyTasksScreen({ navigation }: Props) {
       setError(null)
 
       try {
-        const response = await OolshikApi.getActiveSummary()
-        if (!response.ok || !response.data) {
-          throw new Error(t("errors:fallback"))
-        }
+        await fetchActiveSummary()
         if (!isLive()) return
-
-        setRequests(response.data.activeRequests ?? [])
-        setActiveCount(response.data.activeCount ?? 0)
-        setCap(response.data.cap ?? null)
-        setBlocked(Boolean(response.data.blocked))
       } catch (err) {
         if (!isLive()) return
         setError(err instanceof Error ? err.message : t("errors:fallback"))
@@ -129,18 +131,24 @@ export default function MyTasksScreen({ navigation }: Props) {
         }
       }
     },
-    [t],
+    [t, fetchActiveSummary],
   )
 
   useFocusEffect(
     useCallback(() => {
       const liveRef = { current: true }
-      void loadRequests({ liveRef })
+      // Keep the existing list visible while refreshing if we already have data
+      const hasData = activeSummaryRef.current !== null
+      void loadRequests({ liveRef, refreshing: hasData })
       return () => {
         liveRef.current = false
       }
     }, [loadRequests]),
   )
+
+  useOnForeground(() => {
+    void loadRequests({ refreshing: activeSummaryRef.current !== null })
+  })
 
   const handleRefresh = useCallback(() => {
     void loadRequests({ refreshing: true })

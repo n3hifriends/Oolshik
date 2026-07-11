@@ -46,7 +46,30 @@ const en = {
     tabForYou: "Nearby help",
     tabMyRequests: "My requests",
     emptyForYou: "No nearby requests right now.",
+    helperUnavailableEmpty: "Turn on Available to help in your profile to see nearby requests.",
     emptyMine: "You haven't created any requests yet.",
+    emptySearch: "No results match your search.",
+    emptyFeed: {
+      forYou: {
+        headline: "No requests nearby yet",
+        body: "Check back soon, or be the first to ask for help in your area.",
+        cta: "Ask for Help",
+      },
+      mine: {
+        headline: "You haven't asked for help yet",
+        body: "Describe what you need - a neighbour nearby can help.",
+        cta: "Get Help Now",
+      },
+    },
+    welcomeCard: {
+      greeting: "Welcome to Oolshik",
+      greetingNamed: "Hi {{name}}, welcome to Oolshik",
+      body: "We connect neighbours who need help with those who can give it.",
+      question: "What would you like to do today?",
+      getHelp: "Get Help",
+      helpOthers: "Help Others Nearby",
+      skip: "Skip for now",
+    },
     distanceFilter: "Distance",
     statusFilter: "Status",
     yourExperience: "Your experience",
@@ -263,8 +286,7 @@ const en = {
         validationTitle: "Unable to load nearby requests",
         validationBody: "The request could not be completed with the current parameters.",
         notFoundTitle: "Nearby feed not available",
-        notFoundBody:
-          "The nearby requests endpoint could not be found. Please try again later.",
+        notFoundBody: "The nearby requests endpoint could not be found. Please try again later.",
         unknownTitle: "Something went wrong while loading the feed",
         unknownBodyStale:
           "Showing the last loaded requests for now. Try refreshing again in a moment.",
@@ -339,8 +361,9 @@ const en = {
       optional: "Optional",
       locality: "Locality / area",
       helperDefaults: "Helper defaults",
-      preferredRadius: "Preferred radius (km)",
-      radiusExample: "e.g., 2",
+      preferredRadius: "Preferred radius",
+      radiusNone: "No preference",
+      radiusHint: "Sets your default search radius on the Home screen.",
       availableToHelp: "Available to help",
       localOnlySetting: "Local-only setting",
       helperAvailabilityA11y: "Helper availability",
@@ -358,12 +381,14 @@ const en = {
       detailsOptional: "Details (optional)",
       detailsRequired: "Details (required)",
       placeholder: "Describe what happened…",
-      placeholderChildSafety: "Describe what happened. Do not include unnecessary sensitive details.",
+      placeholderChildSafety:
+        "Describe what happened. Do not include unnecessary sensitive details.",
       submit: "Submit report",
       submitting: "Submitting…",
       missingContext: "Missing context. Please report from a task or a profile.",
       addDetailsForOther: "Please add details when selecting Other.",
-      addDetailsForChildSafety: "Please describe what happened when reporting a child safety concern.",
+      addDetailsForChildSafety:
+        "Please describe what happened when reporting a child safety concern.",
       detailsTooLong: "Details are too long. Please keep under 1000 characters.",
       reportTitle: "Report",
       thanksTitle: "Thanks for reporting",
@@ -403,7 +428,8 @@ const en = {
       authorizationRequested: "Approval requested",
       acceptError: "Couldn't accept / requester can't accept this task",
       acceptErrorTitle: "Couldn't accept",
-      acceptErrorBody: "Requesters can't accept their own task. Please try again if you are a helper.",
+      acceptErrorBody:
+        "Requesters can't accept their own task. Please try again if you are a helper.",
       authorizing: "Approving…",
       authorizationApproved: "Approved.",
       authorizationAlreadyApproved: "Already approved.",
@@ -653,12 +679,13 @@ const en = {
       otpRequired: "Please enter the 6-digit code to continue.",
       phoneRequired: "This field cannot be empty",
       phoneDigits: "Must be 10 digits",
+      phonePrefix: "Enter a valid Indian mobile number",
       nameRequired: "This field cannot be empty",
       backendProfileSyncFailed: "Signed in, but we couldn't sync your profile. Please try again.",
       phonePaymentBindingNote: "Use the same number linked to your UPI / payment account.",
       phoneAlertTitle: "Mobile number",
       phoneAlertBody:
-        "Use the same number linked to your UPI payment account. Entering a different number will block payment features.",
+        "Prefer your UPI-linked mobile number for future payment features. UPI payments are optional.",
       phoneAlertDismiss: "Got it",
       firebaseOtpBlocked:
         "Firebase has temporarily blocked OTP on this device. Use a test number or try again on a different device/emulator.",
@@ -783,6 +810,7 @@ const en = {
       nameLabel: "Name shown to payer",
       namePlaceholder: "Optional",
       nameHint: "This helps the payer confirm they're sending money to the right person.",
+      nameTooLong: "Name must be 50 characters or fewer.",
       scanCta: "Scan my QR",
       scanTitle: "Scan your own QR",
       scanBody:
@@ -797,7 +825,8 @@ const en = {
       scanReviewNameNone: "Not found",
       scanReviewApply: "Use this UPI",
       scanReviewDiscard: "Discard",
-      scanReviewNameMismatch: "This name doesn't match your saved payee name. Confirm it's your own QR before applying.",
+      scanReviewNameMismatch:
+        "This name doesn't match your saved payee name. Confirm it's your own QR before applying.",
       inlineNote:
         "You'll still pay using your own UPI app. Oolshik does not hold or process money.",
       invalidUpi: "Enter a valid UPI ID like name@bank.",
@@ -904,11 +933,13 @@ const en = {
       markingPaid: "Marking…",
       iPaidName: "I paid {{name}}",
       confirmPaidNameTitle: "Confirm payment",
-      confirmPaidNameBody: "Confirm you paid {{name}}. Use this only after the transfer is complete and verified.",
+      confirmPaidNameBody:
+        "Confirm you paid {{name}}. Use this only after the transfer is complete and verified.",
       roleYouArePaying: "You are paying {{name}}",
       roleYouReceiveFrom: "{{name}} will pay you",
       waitingForPayer: "Waiting for {{name}} to pay",
-      viewerReadOnly: "Payment access is still being verified. Refresh the request before taking action.",
+      viewerReadOnly:
+        "Payment access is still being verified. Refresh the request before taking action.",
       beforePaid: "Before you mark as paid",
       referenceCopiedTitle: "Reference copied",
       referenceCopiedBody: "Payment reference copied to clipboard.",

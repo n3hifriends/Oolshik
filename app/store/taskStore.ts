@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { getRemoteFlag } from "@/services/remoteConfig"
 import { MOCK_NEARBY_TASKS } from "@/mocks/nearbyTasks"
 import { OolshikApi } from "@/api"
+import type { ActiveRequestSummary, ActiveRequestSummaryItem } from "@/api/client"
 import type { AppApiError } from "@/api/apiResult"
 import { load, remove, save } from "@/utils/storage"
 
@@ -109,9 +110,12 @@ type State = {
   isNearbyStale: boolean
   lastNearbyLoadedAt: string | null
   tab: TaskTab
+  activeSummary: ActiveRequestSummary | null
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
   upsertTask: (task: Task) => void
+  upsertActiveSummaryTask: (item: ActiveRequestSummaryItem) => void
+  fetchActiveSummary: () => Promise<void>
   fetchNearby: (lat: number, lng: number, statuses?: string[]) => Promise<void>
   hydrateForUser: (userId: string) => void
   clearNearby: () => void
@@ -128,6 +132,7 @@ export const useTaskStore = create<State>((set, get) => ({
   isNearbyStale: false,
   lastNearbyLoadedAt: null,
   tab: "ALL",
+  activeSummary: null,
   setRadius: (r) => set({ radiusMeters: r }),
   setTab: (t) => set({ tab: t }),
   upsertTask: (task) =>
@@ -135,9 +140,44 @@ export const useTaskStore = create<State>((set, get) => ({
       const idx = s.tasks.findIndex((t) => t.id === task.id)
       if (idx === -1) return { tasks: [task, ...s.tasks] }
       const next = s.tasks.slice()
-      next[idx] = { ...next[idx], ...task }
+      next[idx] = {
+        ...next[idx],
+        ...task,
+        // Task-detail endpoint has no location params so it always returns
+        // distanceMtr: null. Preserve the value from fetchNearby instead.
+        distanceMtr: task.distanceMtr ?? next[idx].distanceMtr,
+      }
       return { tasks: next }
     }),
+
+  upsertActiveSummaryTask: (item) =>
+    set((s) => {
+      const current = s.activeSummary
+      if (!current) {
+        return {
+          activeSummary: { cap: 0, activeCount: 1, blocked: false, activeRequests: [item] },
+        }
+      }
+      const idx = current.activeRequests.findIndex((r) => r.id === item.id)
+      if (idx === -1) {
+        return {
+          activeSummary: {
+            ...current,
+            activeRequests: [item, ...current.activeRequests],
+            activeCount: current.activeCount + 1,
+          },
+        }
+      }
+      const next = current.activeRequests.slice()
+      next[idx] = { ...next[idx], ...item }
+      return { activeSummary: { ...current, activeRequests: next } }
+    }),
+
+  fetchActiveSummary: async () => {
+    const res = await OolshikApi.getActiveSummary()
+    if (!res.ok || !res.data) throw new Error("Failed to load active requests")
+    set({ activeSummary: res.data })
+  },
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
     const seq = ++nearbyFetchSeq
@@ -229,9 +269,17 @@ export const useTaskStore = create<State>((set, get) => ({
       const res = await OolshikApi.acceptTask(id, { latitude, longitude })
       if (res.ok) {
         set((s) => ({
-          tasks: s.tasks.map((t) =>
-            t.id === id ? { ...t, ...(res.data as any), status: "PENDING_AUTH" } : t,
-          ),
+          tasks: s.tasks.map((t) => {
+            if (t.id !== id) return t
+            const data = res.data as any
+            return {
+              ...t,
+              ...data,
+              status: "PENDING_AUTH",
+              // Accept endpoint returns no distanceMtr; keep the value from fetchNearby.
+              distanceMtr: data?.distanceMtr ?? t.distanceMtr,
+            }
+          }),
         }))
         return "OK"
       }

@@ -52,7 +52,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const { uri, start, stop, recording, durationSec, countdown, maxSeconds, reset } = useAudioRecorder(10)
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { userId, userName } = useAuth()
-  const { fetchNearby } = useTaskStore()
+  const { fetchNearby, upsertActiveSummaryTask } = useTaskStore()
   const activeCapGuard = useActiveRequestCapGuard(navigation)
 
   useFocusEffect(
@@ -221,7 +221,7 @@ export default function CreateTaskScreen({ navigation }: any) {
       }
 
       const res = await OolshikApi.createTask(payload)
-      if (!res.ok || !res.data) {
+      if (!res.ok || !res.data || !(res.data as any).id) {
         if (activeCapGuard.handleCreateCapResponse(res)) {
           return
         }
@@ -234,14 +234,18 @@ export default function CreateTaskScreen({ navigation }: any) {
       }
 
       await resetAudioPreview()
-      // refresh nearby list so the new task shows up when returning
-      try {
-        await fetchNearby(coords.latitude, coords.longitude)
-      } catch {}
 
-      Alert.alert(t("task:create.alerts.postedTitle"), t("task:create.alerts.postedBody"), [
-        { text: t("common:ok"), onPress: () => navigation.goBack() },
-      ])
+      const created = res.data as { id: string; status: string; createdAt?: string }
+      upsertActiveSummaryTask({
+        id: created.id,
+        status: created.status ?? "PENDING",
+        createdAt: created.createdAt ?? payload.createdAt,
+      })
+
+      // fire-and-forget: refresh nearby feed in background
+      fetchNearby(coords.latitude, coords.longitude).catch(() => {})
+
+      navigation.replace("OolshikDetail", { id: created.id })
     } catch (e: any) {
       Alert.alert(
         t("task:create.alerts.createFailedTitle"),

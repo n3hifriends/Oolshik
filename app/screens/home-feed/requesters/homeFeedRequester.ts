@@ -31,6 +31,17 @@ export async function loadPreferredRadiusKm(): Promise<number | null> {
   return extras.helperRadiusKm ?? null
 }
 
+export async function loadHelperDefaults(): Promise<{
+  helperAvailable: boolean
+  preferredRadiusKm: number | null
+}> {
+  const extras = await getProfileExtras()
+  return {
+    helperAvailable: extras.helperAvailable ?? true,
+    preferredRadiusKm: extras.helperRadiusKm ?? null,
+  }
+}
+
 export async function syncHelperLocation(latitude: number, longitude: number): Promise<boolean> {
   const res = (await OolshikApi.updateHelperLocation(
     latitude,

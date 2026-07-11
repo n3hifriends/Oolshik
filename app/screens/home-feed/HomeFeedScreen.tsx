@@ -23,6 +23,7 @@ import {
   BAR_PEN_CENTER_X,
 } from "@/screens/home-feed/components/HomeFeedBottomBar"
 import { HomeFeedServiceState } from "@/screens/home-feed/components/HomeFeedServiceState"
+import { HomeFeedWelcomeCard } from "@/screens/home-feed/components/HomeFeedWelcomeCard"
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 import { OolshikApi } from "@/api/client"
 
@@ -132,22 +133,32 @@ export default function HomeFeedScreen({ navigation }: Props) {
         />
       ) : null}
 
-      <HomeFeedFilters
-        viewMode={feed.viewMode}
-        radiusMeters={feed.radiusMeters}
-        onSetRadius={handlers.setRadius}
-        selectedStatuses={feed.selectedStatuses}
-        availableStatuses={feed.availableStatuses}
-        onToggleStatus={handlers.toggleStatus}
-        onSelectAllStatuses={handlers.selectAllStatuses}
-        sort={feed.sort}
-        onToggleSort={handlers.toggleSort}
-        expanded={feed.filtersExpanded}
-        onToggleExpanded={handlers.toggleFiltersExpanded}
-        condensed={feed.controlsCondensed}
-        resultCount={feed.filtered.length}
-        isSearchActive={state.searchOpen}
-      />
+      {user.isFirstRun && !state.searchOpen ? (
+        <View style={{ paddingHorizontal: 16 }}>
+          <HomeFeedWelcomeCard
+            userName={user.userName}
+            onIntentSelected={handlers.onIntentSelected}
+            onOpenComposer={() => composerRef.current?.open("type")}
+          />
+        </View>
+      ) : (
+        <HomeFeedFilters
+          viewMode={feed.viewMode}
+          radiusMeters={feed.radiusMeters}
+          onSetRadius={handlers.setRadius}
+          selectedStatuses={feed.selectedStatuses}
+          availableStatuses={feed.availableStatuses}
+          onToggleStatus={handlers.toggleStatus}
+          onSelectAllStatuses={handlers.selectAllStatuses}
+          sort={feed.sort}
+          onToggleSort={handlers.toggleSort}
+          expanded={feed.filtersExpanded}
+          onToggleExpanded={handlers.toggleFiltersExpanded}
+          condensed={feed.controlsCondensed}
+          resultCount={feed.filtered.length}
+          isSearchActive={state.searchOpen}
+        />
+      )}
 
       {state.searchOpen && state.rawSearch.length === 0 && (
         <Pressable
@@ -224,8 +235,16 @@ export default function HomeFeedScreen({ navigation }: Props) {
                 onRefresh={handlers.onRefresh}
                 onScrollOffsetChange={handlers.onListScrollOffsetChange}
                 emptyMineText={t("oolshik:emptyMine")}
-                emptyForYouText={t("oolshik:emptyForYou")}
+                emptyForYouText={
+                  feed.helperAvailable
+                    ? t("oolshik:emptyForYou")
+                    : t("oolshik:helperUnavailableEmpty")
+                }
+                emptySearchText={t("oolshik:emptySearch")}
                 viewMode={feed.viewMode}
+                helperUnavailable={!feed.helperAvailable}
+                rawSearch={state.rawSearch}
+                onGetHelp={() => composerRef.current?.open(feed.viewMode === "mine" ? "voice" : "type")}
                 extraData={feed.extraData}
                 listPaddingBottom={listPaddingBottom}
               />
@@ -246,4 +265,3 @@ export default function HomeFeedScreen({ navigation }: Props) {
     </Screen>
   )
 }
-

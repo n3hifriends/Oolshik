@@ -41,7 +41,9 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
   const phoneError = props.shouldShowGooglePhoneError
     ? props.googlePhoneError === "phone_required"
       ? t("oolshik:login.phoneRequired")
-      : t("oolshik:login.phoneDigits")
+      : props.googlePhoneError === "phone_prefix"
+        ? t("oolshik:login.phonePrefix")
+        : t("oolshik:login.phoneDigits")
     : null
 
   return (

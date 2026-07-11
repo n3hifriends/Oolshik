@@ -441,6 +441,8 @@ export type UserStats = {
   completedHelps?: number | null
 }
 
+export type OnboardingPhase = "FRESH" | "INTENT_SET" | "FIRST_ACTION" | "GRADUATED"
+
 export type AuthMeResponse = {
   id?: string | number
   phone?: string | null
@@ -451,6 +453,7 @@ export type AuthMeResponse = {
   languages?: string
   preferredLanguage?: string
   locale?: string
+  onboardingPhase?: OnboardingPhase
 }
 
 export type PaymentPayerRole = "REQUESTER" | "HELPER"
@@ -786,6 +789,7 @@ export const OolshikApi = {
     api.post("/auth/complete", { displayName, email }),
   me: () => api.get<AuthMeResponse>("/auth/me"),
   updateMe: (patch: Record<string, unknown>) => api.put<AuthMeResponse>("/auth/me", patch),
+  setOnboardingPhase: (phase: OnboardingPhase) => api.put<AuthMeResponse>("/auth/me", { onboardingPhase: phase }),
   getPreferredLanguage: () => api.get<{ preferredLanguage?: string }>("/auth/me/language"),
   updatePreferredLanguage: (preferredLanguage: string) =>
     api.put<{ preferredLanguage?: string; message?: string }>("/auth/me/language", {

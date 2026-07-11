@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react"
-import { Pressable, View } from "react-native"
+import { Linking, Pressable, View } from "react-native"
+import { useFocusEffect } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
 
 import { Screen } from "@/components/Screen"
@@ -8,6 +9,7 @@ import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { SectionCard } from "@/components/SectionCard"
 import { Switch } from "@/components/Toggle/Switch"
+import { RadioGroup } from "@/components/RadioGroup"
 import { useAppTheme } from "@/theme/context"
 import { useAuth } from "@/context/AuthContext"
 import type { ProfileExtras } from "@/features/profile/types"
@@ -15,6 +17,13 @@ import {
   getProfileExtras,
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getNotificationPermissionState,
+} from "@/utils/pushNotifications"
+import type { Radius } from "@/screens/home-feed/types"
+import { RADIUS_OPTIONS, normalizeRadius } from "@/screens/home-feed/helpers/homeFeedFormatters"
 
 export default function EditProfileScreen({ navigation }: { navigation: any }) {
   const { t } = useTranslation()
@@ -28,11 +37,12 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
   const [fullName, setFullName] = useState("")
   const [nickname, setNickname] = useState("")
   const [locality, setLocality] = useState("")
-  const [radius, setRadius] = useState("")
+  const [radius, setRadius] = useState<Radius | 0>(0)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const [notifPermissionState, setNotifPermissionState] = useState(getNotificationPermissionState)
   const [available, setAvailable] = useState(true)
   const [saving, setSaving] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
-  const [radiusError, setRadiusError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -42,7 +52,8 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
       setFullName(extras.fullNameOverride ?? "")
       setNickname(extras.nickname ?? "")
       setLocality(extras.locality ?? "")
-      setRadius(extras.helperRadiusKm ? String(extras.helperRadiusKm) : "")
+      setRadius(extras.helperRadiusKm ? normalizeRadius(extras.helperRadiusKm) : 0)
+      setNotificationsEnabled(extras.notificationsEnabled ?? true)
       setAvailable(extras.helperAvailable ?? true)
     })
 
@@ -51,35 +62,30 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
     }
   }, [])
 
+  useFocusEffect(
+    useCallback(() => {
+      setNotifPermissionState(getNotificationPermissionState())
+    }, []),
+  )
+
   const handleSave = useCallback(async () => {
     setNameError(null)
-    setRadiusError(null)
 
     const cleanedFullName = fullName.trim()
     const cleanedNickname = nickname.trim()
     const cleanedLocality = locality.trim()
-    const radiusValue = radius.trim()
 
     if (canEditName && cleanedFullName && cleanedFullName.length < 2) {
       setNameError(t("oolshik:editProfileScreen.nameTooShort"))
       return
     }
 
-    let parsedRadius: number | undefined
-    if (radiusValue.length > 0) {
-      const numeric = Number(radiusValue)
-      if (!Number.isFinite(numeric) || numeric <= 0) {
-        setRadiusError(t("oolshik:editProfileScreen.radiusInvalid"))
-        return
-      }
-      parsedRadius = numeric
-    }
-
     setSaving(true)
     const patch: Partial<ProfileExtras> = {
       nickname: cleanedNickname || undefined,
       locality: cleanedLocality || undefined,
-      helperRadiusKm: parsedRadius,
+      notificationsEnabled,
+      helperRadiusKm: radius !== 0 ? radius : undefined,
       helperAvailable: available,
     }
 
@@ -88,9 +94,14 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
     }
 
     await updateProfileExtras(patch)
+    if (notificationsEnabled) {
+      enablePushNotifications().catch(() => {})
+    } else {
+      disablePushNotifications().catch(() => {})
+    }
     setSaving(false)
     navigation.goBack()
-  }, [available, canEditName, fullName, locality, nickname, radius, navigation, t])
+  }, [available, canEditName, fullName, locality, nickname, notificationsEnabled, radius, navigation, t])
 
   return (
     <Screen
@@ -158,14 +169,50 @@ export default function EditProfileScreen({ navigation }: { navigation: any }) {
 
       <SectionCard>
         <Text preset="subheading" text={t("oolshik:editProfileScreen.helperDefaults")} style={{ marginBottom: spacing.sm }} />
-        <TextField
-          label={t("oolshik:editProfileScreen.preferredRadius")}
-          placeholder={t("oolshik:editProfileScreen.radiusExample")}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: spacing.lg,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <Text text={t("oolshik:profileScreen.notifications")} weight="medium" />
+            <Text text={t("oolshik:profileScreen.notificationsHint")} size="xs" style={{ color: colors.textDim }} />
+          </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={setNotificationsEnabled}
+            accessibilityLabel={t("oolshik:profileScreen.notificationsToggleA11y")}
+          />
+        </View>
+        {notificationsEnabled && notifPermissionState === "denied" ? (
+          <Pressable onPress={() => Linking.openSettings().catch(() => {})} accessibilityRole="button">
+            <Text
+              text={t("oolshik:profileScreen.notificationsPermissionDeniedHint")}
+              size="xs"
+              style={{ color: colors.palette.warning500, marginTop: spacing.xs }}
+            />
+          </Pressable>
+        ) : null}
+
+        <Text text={t("oolshik:editProfileScreen.preferredRadius")} size="sm" weight="medium" />
+        <View style={{ height: spacing.xs }} />
+        <RadioGroup
           value={radius}
-          onChangeText={setRadius}
-          keyboardType="numeric"
-          helper={radiusError ?? t("oolshik:editProfileScreen.optional")}
-          status={radiusError ? "error" : undefined}
+          onChange={(v) => setRadius(v as Radius | 0)}
+          wrap
+          gap={spacing.sm}
+          options={[
+            { label: t("oolshik:editProfileScreen.radiusNone"), value: 0 },
+            ...RADIUS_OPTIONS.map((km) => ({ label: `${km} km`, value: km })),
+          ]}
+        />
+        <Text
+          text={t("oolshik:editProfileScreen.radiusHint")}
+          size="xs"
+          style={{ color: colors.textDim, marginTop: spacing.xs }}
         />
 
         <View

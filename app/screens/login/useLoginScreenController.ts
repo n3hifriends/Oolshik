@@ -108,7 +108,7 @@ export function useLoginScreenController() {
   const pendingGooglePhoneHintRef = useRef<string | undefined>(undefined)
   const phoneAlertShownRef = useRef(false)
 
-  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, setUserPhone, validationError } =
+  const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, setUserPhone, setOnboardingPhase, hydrateOnboardingPhase, validationError } =
     useAuth()
 
   const googleScopes = useMemo(() => ["openid", "profile", "email"], [])
@@ -186,6 +186,7 @@ export function useLoginScreenController() {
     const digits = phone.replace(/\D/g, "")
     if (digits.length === 0) return "phone_required"
     if (digits.length < 10) return "phone_digits"
+    if (!/^[6-9]/.test(digits)) return "phone_prefix"
     return ""
   }, [phone])
 
@@ -284,6 +285,7 @@ export function useLoginScreenController() {
         setAuthEmail(profile.email ?? "")
         if (profile.id != null) setUserId(String(profile.id))
         setUserPhone(profile.phone ?? undefined)
+        if (profile.onboardingPhase) hydrateOnboardingPhase(profile.onboardingPhase)
 
         let localPreference: string | null = null
         try {

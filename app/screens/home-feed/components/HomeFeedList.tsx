@@ -1,7 +1,8 @@
 import type { ReactElement } from "react"
-import { FlatList } from "react-native"
+import { FlatList, View } from "react-native"
 
 import { Text } from "@/components/Text"
+import { EmptyFeedCard } from "@/screens/home-feed/components/EmptyFeedCard"
 import type { HomeFeedTask, HomeFeedViewMode } from "@/screens/home-feed/types"
 
 type HomeFeedListProps = {
@@ -12,7 +13,11 @@ type HomeFeedListProps = {
   onScrollOffsetChange?: (offsetY: number) => void
   emptyMineText: string
   emptyForYouText: string
+  emptySearchText: string
   viewMode: HomeFeedViewMode
+  helperUnavailable?: boolean
+  rawSearch?: string
+  onGetHelp: () => void
   extraData: {
     viewMode: HomeFeedViewMode
     loading: boolean
@@ -22,6 +27,8 @@ type HomeFeedListProps = {
 }
 
 export function HomeFeedList(props: HomeFeedListProps) {
+  const isSearching = props.rawSearch && props.rawSearch.length > 0
+
   return (
     <FlatList
       style={{ marginBottom: 16 }}
@@ -43,10 +50,17 @@ export function HomeFeedList(props: HomeFeedListProps) {
       }
       contentContainerStyle={{ paddingBottom: props.listPaddingBottom ?? 140 }}
       ListEmptyComponent={
-        <Text
-          text={props.viewMode === "mine" ? props.emptyMineText : props.emptyForYouText}
-          style={{ paddingVertical: 12 }}
-        />
+        isSearching ? (
+          <View style={{ paddingVertical: 12, paddingHorizontal: 16 }}>
+            <Text text={props.emptySearchText} />
+          </View>
+        ) : props.viewMode === "forYou" && props.helperUnavailable ? (
+          <View style={{ paddingVertical: 16, paddingHorizontal: 16 }}>
+            <Text text={props.emptyForYouText} />
+          </View>
+        ) : (
+          <EmptyFeedCard viewMode={props.viewMode} onGetHelp={props.onGetHelp} />
+        )
       }
       extraData={props.extraData}
     />

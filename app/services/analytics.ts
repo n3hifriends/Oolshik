@@ -94,6 +94,12 @@ export const AnalyticsEvent = {
   LOCATION_PERMISSION_DENIED: "location_permission_denied",
   PUSH_PERMISSION_GRANTED: "push_permission_granted",
   PUSH_PERMISSION_DENIED: "push_permission_denied",
+
+  // Onboarding funnel
+  ONBOARDING_WELCOME_VIEWED: "onboarding_welcome_viewed",
+  ONBOARDING_INTENT_SELECTED: "onboarding_intent_selected",
+  ONBOARDING_FIRST_ACTION: "onboarding_first_action",
+  ONBOARDING_GRADUATED: "onboarding_graduated",
 } as const
 
 export type AnalyticsEventName = (typeof AnalyticsEvent)[keyof typeof AnalyticsEvent]

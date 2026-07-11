@@ -225,14 +225,24 @@ export function ActionFooter(props: ActionFooterProps) {
                 />
               </>
             ) : (
-              <Text
-                text={
-                  props.isRequester
-                    ? props.waitingForHelperToMarkDoneText
-                    : props.waitingRequesterToCompleteText
-                }
-                weight="medium"
-              />
+              <>
+                <Text
+                  text={
+                    props.isRequester
+                      ? props.waitingForHelperToMarkDoneText
+                      : props.waitingRequesterToCompleteText
+                  }
+                  weight="medium"
+                />
+                {props.canReportIssue ? (
+                  <Button
+                    text={props.reportIssueLabel}
+                    onPress={() => props.onOpenReason("issue")}
+                    disabled={props.actionLoading}
+                    style={{ paddingVertical: props.spacingXs }}
+                  />
+                ) : null}
+              </>
             )}
           </InfoCard>
         </View>

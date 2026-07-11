@@ -1,4 +1,6 @@
-import { setLoginTokens } from "@/api/client"
+import { setLoginTokens, type OnboardingPhase } from "@/api/client"
+import { OolshikApi } from "@/api"
+import { logEvent, AnalyticsEvent } from "@/services/analytics"
 import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import { navigationRef } from "@/navigators/navigationUtilities"
@@ -33,11 +35,14 @@ export type AuthContextType = {
   userId?: string
   userName?: string
   userPhone?: string
+  onboardingPhase?: OnboardingPhase
   setAuthToken: (token?: string) => void
   setAuthEmail: (email?: string) => void
   setUserId: (id?: string) => void
   setUserName: (name?: string) => void
   setUserPhone: (phone?: string) => void
+  setOnboardingPhase: (phase: OnboardingPhase) => void
+  hydrateOnboardingPhase: (phase: OnboardingPhase) => void
   logout: () => void
   validationError: string
 }
@@ -46,6 +51,7 @@ export const MMKV_AUTH_EMAIL = "auth.email"
 export const MMKV_USER_ID = "auth.userId"
 export const MMKV_USER_NAME = "auth.userName"
 export const MMKV_USER_PHONE = "auth.phone"
+export const MMKV_ONBOARDING_PHASE = "auth.onboardingPhase"
 
 export const AuthContext = createContext<AuthContextType | null>(null)
 
@@ -58,6 +64,8 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   const [userId, setUserIdMMKV] = useMMKVString(MMKV_USER_ID)
   const [userName, setUserNameMMKV] = useMMKVString(MMKV_USER_NAME)
   const [userPhone, setUserPhoneMMKV] = useMMKVString(MMKV_USER_PHONE)
+  const [onboardingComplete] = useMMKVString("onboarding.v1.completed")
+  const [onboardingPhaseRaw, setOnboardingPhaseMMKV] = useMMKVString(MMKV_ONBOARDING_PHASE)
 
   // Defaults for local/dev use
   const effectiveUserId = userId || "U-LOCAL-1"
@@ -83,6 +91,23 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
 
   const setUserPhone = useCallback((phone?: string) => setUserPhoneMMKV(phone ?? ""), [setUserPhoneMMKV])
 
+  const setOnboardingPhase = useCallback(
+    (phase: OnboardingPhase) => {
+      if (phase === "FIRST_ACTION") logEvent(AnalyticsEvent.ONBOARDING_FIRST_ACTION)
+      if (phase === "GRADUATED") logEvent(AnalyticsEvent.ONBOARDING_GRADUATED)
+      setOnboardingPhaseMMKV(phase)
+      OolshikApi.setOnboardingPhase(phase).catch(() => {})
+    },
+    [setOnboardingPhaseMMKV],
+  )
+
+  const hydrateOnboardingPhase = useCallback(
+    (phase: OnboardingPhase) => {
+      setOnboardingPhaseMMKV(phase)
+    },
+    [setOnboardingPhaseMMKV],
+  )
+
   const logout = useCallback(() => {
     crashReporting.breadcrumb("auth:logout")
     crashReporting.clearUserId()
@@ -97,8 +122,9 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     setLoginTokens(undefined, undefined)
     // ✅ clear nearby cache so the next user never sees this session's tasks
     useTaskStore.getState().clearNearby()
+    setOnboardingPhaseMMKV("")
     // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
-  }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV])
+  }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV, setOnboardingPhaseMMKV])
 
   useEffect(() => {
     // Legacy-state recovery: older installs can retain `auth.token` while
@@ -117,6 +143,20 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   }, [authToken, userId])
 
   useEffect(() => {
+    // Backfill onboardingPhase from the server for restored sessions that predate the local
+    // MMKV key. Without this, an existing user who reinstalls (or whose MMKV is cleared)
+    // is indistinguishable from a brand-new user and sees the welcome card again.
+    if (!authToken || onboardingPhaseRaw) return
+    OolshikApi.me()
+      .then((res) => {
+        if (res.ok && res.data?.onboardingPhase) {
+          setOnboardingPhaseMMKV(res.data.onboardingPhase)
+        }
+      })
+      .catch(() => {})
+  }, [authToken, onboardingPhaseRaw, setOnboardingPhaseMMKV])
+
+  useEffect(() => {
     const handler = () => {
       logout()
     }
@@ -128,7 +168,6 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
 
   useEffect(() => {
     if (!authToken) return
-    let active = true
     const cleanup = attachNotificationListeners()
 
     if (!pushEnabled) {
@@ -138,6 +177,13 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       return cleanup
     }
 
+    if (onboardingComplete !== "true") {
+      // Permission will be requested explicitly at the end of onboarding.
+      // Don't race the dialog with the navigation transition.
+      return cleanup
+    }
+
+    let active = true
     ;(async () => {
       try {
         const extras = await getProfileExtras()
@@ -150,25 +196,29 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
         if (!active || !token) return
         await registerDeviceTokenWithRetry(token)
         setCachedPushToken(token)
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.log("FCM token registered")
+        }
       } catch (err) {
+        crashReporting.breadcrumb("push:registration_failed")
         if (__DEV__) {
           // eslint-disable-next-line no-console
           console.warn("push token registration failed", err)
         }
-        // best-effort
       }
     })()
     return () => {
       active = false
       cleanup()
     }
-  }, [authToken, pushEnabled])
+  }, [authToken, pushEnabled, onboardingComplete])
 
   // Re-register FCM token whenever the app returns to the foreground.
   // Firebase may silently rotate tokens (reinstall, service update, etc.); re-running on
   // foreground catches that without requiring a logout/login cycle.
   useEffect(() => {
-    if (!authToken || !pushEnabled) return
+    if (!authToken || !pushEnabled || onboardingComplete !== "true") return
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState !== "active") return
       ;(async () => {
@@ -180,6 +230,10 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
           if (token === getCachedPushToken()) return
           await registerDeviceTokenWithRetry(token)
           setCachedPushToken(token)
+          if (__DEV__) {
+            // eslint-disable-next-line no-console
+            console.log("FCM token rotated and re-registered")
+          }
         } catch (err) {
           if (__DEV__) {
             // eslint-disable-next-line no-console
@@ -190,7 +244,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       })()
     })
     return () => subscription.remove()
-  }, [authToken, pushEnabled])
+  }, [authToken, pushEnabled, onboardingComplete])
 
   // Sync real user identity to Analytics and Crashlytics on auth state change.
   // Uses raw `userId` + `authToken` — NOT effectiveUserId — to avoid attaching
@@ -215,6 +269,8 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     return ""
   }, [authEmail])
 
+  const onboardingPhase = (onboardingPhaseRaw || undefined) as OnboardingPhase | undefined
+
   const value: AuthContextType = useMemo(
     () => ({
       isAuthenticated: !!authToken,
@@ -223,11 +279,14 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       userId: effectiveUserId,
       userName: effectiveUserName,
       userPhone: userPhone || undefined,
+      onboardingPhase,
       setAuthToken,
       setAuthEmail,
       setUserId,
       setUserName,
       setUserPhone,
+      setOnboardingPhase,
+      hydrateOnboardingPhase,
       logout,
       validationError,
     }),
@@ -237,11 +296,14 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
       effectiveUserId,
       effectiveUserName,
       userPhone,
+      onboardingPhase,
       setAuthToken,
       setAuthEmail,
       setUserId,
       setUserName,
       setUserPhone,
+      setOnboardingPhase,
+      hydrateOnboardingPhase,
       logout,
       validationError,
     ],

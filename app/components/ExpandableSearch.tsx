@@ -44,10 +44,14 @@ export const ExpandableSearch: React.FC<Props> = ({
   }, [open, underlineAnim])
 
   useEffect(() => {
+    if (!showSuggestions) {
+      suggestionsAnim.setValue(0)
+      return
+    }
     Animated.timing(suggestionsAnim, {
-      toValue: showSuggestions ? 1 : 0,
+      toValue: 1,
       duration: 200,
-      easing: showSuggestions ? Easing.out(Easing.quad) : Easing.in(Easing.quad),
+      easing: Easing.out(Easing.quad),
       useNativeDriver: false,
     }).start()
   }, [showSuggestions, suggestionsAnim])

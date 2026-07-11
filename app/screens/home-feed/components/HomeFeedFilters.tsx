@@ -21,7 +21,7 @@ type HomeFeedFiltersProps = {
   selectedStatuses: Set<HomeFeedStatus>
   availableStatuses: HomeFeedStatus[]
   onToggleStatus: (status: HomeFeedStatus) => void
-  onSelectAllStatuses: (statuses: HomeFeedStatus[]) => void
+  onSelectAllStatuses: () => void
   sort: HomeFeedSortState
   onToggleSort: (key: HomeFeedSortKey) => void
   expanded: boolean
@@ -385,33 +385,40 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
                 weight="semiBold"
                 style={{ color: theme.colors.palette.neutral700 }}
               />
-              {!allStatusesSelected ? (
-                <Pressable
-                  onPress={() => props.onSelectAllStatuses(props.availableStatuses)}
-                  accessibilityRole="button"
-                  style={({ pressed }) => ({
-                    borderRadius: 999,
-                    backgroundColor: theme.colors.palette.neutral100,
-                    borderWidth: 1,
-                    borderColor: theme.colors.palette.neutral200,
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    opacity: pressed ? 0.92 : 1,
-                  })}
-                >
-                  <Text
-                    text={t("oolshik:homeScreen.allStatuses")}
-                    size="xxs"
-                    weight="medium"
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.1}
-                    style={{ color: theme.colors.palette.neutral700 }}
-                  />
-                </Pressable>
-              ) : null}
             </View>
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <Pressable
+                onPress={props.onSelectAllStatuses}
+                accessibilityRole="button"
+                accessibilityState={{ selected: allStatusesSelected }}
+                style={({ pressed }) => ({
+                  borderRadius: 999,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderWidth: 1,
+                  borderColor: allStatusesSelected
+                    ? theme.colors.palette.primary500
+                    : theme.colors.palette.neutral200,
+                  backgroundColor: allStatusesSelected
+                    ? theme.colors.palette.primary500
+                    : theme.colors.palette.neutral100,
+                  opacity: pressed ? 0.92 : 1,
+                })}
+              >
+                <Text
+                  text={t("oolshik:homeScreen.allStatuses")}
+                  size="xs"
+                  weight="medium"
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.1}
+                  style={{
+                    color: allStatusesSelected
+                      ? theme.colors.palette.neutral100
+                      : theme.colors.palette.neutral700,
+                  }}
+                />
+              </Pressable>
               {props.availableStatuses.map((status) => {
                 const active =
                   allStatusesSelected || props.selectedStatuses.has(status)

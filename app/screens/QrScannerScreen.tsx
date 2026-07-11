@@ -305,13 +305,14 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
           payerRole,
         }
 
-        const submitPaymentBody = async () => {
+        const submitPaymentBody = async (overridePayeeVpa?: string) => {
+          const resolvedBody = overridePayeeVpa !== undefined ? { ...body, payeeVpa: overridePayeeVpa } : body
           let requestId: string | undefined
           let upiIntentOverride: string | undefined
           let responsePayload: any = null
 
           if (!USE_QR_DEMO) {
-            const res = await OolshikApi.createPaymentRequest(body)
+            const res = await OolshikApi.createPaymentRequest(resolvedBody)
             if (!res?.ok || !res.data) {
               const serverMessage =
                 (res?.data as any)?.message ?? res?.problem ?? t("payment:qr.serverRejected")
@@ -359,7 +360,7 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
         // VPA mismatch check: only relevant when expectedPayeeVpa is provided
         const expectedVpa = params?.expectedPayeeVpa ?? null
         if (payerChoice === "OTHER" && expectedVpa && parsed.payeeVpa !== expectedVpa) {
-          mismatchResumeRef.current = submitPaymentBody
+          mismatchResumeRef.current = () => submitPaymentBody(expectedVpa)
           setMismatchReview({
             scannedVpa: parsed.payeeVpa!,
             scannedName: parsed.payeeName ?? null,
@@ -552,29 +553,6 @@ export const QrScannerScreen: FC<QrScannerScreenProps> = ({ navigation }) => {
             >
               <Text style={styles.mismatchPrimaryText}>{t("payment:qr.mismatchUseSaved")}</Text>
             </Pressable>
-
-            {!mismatchReview?.collectIntent ? (
-              <Pressable
-                style={styles.mismatchSecondaryBtn}
-                onPress={async () => {
-                  const resume = mismatchResumeRef.current
-                  setMismatchReview(null)
-                  mismatchResumeRef.current = null
-                  if (resume) {
-                    setProcessing(true)
-                    try {
-                      await resume()
-                    } catch (e: any) {
-                      setErrorMessage(e?.message ?? t("payment:qr.serverRejected"))
-                    } finally {
-                      setProcessing(false)
-                    }
-                  }
-                }}
-              >
-                <Text style={styles.mismatchSecondaryText}>{t("payment:qr.mismatchUseScanned")}</Text>
-              </Pressable>
-            ) : null}
 
             <Pressable
               style={styles.mismatchSecondaryBtn}
@@ -799,6 +777,7 @@ const createStyles = (theme: Theme) =>
       justifyContent: "center",
       gap: theme.spacing.md,
       paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.xl,
     },
     centerStateText: {
       fontSize: 14,
@@ -809,6 +788,7 @@ const createStyles = (theme: Theme) =>
     permissionTitle: {
       textAlign: "center",
       color: theme.colors.text,
+      flexShrink: 1,
     },
     permissionMessage: {
       textAlign: "center",
@@ -816,6 +796,8 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textDim,
       lineHeight: 22,
       fontFamily: theme.typography.primary.normal,
+      maxWidth: 320,
+      flexShrink: 1,
     },
     permissionActions: {
       marginTop: theme.spacing.lg,

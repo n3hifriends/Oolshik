@@ -142,7 +142,9 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
             props.phoneShouldShowError
               ? props.phoneError === "phone_required"
                 ? t("oolshik:login.phoneRequired")
-                : t("oolshik:login.phoneDigits")
+                : props.phoneError === "phone_prefix"
+                  ? t("oolshik:login.phonePrefix")
+                  : t("oolshik:login.phoneDigits")
               : null
           }
           hint={t("oolshik:login.phonePaymentBindingNote")}

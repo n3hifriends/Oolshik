@@ -486,7 +486,8 @@ export function useTaskDetailController({
   const canConfirmCompletion =
     current?.canConfirm ?? (isRequester && rawStatus === "WORK_DONE_PENDING_CONFIRMATION")
   const canReportIssue =
-    current?.canReportIssue ?? (isRequester && rawStatus === "WORK_DONE_PENDING_CONFIRMATION")
+    current?.canReportIssue ??
+    (isRequester && (rawStatus === "ASSIGNED" || rawStatus === "WORK_DONE_PENDING_CONFIRMATION"))
   const canEditOffer = canEditOfferForTask(isRequester, rawStatus, current?.helperId ?? null)
 
   const currentOfferAmount = typeof current?.offerAmount === "number" ? current.offerAmount : null
@@ -704,7 +705,7 @@ ${t("payment:notice.line2")}`,
             onPress: () => {
               markPaymentNoticeSeen(userId)
               paymentNoticeDialogOpenRef.current = false
-              onContinue()
+              setTimeout(onContinue, 350)
             },
           },
         ],

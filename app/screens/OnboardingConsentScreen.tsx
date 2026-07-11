@@ -22,6 +22,7 @@ import {
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
 import { OolshikApi, type PaymentProfileApiResponse } from "@/api"
+import { getFcmTokenAsync } from "@/utils/pushNotifications"
 
 const CONSENT_VERSION = "v1"
 
@@ -46,6 +47,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   const [showConsent, setShowConsent] = useState(false)
   const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({ hasProfile: false })
   const [showPaymentPrompt, setShowPaymentPrompt] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -335,11 +337,21 @@ export default function OnboardingConsentScreen({ navigation }: any) {
       <View style={{ padding: spacing.md }}>
         <Button
           text={t("oolshik:consent.continue")}
-          disabled={!canContinue}
-          onPress={() => {
-            if (!canContinue) return
-            setOnboardingComplete("true")
-            navigation.replace("OolshikHome")
+          disabled={!canContinue || submitting}
+          onPress={async () => {
+            if (!canContinue || submitting) return
+            setSubmitting(true)
+            try {
+              await getFcmTokenAsync()
+            } catch {
+              // best-effort — proceed even if permission denied or unavailable
+            }
+            try {
+              setOnboardingComplete("true")
+              navigation.replace("OolshikHome")
+            } catch {
+              setSubmitting(false)
+            }
           }}
         />
       </View>

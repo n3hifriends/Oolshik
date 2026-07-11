@@ -35,8 +35,17 @@ describe("phoneNumber utils", () => {
     })
   })
 
-  test("accepts the repo's current 10-digit validation rule", () => {
-    expect(isLikelyIndianMobileNumber("1234567890")).toBe(true)
+  test("accepts numbers starting with 6–9", () => {
+    expect(isLikelyIndianMobileNumber("9876543210")).toBe(true)
+    expect(isLikelyIndianMobileNumber("8765432109")).toBe(true)
+    expect(isLikelyIndianMobileNumber("7654321098")).toBe(true)
+    expect(isLikelyIndianMobileNumber("6543210987")).toBe(true)
+  })
+
+  test("rejects numbers not starting with 6–9", () => {
+    expect(isLikelyIndianMobileNumber("1234567890")).toBe(false)
+    expect(isLikelyIndianMobileNumber("0000000000")).toBe(false)
+    expect(isLikelyIndianMobileNumber("5555555555")).toBe(false)
   })
 
   test("rejects malformed numbers", () => {

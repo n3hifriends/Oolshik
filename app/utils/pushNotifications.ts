@@ -1,4 +1,4 @@
-import { Platform } from "react-native"
+import { Platform, PermissionsAndroid } from "react-native"
 import { getApp } from "@react-native-firebase/app"
 import {
   getMessaging,
@@ -54,13 +54,25 @@ Notifications.setNotificationHandler({
   }),
 })
 
+async function requestNotifPermission(): Promise<FirebaseMessagingTypes.AuthorizationStatus> {
+  if (Platform.OS === "android" && Number(Platform.Version) >= 33) {
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    )
+    return result === PermissionsAndroid.RESULTS.GRANTED
+      ? AuthorizationStatus.AUTHORIZED
+      : AuthorizationStatus.DENIED
+  }
+  return requestPermission(messagingInstance)
+}
+
 export async function getFcmTokenAsync(): Promise<string | null> {
   if (Platform.OS === "web") return null
   await ensureAndroidChannel()
 
   const stored = loadString(PUSH_PERMISSION_REQUESTED_KEY)
   if (!stored) {
-    const authStatus = await requestPermission(messagingInstance)
+    const authStatus = await requestNotifPermission()
     const granted =
       authStatus === AuthorizationStatus.AUTHORIZED ||
       authStatus === AuthorizationStatus.PROVISIONAL
@@ -68,22 +80,26 @@ export async function getFcmTokenAsync(): Promise<string | null> {
     if (!granted) return null
   } else {
     const authStatus = await hasPermission(messagingInstance)
-    const granted =
-      authStatus === AuthorizationStatus.AUTHORIZED ||
-      authStatus === AuthorizationStatus.PROVISIONAL
-    if (granted && stored === "denied") {
-      // User granted in device Settings since last ask — update stored state.
-      saveString(PUSH_PERMISSION_REQUESTED_KEY, "granted")
+    if (authStatus === AuthorizationStatus.NOT_DETERMINED) {
+      // Stale stored state — system hasn't been asked yet (e.g. reinstall from iCloud/Android backup).
+      const fresh = await requestNotifPermission()
+      const granted =
+        fresh === AuthorizationStatus.AUTHORIZED || fresh === AuthorizationStatus.PROVISIONAL
+      saveString(PUSH_PERMISSION_REQUESTED_KEY, granted ? "granted" : "denied")
+      if (!granted) return null
+    } else {
+      const granted =
+        authStatus === AuthorizationStatus.AUTHORIZED ||
+        authStatus === AuthorizationStatus.PROVISIONAL
+      if (granted && stored === "denied") {
+        saveString(PUSH_PERMISSION_REQUESTED_KEY, "granted")
+      }
+      if (!granted) return null
     }
-    if (!granted) return null
   }
 
   try {
     const token = await getToken(messagingInstance)
-    if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.log("FCM token acquired")
-    }
     return token
   } catch {
     if (__DEV__) {

@@ -9,16 +9,10 @@ import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
 import { SectionCard } from "@/components/SectionCard"
 import { RadioGroup } from "@/components/RadioGroup"
-import { Switch } from "@/components/Toggle/Switch"
 import { useAppTheme } from "@/theme/context"
 import { useAuth } from "@/context/AuthContext"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { OolshikApi } from "@/api"
-import {
-  disablePushNotifications,
-  enablePushNotifications,
-  getNotificationPermissionState,
-} from "@/utils/pushNotifications"
 import type { ProfileExtras } from "@/features/profile/types"
 import {
   getProfileExtras,
@@ -46,7 +40,8 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const avatarSize = scaleIcon(64)
   const { t, i18n } = useTranslation()
   const { logout, userName, authEmail, userId } = useAuth()
-  const { support_contact_email: remoteEmail, support_contact_whatsapp: remoteWhatsapp } = useRemoteConfig()
+  const { support_contact_email: remoteEmail, support_contact_whatsapp: remoteWhatsapp } =
+    useRemoteConfig()
   const supportEmail = remoteEmail || FALLBACK_supportEmail
   const { status: locationStatus } = useForegroundLocation({ autoRequest: false })
 
@@ -56,8 +51,9 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   )
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [showSafetyTips, setShowSafetyTips] = useState(false)
-  const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({ hasProfile: false })
-  const [notifPermissionState, setNotifPermissionState] = useState(getNotificationPermissionState)
+  const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({
+    hasProfile: false,
+  })
 
   useEffect(() => {
     let active = true
@@ -77,12 +73,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       active = false
     }
   }, [i18n])
-
-  useFocusEffect(
-    useCallback(() => {
-      setNotifPermissionState(getNotificationPermissionState())
-    }, []),
-  )
 
   useFocusEffect(
     useCallback(() => {
@@ -120,8 +110,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     const current = extras.preferredLanguage ?? extras.language ?? i18n.language
     return toLanguageCode(current)
   }, [extras.preferredLanguage, extras.language, i18n.language])
-
-  const notificationsEnabled = extras.notificationsEnabled ?? true
 
   const locationLabel = useMemo(() => {
     if (locationStatus === "ready") return t("oolshik:profileScreen.locationEnabled")
@@ -182,26 +170,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     [applyExtras, i18n],
   )
 
-  const onToggleNotifications = useCallback(
-    async (value: boolean) => {
-      await applyExtras({ notificationsEnabled: value })
-      try {
-        if (value) {
-          await enablePushNotifications()
-        } else {
-          await disablePushNotifications()
-        }
-      } catch (err) {
-        if (__DEV__) {
-          // eslint-disable-next-line no-console
-          console.warn("push notification preference sync failed", err)
-        }
-        // best-effort
-      }
-    },
-    [applyExtras],
-  )
-
   useEffect(() => {
     let active = true
     OolshikApi.getMyStats()
@@ -228,6 +196,16 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       safeAreaEdges={["top", "bottom"]}
       contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}
     >
+      <Pressable
+        onPress={() => navigation.goBack()}
+        accessibilityRole="button"
+        accessibilityLabel={t("oolshik:editProfileScreen.back")}
+        hitSlop={8}
+        style={{ alignSelf: "flex-start" }}
+      >
+        <Text text={`← ${t("oolshik:editProfileScreen.back")}`} />
+      </Pressable>
+
       <Text preset="heading" text={t("oolshik:profileScreen.heading")} />
 
       <SectionCard>
@@ -253,7 +231,11 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               style={showSetNameCta ? { color: colors.palette.primary600 } : undefined}
             />
             <Text text={identifier} size="xs" style={{ color: colors.textDim }} />
-            <Text text={t("oolshik:profileScreen.verificationDone")} size="xxs" style={{ color: colors.textDim }} />
+            <Text
+              text={t("oolshik:profileScreen.verificationDone")}
+              size="xxs"
+              style={{ color: colors.textDim }}
+            />
           </View>
         </View>
 
@@ -283,7 +265,10 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           }}
         >
           <Text text={t("oolshik:profileScreen.advanced")} weight="medium" />
-          <Text text={advancedOpen ? t("oolshik:profileScreen.hide") : t("oolshik:profileScreen.show")} size="xs" />
+          <Text
+            text={advancedOpen ? t("oolshik:profileScreen.hide") : t("oolshik:profileScreen.show")}
+            size="xs"
+          />
         </Pressable>
 
         {advancedOpen ? (
@@ -298,25 +283,41 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text={t("payment:profile.profileCardTitle")} style={{ marginBottom: spacing.sm }} />
-        <Text text={t("payment:profile.profileCardBody")} size="xs" style={{ color: colors.textDim }} />
+        <Text
+          preset="subheading"
+          text={t("payment:profile.profileCardTitle")}
+          style={{ marginBottom: spacing.sm }}
+        />
+        <Text
+          text={t("payment:profile.profileCardBody")}
+          size="xs"
+          style={{ color: colors.textDim }}
+        />
         <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
-          <Text text={t("payment:profile.currentUpi")} size="xs" style={{ color: colors.textDim }} />
+          <Text
+            text={t("payment:profile.currentUpi")}
+            size="xs"
+            style={{ color: colors.textDim }}
+          />
           <Text
             text={
               paymentProfile.hasProfile
-                ? paymentProfile.maskedUpiId ?? t("payment:profile.notAdded")
+                ? (paymentProfile.maskedUpiId ?? t("payment:profile.notAdded"))
                 : t("payment:profile.notAdded")
             }
             weight="medium"
           />
         </View>
         <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
-          <Text text={t("payment:profile.currentName")} size="xs" style={{ color: colors.textDim }} />
+          <Text
+            text={t("payment:profile.currentName")}
+            size="xs"
+            style={{ color: colors.textDim }}
+          />
           <Text
             text={
               paymentProfile.hasProfile
-                ? paymentProfile.payeeLabel ?? t("payment:profile.notAdded")
+                ? (paymentProfile.payeeLabel ?? t("payment:profile.notAdded"))
                 : t("payment:profile.notAdded")
             }
             weight="medium"
@@ -336,14 +337,22 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text={t("oolshik:profileScreen.trustAndSafety")} style={{ marginBottom: spacing.sm }} />
+        <Text
+          preset="subheading"
+          text={t("oolshik:profileScreen.trustAndSafety")}
+          style={{ marginBottom: spacing.sm }}
+        />
         <View style={{ flexDirection: "row", gap: spacing.md }}>
           <View style={{ flex: 1 }}>
             <Text text={t("oolshik:rating")} size="xs" style={{ color: colors.textDim }} />
             <Text text={ratingText} weight="medium" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text text={t("oolshik:profileScreen.completedHelps")} size="xs" style={{ color: colors.textDim }} />
+            <Text
+              text={t("oolshik:profileScreen.completedHelps")}
+              size="xs"
+              style={{ color: colors.textDim }}
+            />
             <Text text={completedText} weight="medium" />
           </View>
         </View>
@@ -372,7 +381,11 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text={t("oolshik:profileScreen.preferences")} style={{ marginBottom: spacing.sm }} />
+        <Text
+          preset="subheading"
+          text={t("oolshik:profileScreen.preferences")}
+          style={{ marginBottom: spacing.sm }}
+        />
 
         <View style={{ gap: spacing.sm }}>
           <Text text={t("oolshik:language")} size="xs" style={{ color: colors.textDim }} />
@@ -385,35 +398,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             ]}
           />
         </View>
-
-        <View
-          style={{
-            marginTop: spacing.lg,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <View style={{ flex: 1, paddingRight: spacing.md }}>
-            <Text text={t("oolshik:profileScreen.notifications")} weight="medium" />
-            <Text text={t("oolshik:profileScreen.notificationsHint")} size="xs" style={{ color: colors.textDim }} />
-          </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={onToggleNotifications}
-            accessibilityLabel={t("oolshik:profileScreen.notificationsToggleA11y")}
-          />
-        </View>
-
-        {notificationsEnabled && notifPermissionState === "denied" ? (
-          <Pressable onPress={openSettings} accessibilityRole="button">
-            <Text
-              text={t("oolshik:profileScreen.notificationsPermissionDeniedHint")}
-              size="xs"
-              style={{ color: colors.palette.warning500, marginTop: spacing.xs }}
-            />
-          </Pressable>
-        ) : null}
 
         <View
           style={{
@@ -455,9 +439,17 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       </SectionCard>
 
       <SectionCard>
-        <Text preset="subheading" text={t("oolshik:profileScreen.account")} style={{ marginBottom: spacing.sm }} />
+        <Text
+          preset="subheading"
+          text={t("oolshik:profileScreen.account")}
+          style={{ marginBottom: spacing.sm }}
+        />
         <View style={{ marginBottom: spacing.sm }}>
-          <Text text={t("oolshik:profileScreen.appVersion")} size="xs" style={{ color: colors.textDim }} />
+          <Text
+            text={t("oolshik:profileScreen.appVersion")}
+            size="xs"
+            style={{ color: colors.textDim }}
+          />
           <Text text={versionLabel} weight="medium" />
         </View>
         <View style={{ gap: spacing.sm }}>

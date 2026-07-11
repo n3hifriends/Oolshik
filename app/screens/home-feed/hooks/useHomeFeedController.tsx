@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, AppState, Linking, TextInput } from "react-native"
+import { useOnForeground } from "@/hooks/useOnForeground"
 import { useFocusEffect } from "@react-navigation/native"
 import { useAppTheme } from "@/theme/context"
 import { useForegroundLocation } from "@/hooks/useForegroundLocation"
@@ -13,6 +14,7 @@ import { TaskCard } from "@/components/TaskCard"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
 import type { AppApiError } from "@/api/apiResult"
+import { logEvent, AnalyticsEvent } from "@/services/analytics"
 import {
   getInitials,
   normalizeRadius,
@@ -22,7 +24,7 @@ import {
 } from "@/screens/home-feed/helpers/homeFeedFormatters"
 import {
   createTask,
-  loadPreferredRadiusKm,
+  loadHelperDefaults,
   syncHelperLocation,
   uploadVoiceNote,
 } from "@/screens/home-feed/requesters/homeFeedRequester"
@@ -221,15 +223,18 @@ export function useHomeFeedController({
     isNearbyStale,
     lastNearbyLoadedAt,
   } = useTaskStore()
-  const { logout, userId, userName, authEmail } = useAuth()
+  const { logout, userId, userName, authEmail, onboardingPhase, setOnboardingPhase } = useAuth()
 
   const taskItems = tasks as HomeFeedTask[]
 
   const lastFetchKeyRef = useRef<string | null>(null)
   const suppressNextFetchRef = useRef(false)
+  const lastForegroundFetchRef = useRef<number>(0)
+  const lastFocusFetchRef = useRef<number>(0)
   const [viewMode, setViewMode] = useState<HomeFeedViewMode>("forYou")
   const [creatingTask, setCreatingTask] = useState(false)
   const [preferredRadiusKm, setPreferredRadiusKm] = useState<number | null>(null)
+  const [helperAvailable, setHelperAvailable] = useState(true)
   const [forYouSortState, setForYouSortState] = useState<HomeFeedSortState>(DEFAULT_HOME_FEED_SORT)
   const [myRequestsSortState, setMyRequestsSortState] =
     useState<HomeFeedSortState>(DEFAULT_MY_REQUESTS_SORT)
@@ -324,19 +329,22 @@ export function useHomeFeedController({
     }
   }, [])
 
-  useEffect(() => {
-    let active = true
-    loadPreferredRadiusKm()
-      .then((storedRadiusKm) => {
-        if (!active) return
-        setPreferredRadiusKm(storedRadiusKm)
-      })
-      .catch(() => {})
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      loadHelperDefaults()
+        .then((defaults) => {
+          if (!active) return
+          setPreferredRadiusKm(defaults.preferredRadiusKm)
+          setHelperAvailable(defaults.helperAvailable)
+        })
+        .catch(() => {})
 
-    return () => {
-      active = false
-    }
-  }, [])
+      return () => {
+        active = false
+      }
+    }, []),
+  )
 
   const availableStatuses = useMemo(() => {
     const list = Array.isArray(taskItems) ? taskItems : []
@@ -385,19 +393,15 @@ export function useHomeFeedController({
     [availableStatuses, viewMode],
   )
 
-  const selectAllStatuses = useCallback(
-    (statuses: HomeFeedStatus[]) => {
-      const next = new Set(statuses)
-      if (viewMode === "forYou") {
-        forYouTouchedStatusesRef.current = true
-        setForYouSelectedStatuses(next)
-        return
-      }
-      myRequestsTouchedStatusesRef.current = true
-      setMyRequestSelectedStatuses(next)
-    },
-    [viewMode],
-  )
+  const selectAllStatuses = useCallback(() => {
+    if (viewMode === "forYou") {
+      forYouTouchedStatusesRef.current = false
+      setForYouSelectedStatuses(new Set())
+      return
+    }
+    myRequestsTouchedStatusesRef.current = false
+    setMyRequestSelectedStatuses(new Set())
+  }, [viewMode])
 
   const toggleSort = useCallback(
     (key: HomeFeedSortKey) => {
@@ -426,14 +430,8 @@ export function useHomeFeedController({
     setFiltersExpanded(false)
   }, [])
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh()
-    }, [refresh]),
-  )
-
   useEffect(() => {
-    if (status !== "ready" || !coords) return
+    if (!helperAvailable || status !== "ready" || !coords) return
 
     const now = Date.now()
     const last = lastLocationSyncRef.current
@@ -467,11 +465,19 @@ export function useHomeFeedController({
     return () => {
       cancelled = true
     }
-  }, [coords?.latitude, coords?.longitude, status])
+  }, [coords?.latitude, coords?.longitude, helperAvailable, status])
 
   useFocusEffect(
     useCallback(() => {
       if (status !== "ready" || !coords) return
+      if (viewMode === "forYou" && !helperAvailable) return
+
+      // Don't hammer a 503 on every re-navigation. Mirror useOnForeground's
+      // backoff: respect retryAfterMs from the error, fall back to 30s.
+      if (nearbyError) {
+        const cooldownMs = nearbyError.retryAfterMs ?? 30_000
+        if (Date.now() - lastFocusFetchRef.current < cooldownMs) return
+      }
 
       const shouldUseStatusFilter = viewMode === "forYou" && forYouTouchedStatusesRef.current
       const statusesArg = shouldUseStatusFilter ? sortedStatuses : undefined
@@ -497,12 +503,15 @@ export function useHomeFeedController({
       if (lastFetchKeyRef.current === key) return
 
       lastFetchKeyRef.current = key
+      lastFocusFetchRef.current = Date.now()
       void fetchNearby(coords.latitude, coords.longitude, statusesArg)
     }, [
       coords?.latitude,
       coords?.longitude,
       fetchNearby,
+      helperAvailable,
       minLocationDeltaMeters,
+      nearbyError,
       radiusMeters,
       sortedStatuses,
       status,
@@ -516,19 +525,23 @@ export function useHomeFeedController({
   // when pollIntervalMs changes from Remote Config, not on every GPS tick.
   const pollParamsRef = useRef({
     coords,
+    helperAvailable,
     status,
     sortedStatuses,
     viewMode,
     fetchNearby,
     forYouTouchedStatusesRef,
+    nearbyError,
   })
   pollParamsRef.current = {
     coords,
+    helperAvailable,
     status,
     sortedStatuses,
     viewMode,
     fetchNearby,
     forYouTouchedStatusesRef,
+    nearbyError,
   }
 
   useFocusEffect(
@@ -537,13 +550,38 @@ export function useHomeFeedController({
         if (AppState.currentState !== "active") return
         const p = pollParamsRef.current
         if (p.status !== "ready" || !p.coords) return
+        if (p.viewMode === "forYou" && !p.helperAvailable) return
+        // Stop polling while the backend is returning errors — avoids hammering
+        // a 503 on every tick. The user can retry manually, or the next
+        // foreground event will attempt a fresh fetch.
+        if (p.nearbyError) return
         const statusesArg =
-          p.viewMode === "forYou" && p.forYouTouchedStatusesRef.current ? p.sortedStatuses : undefined
+          p.viewMode === "forYou" && p.forYouTouchedStatusesRef.current
+            ? p.sortedStatuses
+            : undefined
         void p.fetchNearby(p.coords.latitude, p.coords.longitude, statusesArg)
       }, pollIntervalMs)
       return () => clearInterval(timerId)
     }, [pollIntervalMs]),
   )
+
+  useOnForeground(() => {
+    const p = pollParamsRef.current
+    if (p.status !== "ready" || !p.coords) return
+    if (p.viewMode === "forYou" && !p.helperAvailable) return
+
+    // Always apply a minimum cooldown between foreground fetches. System events
+    // (notification banners, Face ID checks) also flip inactive→active and would
+    // otherwise fire fetchNearby unconditionally when the server is healthy.
+    // On error, honour the server's retryAfterMs hint or fall back to 30s.
+    const cooldownMs = p.nearbyError ? (p.nearbyError.retryAfterMs ?? 30_000) : 10_000
+    if (Date.now() - lastForegroundFetchRef.current < cooldownMs) return
+
+    const statusesArg =
+      p.viewMode === "forYou" && p.forYouTouchedStatusesRef.current ? p.sortedStatuses : undefined
+    lastForegroundFetchRef.current = Date.now()
+    void p.fetchNearby(p.coords.latitude, p.coords.longitude, statusesArg)
+  })
 
   useEffect(() => {
     const touchedRef =
@@ -797,10 +835,11 @@ export function useHomeFeedController({
       refresh()
       return
     }
+    if (viewMode === "forYou" && !helperAvailable) return
 
     const statusesArg = viewMode === "forYou" && sortedStatuses.length ? sortedStatuses : undefined
     void fetchNearby(coords.latitude, coords.longitude, statusesArg)
-  }, [coords, fetchNearby, refresh, sortedStatuses, status, viewMode])
+  }, [coords, fetchNearby, helperAvailable, refresh, sortedStatuses, status, viewMode])
 
   const onLogoutPress = useCallback(() => {
     Alert.alert(t("oolshik:homeScreen.logoutTitle"), t("oolshik:homeScreen.logoutBody"), [
@@ -835,10 +874,8 @@ export function useHomeFeedController({
       viewMode,
       loading,
       titleRefreshCooldowns,
-      controlsCondensed,
-      filtersExpanded,
     }),
-    [controlsCondensed, filtersExpanded, loading, titleRefreshCooldowns, viewMode],
+    [loading, titleRefreshCooldowns, viewMode],
   )
 
   const serviceState = useMemo(
@@ -846,7 +883,9 @@ export function useHomeFeedController({
     [hasVisibleTasks, lastNearbyLoadedAt, nearbyError, t],
   )
 
-  const showInitialLoader = loading && !hasVisibleTasks
+  const helperFeedEnabled = viewMode !== "forYou" || helperAvailable
+  const visibleFiltered = helperFeedEnabled ? sortedFiltered : []
+  const showInitialLoader = helperFeedEnabled && loading && visibleFiltered.length === 0
 
   const setFeedRadius = useCallback(
     (radius: Radius) => {
@@ -860,7 +899,10 @@ export function useHomeFeedController({
   }, [])
 
   const handleListScrollOffsetChange = useCallback((offsetY: number) => {
-    const nextCondensed = offsetY > 24
+    const isCurrentlyCondensed = controlsCondensedRef.current
+    // Hysteresis: condense when scrolled down >32px, expand only when back under 8px.
+    // A single threshold causes rapid toggling near the boundary, producing flicker.
+    const nextCondensed = isCurrentlyCondensed ? offsetY > 8 : offsetY > 32
     if (controlsCondensedRef.current === nextCondensed) return
     controlsCondensedRef.current = nextCondensed
     setControlsCondensed(nextCondensed)
@@ -868,6 +910,22 @@ export function useHomeFeedController({
       setFiltersExpanded(false)
     }
   }, [])
+
+  const isFirstRun = !onboardingPhase || onboardingPhase === "FRESH"
+
+  const handleIntentSelected = useCallback(
+    (intent: "getHelp" | "helpOthers" | "skip") => {
+      logEvent(AnalyticsEvent.ONBOARDING_INTENT_SELECTED, { intent })
+      setOnboardingPhase("INTENT_SET")
+      if (intent === "getHelp") {
+        setNextViewMode("mine")
+      } else if (intent === "helpOthers") {
+        setNextViewMode("forYou")
+        if (status !== "ready") refresh()
+      }
+    },
+    [setOnboardingPhase, setNextViewMode, status, refresh],
+  )
 
   return {
     theme: {
@@ -889,7 +947,8 @@ export function useHomeFeedController({
       isNearbyStale,
       lastNearbyLoadedAt,
       serviceState,
-      filtered: sortedFiltered as HomeFeedTask[],
+      filtered: visibleFiltered as HomeFeedTask[],
+      helperAvailable,
       viewMode,
       radiusMeters: radiusMeters as Radius,
       selectedStatuses,
@@ -901,6 +960,8 @@ export function useHomeFeedController({
     },
     user: {
       profileInitials,
+      isFirstRun,
+      userName,
     },
     refs: {
       searchInputRef,
@@ -928,6 +989,7 @@ export function useHomeFeedController({
       setSearchOpen: handleSearchOpen,
       onSearchChange: handleSearchChange,
       onSearchClear: handleSearchClear,
+      onIntentSelected: handleIntentSelected,
       onBeforeComposerOpen: activeCapGuard.ensureCanCreateRequestOrRedirect,
       openProfile: () => navigation.navigate("OolshikProfile"),
       openCreate: async () => {

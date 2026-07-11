@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react"
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, StyleSheet, View } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { CameraView, useCameraPermissions } from "expo-camera"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -34,6 +35,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
   const { theme } = useAppTheme()
   const { userPhone } = useAuth()
   const styles = useMemo(() => createStyles(theme), [theme])
+  const insets = useSafeAreaInsets()
   const entryPoint = route.params?.entryPoint ?? "profile"
   const required = route.params?.required ?? false
 
@@ -86,6 +88,11 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
     const normalizedUpiId = normalizeUpiId(upiId)
     if (!isValidUpiId(normalizedUpiId)) {
       setError(t("payment:profile.invalidUpi"))
+      return
+    }
+
+    if (payeeLabel.trim().length > 50) {
+      setError(t("payment:profile.nameTooLong"))
       return
     }
 
@@ -313,7 +320,8 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
             value={payeeLabel}
             onChangeText={setPayeeLabel}
             autoCapitalize="words"
-            helper={t("payment:profile.nameHint")}
+            maxLength={50}
+            helper={payeeLabel.length > 0 ? `${payeeLabel.length}/50 · ${t("payment:profile.nameHint")}` : t("payment:profile.nameHint")}
           />
         </View>
 
@@ -416,7 +424,7 @@ export default function PaymentProfileScreen({ navigation, route }: Props) {
           <View style={styles.scannerOverlay} pointerEvents="none">
             <View style={styles.scannerWindow} />
           </View>
-          <View style={styles.scannerCard}>
+          <View style={[styles.scannerCard, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
             <Text
               preset="heading"
               text={t("payment:profile.scanTitle")}
@@ -512,6 +520,7 @@ const createStyles = (theme: Theme) =>
     scannerBody: {
       color: "rgba(255,255,255,0.78)",
       lineHeight: 20,
+      flexShrink: 1,
     },
     scannerButton: {
       borderRadius: 12,
@@ -525,7 +534,7 @@ const createStyles = (theme: Theme) =>
     scannerCard: {
       backgroundColor: "rgba(11,12,16,0.92)",
       borderRadius: 24,
-      bottom: theme.spacing.lg,
+      bottom: 0,
       gap: theme.spacing.sm,
       left: theme.spacing.lg,
       padding: theme.spacing.lg,

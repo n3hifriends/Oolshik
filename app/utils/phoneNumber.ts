@@ -1,6 +1,6 @@
 const INDIA_COUNTRY_CODE = "91"
 const INDIA_NATIONAL_NUMBER_LENGTH = 10
-const INDIA_MOBILE_NUMBER_PATTERN = /^\d{10}$/
+const INDIA_MOBILE_NUMBER_PATTERN = /^[6-9]\d{9}$/
 
 export interface NormalizedIndianPhoneNumber {
   nationalNumber: string | null
