@@ -389,7 +389,9 @@ const en = {
       addDetailsForOther: "Please add details when selecting Other.",
       addDetailsForChildSafety:
         "Please describe what happened when reporting a child safety concern.",
-      detailsTooLong: "Details are too long. Please keep under 1000 characters.",
+      detailsTooLong: "Details are too long. Please keep under 500 characters.",
+      detailsTooShort: "Please enter at least 10 characters.",
+      detailsInvalidContent: "Details must contain meaningful text.",
       reportTitle: "Report",
       thanksTitle: "Thanks for reporting",
       thanksBody: "Our team will review this shortly.",

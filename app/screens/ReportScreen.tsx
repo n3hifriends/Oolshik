@@ -25,22 +25,37 @@ export default function ReportScreen() {
   const [reason, setReason] = React.useState<Reason>("UNSAFE")
   const [text, setText] = React.useState("")
   const [loading, setLoading] = React.useState(false)
+  const [fieldError, setFieldError] = React.useState<string | null>(null)
 
   const MAX_DESC = 500
+  const MIN_DESC = 10
 
-  const validate = (): { ok: boolean; message?: string } => {
+  const validateField = (value: string, currentReason: Reason): string | null => {
+    if (value.length > MAX_DESC) return t("oolshik:reportScreen.detailsTooLong")
+    const isRequired = currentReason === "OTHER" || currentReason === "CHILD_SAFETY"
+    if (isRequired && !value.trim()) {
+      return currentReason === "OTHER"
+        ? t("oolshik:reportScreen.addDetailsForOther")
+        : t("oolshik:reportScreen.addDetailsForChildSafety")
+    }
+    if (value.trim() && !/[a-zA-Z0-9ऀ-ॿ]/.test(value)) {
+      return t("oolshik:reportScreen.detailsInvalidContent")
+    }
+    if (isRequired && value.trim().length < MIN_DESC) {
+      return t("oolshik:reportScreen.detailsTooShort")
+    }
+    return null
+  }
+
+  const validate = (): { ok: boolean; contextError?: string } => {
     const targetUserId = params?.targetUserId || params?.userId
     if (!params?.taskId && !targetUserId) {
-      return { ok: false, message: t("oolshik:reportScreen.missingContext") }
+      return { ok: false, contextError: t("oolshik:reportScreen.missingContext") }
     }
-    if (reason === "OTHER" && !text.trim()) {
-      return { ok: false, message: t("oolshik:reportScreen.addDetailsForOther") }
-    }
-    if (reason === "CHILD_SAFETY" && !text.trim()) {
-      return { ok: false, message: t("oolshik:reportScreen.addDetailsForChildSafety") }
-    }
-    if (text.length > 1000) {
-      return { ok: false, message: t("oolshik:reportScreen.detailsTooLong") }
+    const err = validateField(text, reason)
+    if (err) {
+      setFieldError(err)
+      return { ok: false }
     }
     return { ok: true }
   }
@@ -48,7 +63,7 @@ export default function ReportScreen() {
   const submit = async () => {
     const v = validate()
     if (!v.ok) {
-      Alert.alert(t("oolshik:reportScreen.reportTitle"), v.message)
+      if (v.contextError) Alert.alert(t("oolshik:reportScreen.reportTitle"), v.contextError)
       return
     }
 
@@ -152,26 +167,41 @@ export default function ReportScreen() {
             key={r.value}
             label={r.label}
             active={reason === r.value}
-            onPress={() => setReason(r.value as Reason)}
+            onPress={() => {
+              setReason(r.value as Reason)
+              setFieldError(null)
+            }}
           />
         ))}
       </View>
 
       <View style={{ height: spacing.md }} />
-      <Text text={detailsLabel} weight="medium" />
+      <Text
+        text={detailsLabel}
+        weight="medium"
+        style={detailsRequired ? { color: colors.error } : undefined}
+      />
       <View style={{ height: spacing.xs }} />
       <TextField
         multiline
         numberOfLines={6}
         value={text}
-        onChangeText={(t) => setText(t.slice(0, MAX_DESC))}
+        onChangeText={(v) => {
+          setText(v.slice(0, MAX_DESC))
+          setFieldError(null)
+        }}
         placeholder={detailsPlaceholder}
         style={{ minHeight: 120 }}
         editable={!loading}
       />
-      <Text
-        style={{ alignSelf: "flex-end", color: colors.textDim, marginTop: 4 }}
-      >{`${text.length}/${MAX_DESC}`}</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+        {fieldError ? (
+          <Text text={fieldError} style={{ color: colors.error, fontSize: 13, flex: 1, marginRight: 8 }} />
+        ) : (
+          <View />
+        )}
+        <Text style={{ color: colors.textDim, fontSize: 13 }}>{`${text.length}/${MAX_DESC}`}</Text>
+      </View>
 
       <View style={{ height: spacing.lg }} />
       <Button
