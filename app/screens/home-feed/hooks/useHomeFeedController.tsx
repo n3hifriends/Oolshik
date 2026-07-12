@@ -214,18 +214,20 @@ export function useHomeFeedController({
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const {
     tasks,
+    myTasks,
     fetchNearby,
+    fetchMyTasks,
     loading,
+    myTasksLoading,
+    nearbyError,
+    myTasksError,
     radiusMeters,
     setRadius,
     accept,
-    nearbyError,
     isNearbyStale,
     lastNearbyLoadedAt,
   } = useTaskStore()
   const { logout, userId, userName, authEmail, onboardingPhase, setOnboardingPhase } = useAuth()
-
-  const taskItems = tasks as HomeFeedTask[]
 
   const lastFetchKeyRef = useRef<string | null>(null)
   const suppressNextFetchRef = useRef(false)
@@ -267,6 +269,10 @@ export function useHomeFeedController({
   const [searchOpen, setSearchOpen] = useState(false)
   const [rawSearch, setRawSearch] = useState("")
   const searchInputRef = useRef<TextInput>(null)
+
+  const taskItems = (viewMode === "mine" ? myTasks : tasks) as HomeFeedTask[]
+  const activeLoading = viewMode === "mine" ? myTasksLoading : loading
+  const activeError = viewMode === "mine" ? myTasksError : nearbyError
 
   const selectedStatuses =
     viewMode === "forYou" ? forYouSelectedStatuses : myRequestSelectedStatuses
@@ -476,6 +482,14 @@ export function useHomeFeedController({
 
   useFocusEffect(
     useCallback(() => {
+      if (viewMode === "mine") {
+        const cooldownMs = myTasksError ? (myTasksError.retryAfterMs ?? 30_000) : 10_000
+        if (Date.now() - lastFocusFetchRef.current < cooldownMs) return
+        lastFocusFetchRef.current = Date.now()
+        void fetchMyTasks()
+        return
+      }
+
       if (status !== "ready" || !coords) return
       if (viewMode === "forYou" && !helperAvailable) return
 
@@ -515,9 +529,11 @@ export function useHomeFeedController({
     }, [
       coords?.latitude,
       coords?.longitude,
+      fetchMyTasks,
       fetchNearby,
       helperAvailable,
       minLocationDeltaMeters,
+      myTasksError,
       nearbyError,
       radiusMeters,
       sortedStatuses,
@@ -537,8 +553,10 @@ export function useHomeFeedController({
     sortedStatuses,
     viewMode,
     fetchNearby,
+    fetchMyTasks,
     forYouTouchedStatusesRef,
     nearbyError,
+    myTasksError,
   })
   pollParamsRef.current = {
     coords,
@@ -547,8 +565,10 @@ export function useHomeFeedController({
     sortedStatuses,
     viewMode,
     fetchNearby,
+    fetchMyTasks,
     forYouTouchedStatusesRef,
     nearbyError,
+    myTasksError,
   }
 
   useFocusEffect(
@@ -556,6 +576,7 @@ export function useHomeFeedController({
       const timerId = setInterval(() => {
         if (AppState.currentState !== "active") return
         const p = pollParamsRef.current
+        if (p.viewMode === "mine") return // "mine" tab is refresh-on-focus only, no polling
         if (p.status !== "ready" || !p.coords) return
         if (p.viewMode === "forYou" && !p.helperAvailable) return
         // Stop polling while the backend is returning errors — avoids hammering
@@ -574,6 +595,15 @@ export function useHomeFeedController({
 
   useOnForeground(() => {
     const p = pollParamsRef.current
+
+    if (p.viewMode === "mine") {
+      const cooldownMs = p.myTasksError ? (p.myTasksError.retryAfterMs ?? 30_000) : 10_000
+      if (Date.now() - lastFocusFetchRef.current < cooldownMs) return
+      lastFocusFetchRef.current = Date.now()
+      void p.fetchMyTasks()
+      return
+    }
+
     if (p.status !== "ready" || !p.coords) return
     if (p.viewMode === "forYou" && !p.helperAvailable) return
 
@@ -599,7 +629,7 @@ export function useHomeFeedController({
       selectedStatuses.size === availableStatuses.length &&
       availableStatuses.every((statusValue) => selectedStatuses.has(statusValue))
     if (touchedRef.current) return
-    if (loading) return
+    if (activeLoading) return
     if (!taskItems || taskItems.length === 0) return
     if (matchesAvailableStatuses) return
     if (availableStatuses.length === 0) return
@@ -608,7 +638,7 @@ export function useHomeFeedController({
       suppressNextFetchRef.current = true
     }
     setSelectedStatusesForView(new Set(availableStatuses))
-  }, [availableStatuses, loading, selectedStatuses, taskItems, viewMode])
+  }, [availableStatuses, activeLoading, selectedStatuses, taskItems, viewMode])
 
   const onAcceptPress = useCallback(
     async (taskId: string) => {
@@ -838,6 +868,10 @@ export function useHomeFeedController({
   }, [t])
 
   const onPullToRefresh = useCallback(() => {
+    if (viewMode === "mine") {
+      void fetchMyTasks()
+      return
+    }
     if (status !== "ready" || !coords) {
       refresh()
       return
@@ -846,7 +880,7 @@ export function useHomeFeedController({
 
     const statusesArg = viewMode === "forYou" && sortedStatuses.length ? sortedStatuses : undefined
     void fetchNearby(coords.latitude, coords.longitude, statusesArg)
-  }, [coords, fetchNearby, helperAvailable, refresh, sortedStatuses, status, viewMode])
+  }, [coords, fetchMyTasks, fetchNearby, helperAvailable, refresh, sortedStatuses, status, viewMode])
 
   const onLogoutPress = useCallback(() => {
     Alert.alert(t("oolshik:homeScreen.logoutTitle"), t("oolshik:homeScreen.logoutBody"), [
@@ -879,20 +913,20 @@ export function useHomeFeedController({
   const extraData = useMemo(
     () => ({
       viewMode,
-      loading,
+      loading: activeLoading,
       titleRefreshCooldowns,
     }),
-    [loading, titleRefreshCooldowns, viewMode],
+    [activeLoading, titleRefreshCooldowns, viewMode],
   )
 
   const serviceState = useMemo(
-    () => buildFeedServiceState(nearbyError, hasVisibleTasks, lastNearbyLoadedAt, t),
-    [hasVisibleTasks, lastNearbyLoadedAt, nearbyError, t],
+    () => buildFeedServiceState(activeError, hasVisibleTasks, viewMode === "mine" ? null : lastNearbyLoadedAt, t),
+    [activeError, hasVisibleTasks, lastNearbyLoadedAt, t, viewMode],
   )
 
   const helperFeedEnabled = viewMode !== "forYou" || helperAvailable
   const visibleFiltered = helperFeedEnabled ? sortedFiltered : []
-  const showInitialLoader = helperFeedEnabled && loading && visibleFiltered.length === 0
+  const showInitialLoader = helperFeedEnabled && activeLoading && visibleFiltered.length === 0
 
   const setFeedRadius = useCallback(
     (radius: Radius) => {
@@ -947,12 +981,12 @@ export function useHomeFeedController({
       locationError,
     },
     feed: {
-      loading,
+      loading: activeLoading,
       showInitialLoader,
       hasVisibleTasks,
-      nearbyError,
-      isNearbyStale,
-      lastNearbyLoadedAt,
+      nearbyError: activeError,
+      isNearbyStale: viewMode === "mine" ? false : isNearbyStale,
+      lastNearbyLoadedAt: viewMode === "mine" ? null : lastNearbyLoadedAt,
       serviceState,
       filtered: visibleFiltered as HomeFeedTask[],
       helperAvailable,

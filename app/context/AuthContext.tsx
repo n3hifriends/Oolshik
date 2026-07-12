@@ -124,6 +124,7 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     setLoginTokens(undefined, undefined)
     // ✅ clear nearby cache so the next user never sees this session's tasks
     useTaskStore.getState().clearNearby()
+    useTaskStore.getState().clearMyTasks()
     setOnboardingPhaseMMKV("")
     // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
   }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV, setOnboardingPhaseMMKV])

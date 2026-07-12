@@ -666,6 +666,19 @@ export const OolshikApi = {
 
   getActiveSummary: () => api.get<ActiveRequestSummary>("/requests/active-summary"),
 
+  async myTasks(statuses?: string[]): Promise<ApiResult<ServerTask[]>> {
+    const qs = new URLSearchParams()
+    if (statuses?.length) {
+      statuses.forEach((s) => qs.append("statuses", s))
+    }
+    const url = `/requests/mine${qs.toString() ? `?${qs.toString()}` : ""}`
+    const res = await api.get<ServerTask[]>(url)
+    if (res.ok) {
+      return { ok: true, data: Array.isArray(res.data) ? res.data : [], meta: {} }
+    }
+    return { ok: false, error: normalizeApiError(res) }
+  },
+
   // Nearby
   findTaskByTaskId: (taskId: string) => api.get(`/requests/${taskId}`),
 

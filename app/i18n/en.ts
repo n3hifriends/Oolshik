@@ -726,7 +726,7 @@ const en = {
       section3Title: "3. Consent and withdrawal",
       section3Item1: "These permissions are required for the app to function.",
       section3Item2:
-        "I can withdraw consent at any time by uninstalling the app or contacting support@oolshik.in.",
+        "I can withdraw consent at any time by uninstalling the app or contacting support@oolshik.in",
       section3Item3:
         "After consent is withdrawn, personal data will be deleted or anonymized unless retention is required by law.",
       section4Title: "4. Data security and privacy",
@@ -878,8 +878,7 @@ const en = {
     direct: {
       helperCta: "Request / Pay",
       choiceTitle: "How do you want to pay?",
-      choiceBody:
-        "Choose whether to collect or pay — transfer opens in your UPI app.",
+      choiceBody: "Choose whether to collect or pay — transfer opens in your UPI app.",
       requestToMe: "{{name}} pays me",
       payRequester: "I pay {{name}}",
       requestedTitle: "Direct payment is ready",
@@ -896,8 +895,10 @@ const en = {
     },
     notice: {
       title: "Before you pay",
-      line1: "Payment goes directly to your neighbour via your UPI app. Oolshik does not process or hold your payment.",
-      line2: "Check that the payee name matches who you know from this request. If unsure, do not pay and contact support.",
+      line1:
+        "Payment goes directly to your neighbour via your UPI app. Oolshik does not process or hold your payment.",
+      line2:
+        "Check that the payee name matches who you know from this request. If unsure, do not pay and contact support.",
       primaryCta: "Continue",
       cancelCta: "Cancel",
     },

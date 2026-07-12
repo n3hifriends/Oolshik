@@ -13,6 +13,9 @@ type NearbyCacheEntry = { tasks: Task[]; lastNearbyLoadedAt: string }
 // Each call captures its own value and ignores responses from older calls.
 let nearbyFetchSeq = 0
 
+// Same pattern for fetchMyTasks — incremented on every call and by clearMyTasks.
+let myFetchSeq = 0
+
 // Tracks which user's cache is currently loaded. Set by hydrateForUser, cleared by clearNearby.
 let currentUserId: string | null = null
 
@@ -105,6 +108,8 @@ type State = {
   radiusMeters: 1 | 2 | 5
   tasks: Task[]
   myTasks: Task[]
+  myTasksLoading: boolean
+  myTasksError: AppApiError | null
   loading: boolean
   nearbyError: AppApiError | null
   isNearbyStale: boolean
@@ -117,8 +122,10 @@ type State = {
   upsertActiveSummaryTask: (item: ActiveRequestSummaryItem) => void
   fetchActiveSummary: () => Promise<void>
   fetchNearby: (lat: number, lng: number, statuses?: string[]) => Promise<void>
+  fetchMyTasks: () => Promise<void>
   hydrateForUser: (userId: string) => void
   clearNearby: () => void
+  clearMyTasks: () => void
   accept: (id: string, latitude: number, longitude: number) => Promise<"OK" | "ALREADY" | "ERROR">
   complete: (id: string) => Promise<"OK" | "FORBIDDEN" | "ERROR">
 }
@@ -127,6 +134,8 @@ export const useTaskStore = create<State>((set, get) => ({
   radiusMeters: 1,
   tasks: [],
   myTasks: [],
+  myTasksLoading: false,
+  myTasksError: null,
   loading: false,
   nearbyError: null,
   isNearbyStale: false,
@@ -137,17 +146,35 @@ export const useTaskStore = create<State>((set, get) => ({
   setTab: (t) => set({ tab: t }),
   upsertTask: (task) =>
     set((s) => {
+      // Update nearby list
       const idx = s.tasks.findIndex((t) => t.id === task.id)
-      if (idx === -1) return { tasks: [task, ...s.tasks] }
-      const next = s.tasks.slice()
-      next[idx] = {
-        ...next[idx],
-        ...task,
-        // Task-detail endpoint has no location params so it always returns
-        // distanceMtr: null. Preserve the value from fetchNearby instead.
-        distanceMtr: task.distanceMtr ?? next[idx].distanceMtr,
+      const nextTasks =
+        idx === -1
+          ? [task, ...s.tasks]
+          : (() => {
+              const next = s.tasks.slice()
+              next[idx] = {
+                ...next[idx],
+                ...task,
+                // Task-detail endpoint has no location params so it always returns
+                // distanceMtr: null. Preserve the value from fetchNearby instead.
+                distanceMtr: task.distanceMtr ?? next[idx].distanceMtr,
+              }
+              return next
+            })()
+
+      // Sync into myTasks: update if present, prepend if this is a task owned by the current user
+      const mineIdx = s.myTasks.findIndex((t) => t.id === task.id)
+      let nextMyTasks = s.myTasks
+      if (mineIdx !== -1) {
+        const next = s.myTasks.slice()
+        next[mineIdx] = { ...next[mineIdx], ...task, distanceMtr: task.distanceMtr ?? next[mineIdx].distanceMtr }
+        nextMyTasks = next
+      } else if (currentUserId && String(task.requesterId) === currentUserId && s.myTasks.length > 0) {
+        nextMyTasks = [task, ...s.myTasks]
       }
-      return { tasks: next }
+
+      return { tasks: nextTasks, myTasks: nextMyTasks }
     }),
 
   upsertActiveSummaryTask: (item) =>
@@ -250,26 +277,43 @@ export const useTaskStore = create<State>((set, get) => ({
     set({ tasks: [], lastNearbyLoadedAt: null, isNearbyStale: false, nearbyError: null })
   },
 
+  fetchMyTasks: async () => {
+    const seq = ++myFetchSeq
+    const requestUserId = currentUserId
+    set({ myTasksLoading: true, myTasksError: null })
+    try {
+      const res = await OolshikApi.myTasks()
+      if (seq !== myFetchSeq || currentUserId !== requestUserId) return
+      if (res.ok) {
+        set({ myTasks: normalizeTasks(res.data), myTasksLoading: false })
+      } else {
+        set({ myTasksError: res.error, myTasksLoading: false })
+      }
+    } catch {
+      if (seq !== myFetchSeq || currentUserId !== requestUserId) return
+      set({ myTasksLoading: false, myTasksError: { kind: "network", temporary: true, message: "Request failed" } })
+    }
+  },
+
+  clearMyTasks: () => {
+    myFetchSeq++
+    set({ myTasks: [], myTasksLoading: false, myTasksError: null })
+  },
+
   accept: async (id: string, latitude: number, longitude: number) => {
     if (getRemoteFlag("mock_nearby_enabled") && __DEV__) {
       // optimistic accept in mock mode
-      set((s) => ({
-        tasks: s.tasks.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                status: "PENDING_AUTH",
-                pendingAuthExpiresAt: new Date(Date.now() + 120 * 1000).toISOString(),
-              }
-            : t,
-        ),
-      }))
+      const applyMockAccept = (t: Task) =>
+        t.id === id
+          ? { ...t, status: "PENDING_AUTH" as const, pendingAuthExpiresAt: new Date(Date.now() + 120 * 1000).toISOString() }
+          : t
+      set((s) => ({ tasks: s.tasks.map(applyMockAccept), myTasks: s.myTasks.map(applyMockAccept) }))
       return "OK"
     } else {
       const res = await OolshikApi.acceptTask(id, { latitude, longitude })
       if (res.ok) {
-        set((s) => ({
-          tasks: s.tasks.map((t) => {
+        set((s) => {
+          const applyUpdate = (t: Task) => {
             if (t.id !== id) return t
             const data = res.data as any
             return {
@@ -279,8 +323,12 @@ export const useTaskStore = create<State>((set, get) => ({
               // Accept endpoint returns no distanceMtr; keep the value from fetchNearby.
               distanceMtr: data?.distanceMtr ?? t.distanceMtr,
             }
-          }),
-        }))
+          }
+          return {
+            tasks: s.tasks.map(applyUpdate),
+            myTasks: s.myTasks.map(applyUpdate),
+          }
+        })
         return "OK"
       }
       if (res.status === 409) return "ALREADY"
@@ -292,25 +340,24 @@ export const useTaskStore = create<State>((set, get) => ({
     if (getRemoteFlag("mock_nearby_enabled") && __DEV__) {
       // In mock mode, allow completion if requester unknown; otherwise block (no auth context here)
       let updated = false
-      set((s) => {
-        const next = s.tasks.map((t) => {
-          if (t.id !== id) return t
-          const meId = undefined // no auth lookup in this store
-          const allowed = !t.createdById || (meId && t.createdById === meId)
-          if (allowed) {
-            updated = true
-            return { ...t, status: "COMPLETED" as const }
-          }
-          return t
-        })
-        return { tasks: next }
-      })
+      const applyMockComplete = (t: Task) => {
+        if (t.id !== id) return t
+        const meId = undefined // no auth lookup in this store
+        const allowed = !t.createdById || (meId && t.createdById === meId)
+        if (allowed) {
+          updated = true
+          return { ...t, status: "COMPLETED" as const }
+        }
+        return t
+      }
+      set((s) => ({ tasks: s.tasks.map(applyMockComplete), myTasks: s.myTasks.map(applyMockComplete) }))
       return updated ? "OK" : "FORBIDDEN"
     } else {
       const res = await OolshikApi.completeTask(id)
       if (res.ok) {
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "COMPLETED" } : t)),
+          myTasks: s.myTasks.map((t) => (t.id === id ? { ...t, status: "COMPLETED" } : t)),
         }))
         return "OK"
       }
