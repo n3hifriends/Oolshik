@@ -13,6 +13,7 @@ type SegmentedProps = {
   value: ViewMode
   onChange: (value: ViewMode) => void
   compact?: boolean
+  mineCount?: number
 }
 
 type SegmentedTab = {
@@ -29,6 +30,7 @@ export const Segmented = memo(function Segmented({
   value,
   onChange,
   compact = false,
+  mineCount = 0,
 }: SegmentedProps) {
   const { t } = useTranslation()
   const { theme, themed } = useAppTheme()
@@ -92,6 +94,16 @@ export const Segmented = memo(function Segmented({
                 />
 
                 <View style={themed(active ? $activeRail : $inactiveRail)} />
+
+                {tab.key === "mine" && !active && mineCount > 0 && (
+                  <View style={themed($mineBadge)}>
+                    <Text
+                      text={String(Math.min(mineCount, 99))}
+                      style={themed($mineBadgeText)}
+                      maxFontSizeMultiplier={1}
+                    />
+                  </View>
+                )}
               </>
             )}
           </Pressable>
@@ -192,4 +204,24 @@ const $inactiveRail: ThemedStyle<ViewStyle> = () => ({
 
 const $ripple: ThemedStyle<{ color: string }> = ({ colors }) => ({
   color: colors.palette.primary100,
+})
+
+const $mineBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  top: 4,
+  right: 6,
+  minWidth: 16,
+  height: 16,
+  borderRadius: 8,
+  backgroundColor: colors.palette.primary500,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 3,
+})
+
+const $mineBadgeText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.neutral100,
+  fontSize: 9,
+  fontWeight: "700",
+  lineHeight: 12,
 })

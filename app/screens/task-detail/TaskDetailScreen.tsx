@@ -47,7 +47,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
     <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
       <TaskDetailHeader
         title={t("oolshik:taskDetail")}
-        backLabel={t("oolshik:taskDetailScreen.goBack")}
+        backLabel={`← ${t("common:back")}`}
         refreshLabel={t("oolshik:taskDetailScreen.refresh")}
         reportLabel={t("oolshik:taskDetailScreen.report")}
         refreshA11yLabel={t("oolshik:taskDetailScreen.refreshTaskDetailsA11y")}

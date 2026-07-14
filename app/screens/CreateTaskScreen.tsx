@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react"
-import { View, Alert, ActivityIndicator, Linking } from "react-native"
+import { View, Alert, ActivityIndicator, Linking, Pressable } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
 import { Screen } from "@/components/Screen"
@@ -274,6 +274,16 @@ export default function CreateTaskScreen({ navigation }: any) {
         safeAreaEdges={["top", "bottom"]}
         contentContainerStyle={{ padding: 16, gap: 12 }}
       >
+        <Pressable
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel={t("common:back")}
+          hitSlop={8}
+          style={{ alignSelf: "flex-start" }}
+        >
+          <Text text={`← ${t("common:back")}`} />
+        </Pressable>
+
         <Text preset="heading" text={t("task:create.heading")} />
 
         {status !== "ready" && (

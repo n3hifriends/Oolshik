@@ -185,6 +185,8 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
 
   const compactPadding = props.condensed ? 8 : 10
 
+  const nearbyStatusActive = !allStatusesSelected
+
   const nearbyStatusControl = (
     <Pressable
       onPress={props.onToggleExpanded}
@@ -196,8 +198,12 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
         ...(isCompact ? {} : { minWidth: 88 }),
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: theme.colors.palette.neutral200,
-        backgroundColor: theme.colors.palette.neutral100,
+        borderColor: nearbyStatusActive
+          ? theme.colors.palette.primary500
+          : theme.colors.palette.neutral200,
+        backgroundColor: nearbyStatusActive
+          ? theme.colors.palette.primary100
+          : theme.colors.palette.neutral100,
         justifyContent: "center",
         paddingHorizontal: 10,
         paddingVertical: 8,
@@ -210,7 +216,11 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
         weight="bold"
         numberOfLines={1}
         maxFontSizeMultiplier={1.1}
-        style={{ color: theme.colors.palette.neutral700 }}
+        style={{
+          color: nearbyStatusActive
+            ? theme.colors.palette.primary600
+            : theme.colors.palette.neutral700,
+        }}
       />
       <Text
         text={selectedStatusLabel}
@@ -218,7 +228,11 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
         numberOfLines={1}
         ellipsizeMode="tail"
         maxFontSizeMultiplier={1.1}
-        style={{ color: theme.colors.palette.neutral600 }}
+        style={{
+          color: nearbyStatusActive
+            ? theme.colors.palette.primary600
+            : theme.colors.palette.neutral600,
+        }}
       />
     </Pressable>
   )
@@ -351,7 +365,7 @@ export function HomeFeedFilters(props: HomeFeedFiltersProps) {
           </View>
         )}
 
-        {(!props.condensed || props.expanded) && (
+        {(!props.condensed || props.expanded || (isNearbyView && nearbyStatusActive)) && (
           <View
             style={{
               flexDirection: "row",

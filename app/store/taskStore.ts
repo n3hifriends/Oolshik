@@ -9,6 +9,8 @@ import { load, remove, save } from "@/utils/storage"
 const nearbyKey = (uid: string) => `nearby.cache.v2.${uid}`
 type NearbyCacheEntry = { tasks: Task[]; lastNearbyLoadedAt: string }
 
+const activeCountKey = (uid: string) => `active.count.v1.${uid}`
+
 // Monotonic counter — incremented on every fetchNearby call.
 // Each call captures its own value and ignores responses from older calls.
 let nearbyFetchSeq = 0
@@ -116,6 +118,7 @@ type State = {
   lastNearbyLoadedAt: string | null
   tab: TaskTab
   activeSummary: ActiveRequestSummary | null
+  cachedActiveCount: number | null
   setRadius: (r: 1 | 2 | 5) => void
   setTab: (t: TaskTab) => void
   upsertTask: (task: Task) => void
@@ -142,6 +145,7 @@ export const useTaskStore = create<State>((set, get) => ({
   lastNearbyLoadedAt: null,
   tab: "ALL",
   activeSummary: null,
+  cachedActiveCount: null,
   setRadius: (r) => set({ radiusMeters: r }),
   setTab: (t) => set({ tab: t }),
   upsertTask: (task) =>
@@ -203,7 +207,8 @@ export const useTaskStore = create<State>((set, get) => ({
   fetchActiveSummary: async () => {
     const res = await OolshikApi.getActiveSummary()
     if (!res.ok || !res.data) throw new Error("Failed to load active requests")
-    set({ activeSummary: res.data })
+    set({ activeSummary: res.data, cachedActiveCount: res.data.activeCount })
+    if (currentUserId) save(activeCountKey(currentUserId), res.data.activeCount)
   },
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
@@ -258,15 +263,17 @@ export const useTaskStore = create<State>((set, get) => ({
     if (currentUserId === userId) return
     nearbyFetchSeq++
     currentUserId = userId
+    const cachedCount = load<number>(activeCountKey(userId))
     const cached = load<NearbyCacheEntry>(nearbyKey(userId))
     if (!cached?.tasks?.length) {
-      set({ tasks: [], lastNearbyLoadedAt: null, isNearbyStale: false })
+      set({ tasks: [], lastNearbyLoadedAt: null, isNearbyStale: false, cachedActiveCount: cachedCount ?? null })
       return
     }
     set({
       tasks: normalizeTasks(cached.tasks),
       lastNearbyLoadedAt: cached.lastNearbyLoadedAt,
       isNearbyStale: true,
+      cachedActiveCount: cachedCount ?? null,
     })
   },
 
@@ -297,7 +304,8 @@ export const useTaskStore = create<State>((set, get) => ({
 
   clearMyTasks: () => {
     myFetchSeq++
-    set({ myTasks: [], myTasksLoading: false, myTasksError: null })
+    if (currentUserId) remove(activeCountKey(currentUserId))
+    set({ myTasks: [], myTasksLoading: false, myTasksError: null, activeSummary: null, cachedActiveCount: null })
   },
 
   accept: async (id: string, latitude: number, longitude: number) => {

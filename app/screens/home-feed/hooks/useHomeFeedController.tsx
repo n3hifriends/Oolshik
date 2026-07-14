@@ -226,6 +226,8 @@ export function useHomeFeedController({
     accept,
     isNearbyStale,
     lastNearbyLoadedAt,
+    activeSummary,
+    cachedActiveCount,
   } = useTaskStore()
   const { logout, userId, userName, authEmail, onboardingPhase, setOnboardingPhase } = useAuth()
 
@@ -998,6 +1000,7 @@ export function useHomeFeedController({
       filtersExpanded,
       controlsCondensed,
       extraData,
+      activeCount: activeSummary?.activeCount ?? cachedActiveCount ?? 0,
     },
     user: {
       profileInitials,

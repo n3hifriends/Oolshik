@@ -28,6 +28,7 @@ type HomeFeedHeaderProps = {
   condensed: boolean
   onOpenInbox: () => void
   unreadCount: number
+  mineCount: number
 }
 
 export function HomeFeedHeader(props: HomeFeedHeaderProps) {
@@ -112,9 +113,14 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
               backgroundColor: props.primary500,
               alignItems: "center",
               justifyContent: "center",
+              overflow: "hidden",
             }}
           >
-            <Text text={props.profileInitials} style={{ color: props.profileTextColor, fontWeight: "700" }} />
+            <Text
+              text={props.profileInitials}
+              numberOfLines={1}
+              style={{ color: props.profileTextColor, fontWeight: "700", fontSize: Math.round(avatarInnerSize * 0.46) }}
+            />
           </View>
         </Pressable>
 
@@ -172,7 +178,7 @@ export function HomeFeedHeader(props: HomeFeedHeaderProps) {
         </Pressable>
       </View>
 
-      <Segmented value={props.viewMode} onChange={props.onChangeViewMode} compact />
+      <Segmented value={props.viewMode} onChange={props.onChangeViewMode} compact mineCount={props.mineCount} />
     </View>
   )
 }

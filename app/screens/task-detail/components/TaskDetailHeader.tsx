@@ -27,83 +27,79 @@ type TaskDetailHeaderProps = {
 
 export function TaskDetailHeader(props: TaskDetailHeaderProps) {
   return (
-    <View style={{ padding: 16, flexDirection: "row", alignItems: "center" }}>
+    <View style={{ padding: 16, gap: props.spacingSm }}>
       <Pressable
         onPress={props.onBack}
         accessibilityRole="button"
         accessibilityLabel={props.backLabel}
-        hitSlop={6}
-        style={({ pressed }) => ({
-          width: 40,
-          height: 40,
-          marginRight: props.spacingXs,
-          borderRadius: 20,
-          borderWidth: 1,
-          borderColor: props.neutral300,
-          backgroundColor: props.neutral100,
-          transform: [{ scale: pressed ? 0.96 : 1 }],
-          alignItems: "center",
-          justifyContent: "center",
-        })}
+        hitSlop={8}
+        style={{ alignSelf: "flex-start" }}
       >
-        <MaterialCommunityIcons name="chevron-left" size={24} color={props.textDimColor} />
+        <Text text={`${props.backLabel}`} style={{ color: props.textDimColor }} />
       </Pressable>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text preset="heading" text={props.title} numberOfLines={2} />
-      </View>
       <View
         style={{
-          marginLeft: props.spacingXs,
-          flexShrink: 0,
           flexDirection: "row",
           alignItems: "center",
-          gap: props.spacingXs,
         }}
       >
-        <Pressable
-          onPress={props.onRefresh}
-          disabled={props.refreshing}
-          accessibilityRole="button"
-          accessibilityLabel={props.refreshA11yLabel}
-          hitSlop={6}
-          style={({ pressed }) => ({
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: props.neutral300,
-            backgroundColor: props.neutral100,
-            opacity: props.refreshing ? 0.6 : 1,
-            transform: [{ scale: pressed ? 0.96 : 1 }],
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text preset="heading" text={props.title} numberOfLines={2} />
+        </View>
+        <View
+          style={{
+            marginLeft: props.spacingXs,
+            flexShrink: 0,
+            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
-          })}
+            gap: props.spacingXs,
+          }}
         >
-          {props.refreshing ? (
-            <ActivityIndicator size="small" color={props.primaryColor} />
-          ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={props.textDimColor} />
-          )}
-        </Pressable>
-        <Pressable
-          onPress={props.onReport}
-          accessibilityRole="button"
-          accessibilityLabel={props.reportLabel}
-          hitSlop={6}
-          style={({ pressed }) => ({
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: props.reportBorderColor,
-            backgroundColor: props.reportBgColor,
-            alignItems: "center",
-            justifyContent: "center",
-            transform: [{ scale: pressed ? 0.96 : 1 }],
-          })}
-        >
-          <MaterialCommunityIcons name="flag-outline" size={20} color={props.reportIconColor} />
-        </Pressable>
+          <Pressable
+            onPress={props.onRefresh}
+            disabled={props.refreshing}
+            accessibilityRole="button"
+            accessibilityLabel={props.refreshA11yLabel}
+            hitSlop={6}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: props.neutral300,
+              backgroundColor: props.neutral100,
+              opacity: props.refreshing ? 0.6 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+              alignItems: "center",
+              justifyContent: "center",
+            })}
+          >
+            {props.refreshing ? (
+              <ActivityIndicator size="small" color={props.primaryColor} />
+            ) : (
+              <MaterialCommunityIcons name="refresh" size={20} color={props.textDimColor} />
+            )}
+          </Pressable>
+          <Pressable
+            onPress={props.onReport}
+            accessibilityRole="button"
+            accessibilityLabel={props.reportLabel}
+            hitSlop={6}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: props.reportBorderColor,
+              backgroundColor: props.reportBgColor,
+              alignItems: "center",
+              justifyContent: "center",
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            })}
+          >
+            <MaterialCommunityIcons name="flag-outline" size={20} color={props.reportIconColor} />
+          </Pressable>
+        </View>
       </View>
     </View>
   )

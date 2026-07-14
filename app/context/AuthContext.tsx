@@ -125,9 +125,12 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     // ✅ clear nearby cache so the next user never sees this session's tasks
     useTaskStore.getState().clearNearby()
     useTaskStore.getState().clearMyTasks()
-    setOnboardingPhaseMMKV("")
+    // onboardingPhase is NOT cleared here — it is a permanent user-level state, not a
+    // session credential. Clearing it caused a false "new user" flash on re-login while
+    // the /me backfill was in-flight. The backfill (below) always runs on authToken
+    // change and will correct the value if a different user logs in on this device.
     // (navigation back to Login is handled by your app's routing on isAuthenticated=false)
-  }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV, setOnboardingPhaseMMKV])
+  }, [setAuthTokenMMKV, setAuthEmailMMKV, setUserIdMMKV, setUserNameMMKV, setUserPhoneMMKV])
 
   useEffect(() => {
     // Legacy-state recovery: older installs can retain `auth.token` while
@@ -141,15 +144,20 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   useEffect(() => {
     // Hydrate the nearby cache for the confirmed user. Uses raw userId (not effectiveUserId)
     // so the dev fallback "U-LOCAL-1" never loads a real user's scoped cache.
+    // fetchActiveSummary is called here too so the "My Requests" badge count is available
+    // immediately on login, before the user taps that tab.
     if (!authToken || !userId) return
     useTaskStore.getState().hydrateForUser(userId)
+    useTaskStore.getState().fetchActiveSummary().catch(() => {})
   }, [authToken, userId])
 
   useEffect(() => {
-    // Backfill onboardingPhase from the server for restored sessions that predate the local
-    // MMKV key. Without this, an existing user who reinstalls (or whose MMKV is cleared)
-    // is indistinguishable from a brand-new user and sees the welcome card again.
-    if (!authToken || onboardingPhaseRaw) return
+    // Sync onboardingPhase from the server on every login. Running unconditionally
+    // (not just when the local value is empty) ensures that if a different user logs
+    // in on the same device they see their own phase rather than the previous user's
+    // persisted value. It also eliminates the false "new user" flash that occurred
+    // when logout cleared the phase and the async fetch hadn't completed yet.
+    if (!authToken) return
     OolshikApi.me()
       .then((res) => {
         if (res.ok && res.data?.onboardingPhase) {
@@ -163,7 +171,9 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
         }
       })
       .catch(() => {})
-  }, [authToken, onboardingPhaseRaw, onboardingComplete, setOnboardingPhaseMMKV, setOnboardingComplete])
+  // authToken is the only trigger we need — run once per login, not on every phase change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken])
 
   useEffect(() => {
     const handler = () => {

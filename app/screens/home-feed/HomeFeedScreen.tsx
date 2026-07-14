@@ -121,6 +121,7 @@ export default function HomeFeedScreen({ navigation }: Props) {
         condensed={feed.controlsCondensed}
         onOpenInbox={openInbox}
         unreadCount={unreadCount}
+        mineCount={feed.activeCount}
       />
 
       {showBanner ? (
@@ -178,7 +179,7 @@ export default function HomeFeedScreen({ navigation }: Props) {
       <View
         style={{
           flex: 1,
-          paddingHorizontal: 16,
+          paddingHorizontal: 5,
           paddingTop: state.searchOpen ? 8 : 0,
           backgroundColor: theme.themeColors.background,
         }}
@@ -244,7 +245,9 @@ export default function HomeFeedScreen({ navigation }: Props) {
                 viewMode={feed.viewMode}
                 helperUnavailable={!feed.helperAvailable}
                 rawSearch={state.rawSearch}
-                onGetHelp={() => composerRef.current?.open(feed.viewMode === "mine" ? "voice" : "type")}
+                onGetHelp={() =>
+                  composerRef.current?.open(feed.viewMode === "mine" ? "voice" : "type")
+                }
                 extraData={feed.extraData}
                 listPaddingBottom={listPaddingBottom}
               />
