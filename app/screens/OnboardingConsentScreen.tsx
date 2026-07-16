@@ -344,13 +344,10 @@ export default function OnboardingConsentScreen({ navigation }: any) {
         <Button
           text={t("oolshik:consent.continue")}
           disabled={!canContinue || submitting}
+          loading={submitting}
           onPress={async () => {
             if (!canContinue || submitting) return
             setSubmitting(true)
-            // Kick off FCM permission request in the background so it doesn't block
-            // navigation — AuthContext handles the actual backend token registration
-            // once onboarding.v1.completed is written below.
-            getFcmTokenAsync().catch(() => {})
             try {
               let eligible = true
               if (coords) {
@@ -367,8 +364,22 @@ export default function OnboardingConsentScreen({ navigation }: any) {
               if (eligible) {
                 setOnboardingPhase("INTENT_SET")
                 setOnboardingComplete("true")
+                // Request notification permission before navigating so the system dialog
+                // appears on this screen. If it fires after navigation the app goes
+                // inactive mid-GPS-acquisition and can push the cold-start past the 12s
+                // timeout, leaving the feed stuck on "fetching your location".
+                // A 6s cap ensures a slow/offline getToken() never blocks navigation.
+                await Promise.race([
+                  getFcmTokenAsync().catch(() => null),
+                  new Promise<null>((resolve) => { setTimeout(() => resolve(null), 6_000) }),
+                ])
                 navigation.replace("OolshikHome")
               } else {
+                // Request notification permission even for ineligible users so they
+                // receive push notifications if zone access is later granted.
+                // AuthContext FCM registration is gated on onboardingComplete=true, which
+                // is never set here, so this fire-and-forget is the only registration path.
+                getFcmTokenAsync().catch(() => {})
                 setSubmitting(false)
                 navigation.navigate("OolshikZoneGate")
               }

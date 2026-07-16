@@ -141,7 +141,6 @@ export function AlertDialog(props: AlertDialogProps) {
             text={title}
             preset="heading"
             style={{ marginBottom: 6, color: theme.colors.text }}
-            numberOfLines={2}
           />
         )}
         {!!message && (

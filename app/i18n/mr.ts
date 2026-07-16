@@ -139,7 +139,8 @@ const mr: Translations = {
       safetyUnsafe: "असुरक्षित वर्तन",
       safetyHarassment: "त्रास / छळ",
       safetyScam: "फसवणूक",
-      addDetails: "‘इतर’ निवडल्यास तपशील द्या.",
+      addDetails: "’इतर’ निवडल्यास तपशील द्या.",
+      addDetailsTitle: "तपशील आवश्यक आहे",
       submit: "पाठवा",
       submitting: "पाठवत आहोत…",
       thanks: "अभिप्रायाबद्दल धन्यवाद!",
@@ -446,6 +447,7 @@ const mr: Translations = {
       noMapsTitle: "मॅप्स ॲप सापडले नाही",
       noMapsBody: "या डिव्हाइसवर मॅप्स उघडता येत नाही.\n\n{{lat}}, {{lon}}",
       onlyRequesterCanComplete: "हे काम फक्त विनंतीकर्ता पूर्ण म्हणून चिन्हांकित करू शकतो.",
+      onlyRequesterCanCompleteTitle: "परवानगी नाही",
       errorCompletingTask: "काम पूर्ण करताना त्रुटी आली",
       ratingSubmitted: "रेटिंग पाठवले. धन्यवाद!",
       ratingFailedTitle: "रेटिंग पाठवता आले नाही",
@@ -516,7 +518,9 @@ const mr: Translations = {
       markDoneConfirmTitle: "तुम्ही हे काम पूर्ण केले आहे का?",
       markDoneConfirmBody: "यामुळे विनंतीकर्त्याला सूचना जाईल आणि पुष्टीसाठीची वेळ सुरू होईल.",
       markDoneFailed: "हे काम पूर्ण झाले म्हणून चिन्हांकित करता आले नाही.",
+      markDoneFailedTitle: "चिन्हांकित करता आले नाही",
       markDoneNotAllowed: "फक्त नेमलेला कार्यकर्ता हे काम पूर्ण झाले म्हणून चिन्हांकित करू शकतो.",
+      markDoneNotAllowedTitle: "परवानगी नाही",
       confirmCompletion: "पूर्णतेची पुष्टी करा",
       confirmCompletionConfirmTitle: "कार्य पूर्ण झाल्याची पुष्टी करायची का?",
       confirmCompletionConfirmBody:
@@ -525,6 +529,7 @@ const mr: Translations = {
       confirmCompletionProgressBody: "कृपया थोडा वेळ थांबा. आम्ही कामाची स्थिती अपडेट करत आहोत.",
       confirmCompletionFailed:
         "पूर्णतेची पुष्टी करता आली नाही. कृपया रिफ्रेश करून पुन्हा प्रयत्न करा.",
+      confirmCompletionFailedTitle: "पुष्टी करता आली नाही",
       reportIssue: "समस्या नोंदवा",
       issueReportedNotice: "समस्या नोंदवली गेली आहे. या कामाला आता पुनरावलोकन आवश्यक आहे.",
       reviewRequiredText: "या कामाबद्दल समस्या नोंदवली गेली आहे. यासाठी पुनरावलोकन आवश्यक आहे.",
@@ -637,7 +642,7 @@ const mr: Translations = {
       googleUnavailable: "या बिल्डमध्ये Google लॉगिन अजून कॉन्फिगर केलेले नाही.",
       googleLoading: "जोडत आहोत...",
       googleSuccess: "Google लॉगिन यशस्वी झाले.",
-      googleCancelled: "Google लॉगिन रद्द केले गेले.",
+      googleCancelled: "साइन इन करण्यासाठी 'Google सह सुरू ठेवा' टॅप करा.",
       googleTokenExchangeFailed: "Google लॉगिन पूर्ण करता आले नाही. कृपया पुन्हा प्रयत्न करा.",
       googleBackendAuthFailed: "सर्व्हरने Google लॉगिन नाकारले.",
       googleNetworkFailure: "सर्व्हरशी संपर्क करताना नेटवर्क त्रुटी आली.",
@@ -687,12 +692,14 @@ const mr: Translations = {
       otpNetworkFailure: "OTP पाठवताना किंवा पडताळताना नेटवर्क त्रुटी आली.",
       otpTimedOut: "OTP विनंतीची वेळ संपली",
       otpRequired: "पुढे जाण्यासाठी कृपया ६-अंकी कोड टाका.",
+      otpRequiredTitle: "OTP आवश्यक आहे",
       phoneRequired: "हे फील्ड रिक्त ठेवू नका",
       phoneDigits: "१० अंक असणे आवश्यक आहे",
       phonePrefix: "वैध भारतीय मोबाइल नंबर टाका",
       nameRequired: "हे फील्ड रिक्त ठेवू नका",
       backendProfileSyncFailed:
         "लॉगिन झाले, पण प्रोफाइल सिंक करता आले नाही. कृपया पुन्हा प्रयत्न करा.",
+      backendProfileSyncFailedTitle: "प्रोफाइल सिंक अयशस्वी",
       phonePaymentBindingNote: "UPI / पेमेंट खात्याशी जोडलेला तोच नंबर वापरा.",
       phoneAlertTitle: "मोबाइल नंबर",
       phoneAlertBody:
@@ -1081,6 +1088,7 @@ const mr: Translations = {
   errors: {
     invalidEmail: "अवैध ईमेल पत्ता.",
     fallback: "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा.",
+    requestFailed: "विनंती अयशस्वी",
   },
   validation: {
     required: "हे फील्ड आवश्यक आहे.",

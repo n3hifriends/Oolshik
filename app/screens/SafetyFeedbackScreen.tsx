@@ -42,7 +42,7 @@ export default function SafetyFeedbackScreen({ navigation }: { navigation: any }
 
     const trimmed = desc.trim().slice(0, MAX_DESC)
     if (category === "OTHER" && !trimmed) {
-      Alert.alert(t("oolshik:feedback.addDetails"))
+      Alert.alert(t("oolshik:feedback.addDetailsTitle"), t("oolshik:feedback.addDetails"))
       return
     }
 

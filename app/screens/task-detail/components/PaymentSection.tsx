@@ -129,6 +129,14 @@ export function PaymentSection(props: PaymentSectionProps) {
           {props.showHelperWaitingText ? (
             <Text text={props.helperWaitingText} size="xs" style={{ color: theme.colors.textDim }} />
           ) : null}
+
+          {!props.canRequesterPay ? (
+            <Button
+              text={props.refreshLabel}
+              onPress={props.onRefreshPayment}
+              style={{ minHeight: 44, justifyContent: "center" }}
+            />
+          ) : null}
         </View>
       ) : null}
     </>

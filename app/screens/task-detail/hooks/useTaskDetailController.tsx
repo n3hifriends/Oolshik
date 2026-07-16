@@ -985,7 +985,7 @@ ${t("payment:notice.line2")}`,
         if (phone) setFullPhone(String(phone))
         setIsRevealed(true)
       } else {
-        Alert.alert(res.message || t("oolshik:taskDetailScreen.unableShowNumber"))
+        Alert.alert(t("errors:requestFailed"), res.message || t("oolshik:taskDetailScreen.unableShowNumber"))
       }
     } finally {
       setRevealLoading(false)
@@ -1124,7 +1124,7 @@ ${t("payment:notice.line2")}`,
   const onMarkDone = useCallback(() => {
     if (!current?.id) return
     if (!canMarkDone) {
-      Alert.alert(t("oolshik:taskDetailScreen.markDoneNotAllowed"))
+      Alert.alert(t("oolshik:taskDetailScreen.markDoneNotAllowedTitle"), t("oolshik:taskDetailScreen.markDoneNotAllowed"))
       return
     }
     setMarkDoneConfirmVisible(true)
@@ -1148,7 +1148,7 @@ ${t("payment:notice.line2")}`,
       }
       setRecoveryNotice(t("oolshik:taskDetailScreen.waitingForConfirmationNotice"))
     } catch {
-      Alert.alert(t("oolshik:taskDetailScreen.markDoneFailed"))
+      Alert.alert(t("oolshik:taskDetailScreen.markDoneFailedTitle"), t("oolshik:taskDetailScreen.markDoneFailed"))
     } finally {
       setActionKind(null)
       setActionLoading(false)
@@ -1190,7 +1190,7 @@ ${t("payment:notice.line2")}`,
       }
 
       if (rawStatus === "WORK_DONE_PENDING_CONFIRMATION") {
-        Alert.alert(t("oolshik:taskDetailScreen.confirmCompletionFailed"))
+        Alert.alert(t("oolshik:taskDetailScreen.confirmCompletionFailedTitle"), t("oolshik:taskDetailScreen.confirmCompletionFailed"))
         return
       }
 
@@ -1199,7 +1199,7 @@ ${t("payment:notice.line2")}`,
         res.status === 409 ||
         String(res.data || "").includes("Only requester can complete")
       ) {
-        Alert.alert(t("oolshik:taskDetailScreen.onlyRequesterCanComplete"))
+        Alert.alert(t("oolshik:taskDetailScreen.onlyRequesterCanCompleteTitle"), t("oolshik:taskDetailScreen.onlyRequesterCanComplete"))
         return
       }
 

@@ -180,8 +180,11 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const { t, i18n } = useTranslation()
   const localeTag = normalizeLocaleTag(i18n.language)
   const { theme } = useAppTheme()
-  const { scaleDisplayText } = useResponsiveLayout()
-  const styles = useMemo(() => createStyles(theme, scaleDisplayText), [theme, scaleDisplayText])
+  const { scaleDisplayText, scaleHeroText, screenPaddingH } = useResponsiveLayout()
+  const styles = useMemo(
+    () => createStyles(theme, scaleDisplayText, scaleHeroText, screenPaddingH),
+    [theme, scaleDisplayText, scaleHeroText, screenPaddingH],
+  )
   const { userId } = useAuth()
 
   const seedPayment = useMemo(() => {
@@ -482,9 +485,15 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       <View style={styles.hero}>
         <View style={styles.heroGlow} />
         <View style={styles.heroHeader}>
-          <View>
+          <View style={styles.heroAmountBlock}>
             <Text style={styles.heroLabel} text={t("payment:pay.transferAmount")} />
-            <Text style={styles.heroAmount} text={amountDisplay} />
+            <Text
+              style={styles.heroAmount}
+              text={amountDisplay}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            />
           </View>
           <View style={styles.heroStatusPill}>
             <MaterialCommunityIcons
@@ -492,7 +501,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
               size={16}
               color={theme.colors.palette.neutral100}
             />
-            <Text style={styles.heroStatusText} text={statusText.toUpperCase()} />
+            <Text style={styles.heroStatusText} numberOfLines={1} text={statusText.toUpperCase()} />
           </View>
         </View>
 
@@ -959,10 +968,15 @@ const buildHeroMessage = ({
   return t("payment:pay.defaultHeroBody")
 }
 
-const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) =>
+const createStyles = (
+  theme: Theme,
+  scaleDisplayText: (size: number) => number,
+  scaleHeroText: (size: number) => number,
+  screenPaddingH: number,
+) =>
   StyleSheet.create({
     content: {
-      paddingHorizontal: theme.spacing.sm,
+      paddingHorizontal: screenPaddingH,
       paddingVertical: theme.spacing.xl,
       gap: theme.spacing.lg,
     },
@@ -995,6 +1009,11 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       justifyContent: "space-between",
       alignItems: "flex-start",
       gap: theme.spacing.md,
+      flexWrap: "wrap",
+    },
+    heroAmountBlock: {
+      flex: 1,
+      minWidth: 0,
     },
     heroLabel: {
       color: theme.colors.palette.neutral200,
@@ -1004,8 +1023,8 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
     },
     heroAmount: {
       color: theme.colors.palette.neutral100,
-      fontSize: scaleDisplayText(38),
-      lineHeight: scaleDisplayText(44),
+      fontSize: scaleHeroText(38),
+      lineHeight: scaleHeroText(44),
       fontFamily: theme.typography.primary.bold,
     },
     heroStatusPill: {
@@ -1016,17 +1035,20 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       paddingVertical: theme.spacing.xs,
       borderRadius: 999,
       backgroundColor: "rgba(255,255,255,0.14)",
+      flexShrink: 0,
+      maxWidth: "55%",
     },
     heroStatusText: {
       color: theme.colors.palette.neutral100,
       fontSize: 12,
       letterSpacing: 0.5,
       fontFamily: theme.typography.primary.medium,
+      flexShrink: 1,
     },
     heroSupportText: {
       color: theme.colors.palette.neutral100,
-      fontSize: 16,
-      lineHeight: 24,
+      fontSize: scaleDisplayText(16),
+      lineHeight: scaleDisplayText(24),
       opacity: 0.96,
       fontFamily: theme.typography.primary.normal,
     },
@@ -1083,8 +1105,8 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
     },
     contextTitle: {
       color: theme.colors.palette.neutral100,
-      fontSize: 20,
-      lineHeight: 28,
+      fontSize: scaleDisplayText(20),
+      lineHeight: scaleDisplayText(28),
       fontFamily: theme.typography.primary.bold,
     },
     requesterCard: {
@@ -1111,7 +1133,7 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
     },
     requesterCopy: {
       flex: 1,
-      minWidth: 120,
+      minWidth: 0,
     },
     requesterLabel: {
       color: theme.colors.palette.neutral100,
@@ -1123,8 +1145,8 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
     },
     requesterName: {
       color: theme.colors.palette.neutral100,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: scaleDisplayText(16),
+      lineHeight: scaleDisplayText(22),
       fontFamily: theme.typography.primary.semiBold ?? theme.typography.primary.medium,
     },
     requesterContactPill: {
@@ -1150,7 +1172,7 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       borderColor: theme.colors.border,
     },
     cardTitle: {
-      fontSize: 18,
+      fontSize: scaleDisplayText(18),
       fontFamily: theme.typography.primary.medium,
       marginBottom: theme.spacing.sm,
       color: theme.colors.text,
@@ -1182,8 +1204,8 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       fontFamily: theme.typography.primary.medium,
     },
     payeeName: {
-      fontSize: 20,
-      lineHeight: 26,
+      fontSize: scaleDisplayText(20),
+      lineHeight: scaleDisplayText(26),
       color: theme.colors.text,
       fontFamily: theme.typography.primary.bold,
     },
@@ -1277,7 +1299,8 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       paddingVertical: 8,
       paddingHorizontal: theme.spacing.sm,
       backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : theme.colors.palette.accent100,
-      minWidth: 110,
+      flex: 1,
+      flexBasis: "45%",
     },
     highlightLabel: {
       fontSize: 11,

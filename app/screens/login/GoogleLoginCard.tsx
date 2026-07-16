@@ -21,7 +21,7 @@ interface GoogleLoginCardProps {
   googlePhoneRequired: boolean
   googleRequestReady: boolean
   googleStatusMessage: string | null
-  googleStatusTone: "error" | "success"
+  googleStatusTone: "error" | "neutral" | "success"
   isGoogleLoading: boolean
   onGooglePhoneBlur: () => void
   onGooglePress: () => void
@@ -104,7 +104,9 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
             color:
               props.googleStatusTone === "success"
                 ? colors.palette.success500
-                : colors.palette.angry500,
+                : props.googleStatusTone === "neutral"
+                  ? colors.textDim
+                  : colors.palette.angry500,
           }}
         />
       ) : null}

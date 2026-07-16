@@ -146,7 +146,12 @@ export function TaskCard({
           weight="medium"
           numberOfLines={1}
         />
-        <Text text={minsAgo(createdAt, t)} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
+        <Text
+          text={minsAgo(createdAt, t)}
+          size="xxs"
+          numberOfLines={1}
+          style={{ color: colors.textDim }}
+        />
       </View>
 
       {normalizedVoiceUrl || canAccept ? (
@@ -159,7 +164,9 @@ export function TaskCard({
             flexShrink: 0,
           }}
         >
-          {normalizedVoiceUrl ? <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} /> : undefined}
+          {normalizedVoiceUrl ? (
+            <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} />
+          ) : undefined}
           {canAccept ? (
             <Button
               text={t("oolshik:taskCard.accept")}
@@ -232,7 +239,13 @@ export function TaskCard({
             minWidth: 0,
           }}
         >
-          <Text text={statusLabel} size="xs" weight="medium" numberOfLines={1} style={{ color: statusFg }} />
+          <Text
+            text={statusLabel}
+            size="xs"
+            weight="medium"
+            numberOfLines={1}
+            style={{ color: statusFg }}
+          />
         </View>
         <RatingBadge value={avgRating} />
       </View>
@@ -291,7 +304,11 @@ const VoicePlayButton = React.memo(function VoicePlayButton({
       {audioLoading ? (
         <ActivityIndicator color="#fff" size="small" />
       ) : (
-        <Text text={playing ? "⏸" : "▶︎"} size="xxs" style={{ color: "white", fontWeight: "bold" }} />
+        <Text
+          text={playing ? "⏸" : "▶︎"}
+          size="xxs"
+          style={{ color: "white", fontWeight: "bold" }}
+        />
       )}
     </Pressable>
   )

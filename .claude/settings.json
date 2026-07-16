@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(yarn tsc *)"
+      "Bash(yarn tsc *)",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(awk -F: '{print $1, $2}')"
+    ],
+    "additionalDirectories": [
+      "/Users/nitinkalokhe/Ni3/spring_boot_proj/oolshik-backend-otp/src/main/java/com/oolshik/backend/payment"
     ]
   }
 }

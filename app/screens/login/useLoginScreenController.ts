@@ -105,6 +105,7 @@ export function useLoginScreenController() {
   const googleAttemptSeqRef = useRef(0)
   const activeGoogleAttemptRef = useRef<number | null>(null)
   const lastHandledGoogleResponseRef = useRef<unknown>(null)
+  const cancelledAttemptRef = useRef<number | null>(null)
   const pendingGooglePhoneHintRef = useRef<string | undefined>(undefined)
   const phoneAlertShownRef = useRef(false)
 
@@ -455,6 +456,13 @@ export function useLoginScreenController() {
     }
 
     if (response.type === "cancel" || response.type === "dismiss") {
+      // If onGooglePress already handled this cancel and a newer attempt has since
+      // started, skip clearing the new attempt's ref to avoid silently dropping
+      // the new attempt's successful token exchange.
+      if (cancelledAttemptRef.current !== null && cancelledAttemptRef.current < attemptId) {
+        setLoading(null)
+        return
+      }
       activeGoogleAttemptRef.current = null
       setGoogleFlowState("user-cancelled")
       setLoading(null)
@@ -491,7 +499,7 @@ export function useLoginScreenController() {
     let session = pendingTokens
     if (!otpVerified) {
       if (!otpSent || !/^\d{6}$/.test(otp)) {
-        Alert.alert(t("oolshik:login.otpRequired"))
+        Alert.alert(t("oolshik:login.otpRequiredTitle"), t("oolshik:login.otpRequired"))
         return
       }
       session = await verifyOtp(otp)
@@ -509,7 +517,7 @@ export function useLoginScreenController() {
         shouldCompleteProfile: true,
       })
     } catch {
-      Alert.alert(t("oolshik:login.backendProfileSyncFailed"))
+      Alert.alert(t("oolshik:login.backendProfileSyncFailedTitle"), t("oolshik:login.backendProfileSyncFailed"))
     }
   }, [
     authEmail,
@@ -546,6 +554,8 @@ export function useLoginScreenController() {
     try {
       const result = await promptGoogleAsync()
       if (result.type === "cancel" || result.type === "dismiss") {
+        cancelledAttemptRef.current = attemptId
+        activeGoogleAttemptRef.current = null
         setLoading(null)
         setGoogleFlowState("user-cancelled")
       }
@@ -633,7 +643,11 @@ export function useLoginScreenController() {
     googlePhoneRequired,
     googleRequestReady: Boolean(googleRequest),
     googleStatusMessage,
-    googleStatusTone: googleFlowState === "success" ? ("success" as const) : ("error" as const),
+    googleStatusTone: googleFlowState === "success"
+      ? ("success" as const)
+      : googleFlowState === "user-cancelled"
+        ? ("neutral" as const)
+        : ("error" as const),
     isGoogleLoading: loading === "google",
     isOtpSending: loading === "send",
     isOtpVerifying: loading === "verify",

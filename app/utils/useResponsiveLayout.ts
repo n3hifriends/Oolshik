@@ -17,6 +17,12 @@ export function useResponsiveLayout() {
     (size: number) => clampedScale(size, ratio, 0.88, 1.08),
     [ratio],
   )
+  // Tighter clamp for hero/large display numbers (e.g. currency amounts) that
+  // need to shrink more aggressively on sub-375px screens to avoid overflow.
+  const scaleHeroText = useCallback(
+    (size: number) => clampedScale(size, ratio, 0.78, 1.08),
+    [ratio],
+  )
   const scaleIcon = useCallback(
     (size: number) => clampedScale(size, ratio, 0.9, 1.1),
     [ratio],
@@ -29,6 +35,7 @@ export function useResponsiveLayout() {
     isCompact: width < 380,
     isLarge: width >= 414,
     scaleDisplayText,
+    scaleHeroText,
     scaleIcon,
     screenPaddingH: clampedScale(16, ratio, 0.9, 1.15),
   }
