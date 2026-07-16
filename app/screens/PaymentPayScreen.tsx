@@ -367,6 +367,22 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     }
   }, [payment, seedPayment, t])
 
+  const handleCallRequester = useCallback(async () => {
+    const phone = taskContext?.createdByPhoneNumber
+    if (!phone) return
+    const url = `tel:${phone}`
+    try {
+      const supported = await Linking.canOpenURL(url)
+      if (!supported) {
+        Alert.alert(t("payment:pay.callNotSupported"))
+        return
+      }
+      await Linking.openURL(url)
+    } catch {
+      Alert.alert(t("payment:pay.callFailed"))
+    }
+  }, [taskContext?.createdByPhoneNumber, t])
+
   if (loading && !payment) {
     return (
       <Screen style={$root} preset="fixed">
@@ -558,21 +574,27 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
                 <View style={styles.requesterCopy}>
                   <Text style={styles.requesterLabel} text={t("payment:pay.requestedBy")} />
                   <Text style={styles.requesterName} text={requesterName} />
+                  {taskContext?.createdByPhoneNumber ? (
+                    <Pressable
+                      onPress={handleCallRequester}
+                      style={({ pressed }) => [styles.requesterContactPill, pressed && { opacity: 0.65 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("payment:pay.callRequester")}
+                      accessibilityHint={taskContext.createdByPhoneNumber}
+                    >
+                      <MaterialCommunityIcons
+                        name="phone-outline"
+                        size={14}
+                        color={theme.colors.palette.primary500}
+                      />
+                      <Text
+                        style={styles.requesterContactText}
+                        numberOfLines={1}
+                        text={taskContext.createdByPhoneNumber}
+                      />
+                    </Pressable>
+                  ) : null}
                 </View>
-                {taskContext?.createdByPhoneNumber ? (
-                  <View style={styles.requesterContactPill}>
-                    <MaterialCommunityIcons
-                      name="phone-outline"
-                      size={14}
-                      color={theme.colors.palette.primary500}
-                    />
-                    <Text
-                      style={styles.requesterContactText}
-                      numberOfLines={1}
-                      text={taskContext.createdByPhoneNumber}
-                    />
-                  </View>
-                ) : null}
               </View>
             ) : null}
           </View>
@@ -1115,8 +1137,7 @@ const createStyles = (
       gap: theme.spacing.sm,
       backgroundColor: "rgba(255,255,255,0.12)",
       flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
+      alignItems: "flex-start",
     },
     requesterAvatar: {
       width: 42,
@@ -1134,6 +1155,7 @@ const createStyles = (
     requesterCopy: {
       flex: 1,
       minWidth: 0,
+      gap: theme.spacing.xs,
     },
     requesterLabel: {
       color: theme.colors.palette.neutral100,
@@ -1152,6 +1174,7 @@ const createStyles = (
     requesterContactPill: {
       flexDirection: "row",
       alignItems: "center",
+      alignSelf: "flex-start",
       gap: 6,
       borderRadius: 999,
       paddingHorizontal: theme.spacing.sm,

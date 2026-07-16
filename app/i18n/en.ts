@@ -994,6 +994,9 @@ const en = {
       payByMobile: "Pay via mobile number",
       payByMobileCopied: "Mobile number copied — paste it in your UPI app to search by number.",
       copiedToClipboard: "Copied",
+      callRequester: "Call requester",
+      callNotSupported: "Phone calls are not supported on this device.",
+      callFailed: "Could not open the phone app. Please dial manually.",
       status: {
         pending: "Pending payment",
         initiated: "Payment initiated",
