@@ -993,6 +993,9 @@ const mr: Translations = {
       payByMobile: "मोबाइल नंबरने पैसे द्या",
       payByMobileCopied: "मोबाइल नंबर कॉपी केला — नंबरने शोधण्यासाठी तो UPI ॲपमध्ये पेस्ट करा.",
       copiedToClipboard: "कॉपी केले",
+      callRequester: "विनंतीकर्त्याला कॉल करा",
+      callNotSupported: "या डिव्हाइसवर फोन कॉल्स समर्थित नाहीत.",
+      callFailed: "फोन अ‍ॅप उघडता आले नाही. कृपया स्वतः डायल करा.",
       status: {
         pending: "पेमेंट प्रतीक्षेत",
         initiated: "पेमेंट सुरू केले",
