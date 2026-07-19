@@ -23,7 +23,7 @@ export function toLanguageCode(input?: string | null): "en" | "mr" {
 }
 
 export function fromLanguageCode(input?: string | null): SupportedLocaleTag {
-  return input === "mr" ? "mr-IN" : "en-IN"
+  return normalizeLocaleTag(input)
 }
 
 export function pickDeviceLocaleTag(

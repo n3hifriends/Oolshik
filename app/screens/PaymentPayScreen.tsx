@@ -386,6 +386,9 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   if (loading && !payment) {
     return (
       <Screen style={$root} preset="fixed">
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backLinkFixed}>
+          <Text text={`← ${t("common:back")}`} />
+        </Pressable>
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={theme.colors.palette.primary500} />
           <Text style={styles.loadingText} text={t("payment:pay.fallbackLoading")} />
@@ -397,6 +400,9 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   if (error && !payment) {
     return (
       <Screen style={$root} preset="fixed">
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backLinkFixed}>
+          <Text text={`← ${t("common:back")}`} />
+        </Pressable>
         <View style={styles.fallbackState}>
           <Text preset="heading" style={styles.fallbackTitle} text={t("payment:pay.fallbackNotReadyTitle")} />
           <Text style={styles.fallbackMessage}>{error}</Text>
@@ -414,6 +420,9 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   if (!payment?.snapshot) {
     return (
       <Screen style={$root} preset="fixed">
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backLinkFixed}>
+          <Text text={`← ${t("common:back")}`} />
+        </Pressable>
         <View style={styles.fallbackState}>
           <Text preset="heading" style={styles.fallbackTitle} text={t("payment:pay.fallbackMissingTitle")} />
           <Text style={styles.fallbackMessage}>
@@ -498,6 +507,10 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
 
   return (
     <Screen style={$root} preset="scroll" contentContainerStyle={styles.content}>
+      <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backLink}>
+        <Text text={`← ${t("common:back")}`} />
+      </Pressable>
+
       <View style={styles.hero}>
         <View style={styles.heroGlow} />
         <View style={styles.heroHeader}>
@@ -1001,6 +1014,13 @@ const createStyles = (
       paddingHorizontal: screenPaddingH,
       paddingVertical: theme.spacing.xl,
       gap: theme.spacing.lg,
+    },
+    backLink: {
+      alignSelf: "flex-start",
+    },
+    backLinkFixed: {
+      alignSelf: "flex-start",
+      padding: theme.spacing.md,
     },
     hero: {
       backgroundColor: theme.isDark
