@@ -37,6 +37,7 @@ import { canEditOfferForTask, parseOfferInput } from "@/utils/offerRules"
 import {
   hasSeenPaymentNotice,
   markPaymentNoticeSeen,
+  type PaymentNoticeIntent,
 } from "@/screens/task-detail/helpers/paymentNoticeGate"
 import {
   formatDistance,
@@ -679,19 +680,23 @@ export function useTaskDetailController({
   }, [canEditOffer, current, offerInput, offerSaving, t])
 
   const withPaymentNoticeGate = useCallback(
-    (onContinue: () => void) => {
+    (onContinue: () => void, intent: PaymentNoticeIntent = "pay") => {
       if (paymentNoticeDialogOpenRef.current) return
-      if (hasSeenPaymentNotice(userId)) {
+      if (hasSeenPaymentNotice(userId, intent)) {
         onContinue()
         return
       }
 
+      const titleKey = intent === "collect" ? "payment:notice.collectTitle" : "payment:notice.title"
+      const line1Key = intent === "collect" ? "payment:notice.collectLine1" : "payment:notice.line1"
+      const line2Key = intent === "collect" ? "payment:notice.collectLine2" : "payment:notice.line2"
+
       paymentNoticeDialogOpenRef.current = true
       Alert.alert(
-        t("payment:notice.title"),
-        `${t("payment:notice.line1")}
+        t(titleKey),
+        `${t(line1Key)}
 
-${t("payment:notice.line2")}`,
+${t(line2Key)}`,
         [
           {
             text: t("payment:notice.cancelCta"),
@@ -703,7 +708,7 @@ ${t("payment:notice.line2")}`,
           {
             text: t("payment:notice.primaryCta"),
             onPress: () => {
-              markPaymentNoticeSeen(userId)
+              markPaymentNoticeSeen(userId, intent)
               paymentNoticeDialogOpenRef.current = false
               InteractionManager.runAfterInteractions(onContinue)
             },
@@ -758,110 +763,89 @@ ${t("payment:notice.line2")}`,
     })
   }, [current, navigation, payablePayments, t, withPaymentNoticeGate])
 
-  const openPaymentsScanner = useCallback(() => {
-    if (rawStatus !== "ASSIGNED") return
-    if (!current?.id) return
-
+  const validateHelperAmount = useCallback((): number | null => {
     const trimmed = helperPaymentAmountInput.trim()
     if (!trimmed) {
       setHelperPaymentAmountError(t("payment:qr.enterAmount"))
-      return
+      return null
     }
 
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed) || parsed <= 0) {
       setHelperPaymentAmountError(t("payment:qr.invalidAmount"))
-      return
+      return null
     }
 
     if (parsed > 1000000) {
       setHelperPaymentAmountError(t("payment:qr.amountTooHigh"))
-      return
+      return null
     }
 
-    const taskAmount = Number(parsed.toFixed(2))
     setHelperPaymentAmountError(null)
-    withPaymentNoticeGate(() => {
+    return Number(parsed.toFixed(2))
+  }, [helperPaymentAmountInput, t])
+
+  const launchScanMethod = useCallback(
+    (collectIntent: boolean, amount: number) => {
+      if (!current?.id) return
       const requesterName = toFirstName(current.createdByName ?? t("payment:qr.requester"))
-      Alert.alert(
-        t("payment:direct.choiceTitle"),
-        t("payment:direct.choiceBody"),
-        [
-          {
-            text: t("payment:qr.collectFromName", { name: requesterName }),
-            onPress: () => {
-              if (!myPaymentProfile.hasProfile) {
-                InteractionManager.runAfterInteractions(() => {
-                  Alert.alert(
-                    t("payment:direct.profileRequiredTitle"),
-                    t("payment:direct.profileRequiredBody"),
-                    [
-                      { text: t("common:cancel"), style: "cancel" },
-                      {
-                        text: t("payment:direct.addProfileCta"),
-                        onPress: () =>
-                          navigation.navigate("PaymentProfile", {
-                            entryPoint: "task-payment",
-                            required: true,
-                          }),
-                      },
-                    ],
-                  )
-                })
-                return
-              }
-              navigation.navigate("QrScanner", {
-                taskId: String(current.id),
-                amount: taskAmount,
-                expectedPayeeName: myPaymentProfile.payeeLabel ?? null,
-                expectedPayeeVpa: null,
-                expectedTaskAmount: taskAmount,
-                collectIntent: true,
-              })
+
+      if (collectIntent && !myPaymentProfile.hasProfile) {
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            t("payment:direct.profileRequiredTitle"),
+            t("payment:direct.profileRequiredBody"),
+            [
+              { text: t("common:cancel"), style: "cancel" },
+              {
+                text: t("payment:direct.addProfileCta"),
+                onPress: () =>
+                  navigation.navigate("PaymentProfile", {
+                    entryPoint: "task-payment",
+                    required: true,
+                  }),
+              },
+            ],
+          )
+        })
+        return
+      }
+
+      navigation.navigate("QrScanner", {
+        taskId: String(current.id),
+        amount,
+        expectedPayeeName: collectIntent ? (myPaymentProfile.payeeLabel ?? null) : requesterName,
+        expectedPayeeVpa: null,
+        expectedTaskAmount: amount,
+        collectIntent,
+      })
+    },
+    [current, myPaymentProfile.hasProfile, myPaymentProfile.payeeLabel, navigation, t],
+  )
+
+  const startDirectPayment = useCallback(
+    async (payerRole: PaymentPayerRole, amount: number) => {
+      if (!current?.id) return
+
+      if (payerRole === "REQUESTER" && !myPaymentProfile.hasProfile) {
+        Alert.alert(
+          t("payment:direct.profileRequiredTitle"),
+          t("payment:direct.profileRequiredBody"),
+          [
+            { text: t("common:cancel"), style: "cancel" },
+            {
+              text: t("payment:direct.addProfileCta"),
+              onPress: () =>
+                navigation.navigate("PaymentProfile", {
+                  entryPoint: "task-payment",
+                  required: true,
+                }),
             },
-          },
-          {
-            text: t("payment:qr.payName", { name: requesterName }),
-            onPress: () =>
-              navigation.navigate("QrScanner", {
-                taskId: String(current.id),
-                amount: taskAmount,
-                expectedPayeeName: requesterName,
-                expectedPayeeVpa: null,
-                expectedTaskAmount: taskAmount,
-                collectIntent: false,
-              }),
-          },
-          { text: t("common:cancel"), style: "cancel" },
-        ],
-      )
-    })
-  }, [current, helperPaymentAmountInput, myPaymentProfile.hasProfile, myPaymentProfile.payeeLabel, navigation, rawStatus, t, withPaymentNoticeGate])
+          ],
+        )
+        return
+      }
 
-  const openDirectPaymentFlow = useCallback(() => {
-    if (rawStatus !== "ASSIGNED" || !current?.id) return
-
-    const trimmed = helperPaymentAmountInput.trim()
-    if (!trimmed) {
-      setHelperPaymentAmountError(t("payment:qr.enterAmount"))
-      return
-    }
-
-    const parsed = Number(trimmed)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setHelperPaymentAmountError(t("payment:qr.invalidAmount"))
-      return
-    }
-
-    if (parsed > 1000000) {
-      setHelperPaymentAmountError(t("payment:qr.amountTooHigh"))
-      return
-    }
-
-    const amount = Number(parsed.toFixed(2))
-    setHelperPaymentAmountError(null)
-
-    const startDirectPayment = async (payerRole: PaymentPayerRole) => {
       try {
         const response = await OolshikApi.createDirectPaymentRequest({
           taskId: String(current.id),
@@ -920,58 +904,41 @@ ${t("payment:notice.line2")}`,
         }
         Alert.alert(alertCopy.title, alertCopy.body)
       }
-    }
+    },
+    [current, myPaymentProfile.hasProfile, navigation, t],
+  )
 
-    const requesterFirstName = toFirstName(current.createdByName ?? t("payment:qr.requester"))
-    withPaymentNoticeGate(() => {
-      Alert.alert(
-        t("payment:direct.choiceTitle"),
-        t("payment:direct.choiceBody"),
-        [
-          {
-            text: t("payment:direct.requestToMe", { name: requesterFirstName }),
-            onPress: () => {
-              if (!myPaymentProfile.hasProfile) {
-                Alert.alert(
-                  t("payment:direct.profileRequiredTitle"),
-                  t("payment:direct.profileRequiredBody"),
-                  [
-                    { text: t("common:cancel"), style: "cancel" },
-                    {
-                      text: t("payment:direct.addProfileCta"),
-                      onPress: () =>
-                        navigation.navigate("PaymentProfile", {
-                          entryPoint: "task-payment",
-                          required: true,
-                        }),
-                    },
-                  ],
-                )
-                return
-              }
+  const choosePaymentMethod = useCallback(
+    (collectIntent: boolean) => {
+      if (rawStatus !== "ASSIGNED" || !current?.id) return
+      const amount = validateHelperAmount()
+      if (amount == null) return
 
-              void startDirectPayment("REQUESTER")
+      withPaymentNoticeGate(() => {
+        Alert.alert(
+          t("payment:direct.methodTitle"),
+          t("payment:direct.methodBody"),
+          [
+            {
+              text: t("payment:direct.scanMethod"),
+              onPress: () => launchScanMethod(collectIntent, amount),
             },
-          },
-          {
-            text: t("payment:direct.payRequester", { name: requesterFirstName }),
-            onPress: () => {
-              void startDirectPayment("HELPER")
+            {
+              text: t("payment:direct.directMethod"),
+              onPress: () => {
+                void startDirectPayment(collectIntent ? "REQUESTER" : "HELPER", amount)
+              },
             },
-          },
-          { text: t("common:cancel"), style: "cancel" },
-        ],
-      )
-    })
-  }, [
-    current,
-    helperPaymentAmountInput,
-    myPaymentProfile.hasProfile,
-    navigation,
-    rawStatus,
-    t,
-    withPaymentNoticeGate,
-  ])
+            { text: t("common:cancel"), style: "cancel" },
+          ],
+        )
+      }, collectIntent ? "collect" : "pay")
+    },
+    [current, launchScanMethod, rawStatus, startDirectPayment, t, validateHelperAmount, withPaymentNoticeGate],
+  )
+
+  const onRequestPayment = useCallback(() => choosePaymentMethod(true), [choosePaymentMethod])
+  const onPayRequester = useCallback(() => choosePaymentMethod(false), [choosePaymentMethod])
 
   const onRevealPhone = useCallback(async () => {
     if (!current?.id) return
@@ -1774,8 +1741,8 @@ ${t("payment:notice.line2")}`,
       onConfirmReason,
       onReassign,
       openPaymentFlow,
-      openDirectPaymentFlow,
-      openPaymentsScanner,
+      onRequestPayment,
+      onPayRequester,
       loadActivePayment,
       onHelperPaymentAmountChange: (value: string) => {
         setHelperPaymentAmountInput(sanitizePaymentAmountInput(value))

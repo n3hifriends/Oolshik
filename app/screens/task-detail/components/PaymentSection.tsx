@@ -7,18 +7,23 @@ import { useAppTheme } from "@/theme/context"
 
 type PaymentSectionProps = {
   showHelperScanner: boolean
-  paymentsTitle: string
-  paymentsHint: string
+  settlePaymentTitle: string
+  settlePaymentHint: string
   amountInrLabel: string
   helperAmountInput: string
   helperAmountError: string | null
   onHelperAmountChange: (value: string) => void
-  onOpenScanner: () => void
-  paymentButtonLabel: string
-  directPaymentLabel: string
+  requestPaymentLabel: string
+  requestPaymentCaption: string
+  payRequesterLabel: string
+  payRequesterCaption: string
+  onRequestPayment: () => void
+  onPayRequester: () => void
   PaymentAmountPrefix: (props: TextFieldAccessoryProps) => React.ReactNode
   showActivePayment: boolean
-  paymentUpdateTitle: string
+  paymentRequestedTitle: string
+  waitingForPaymentTitle: string
+  paymentInProgressTitle: string
   paymentStatusText: string
   paymentAmountText?: string | null
   paymentExpiryText?: string | null
@@ -28,7 +33,6 @@ type PaymentSectionProps = {
   payWithUpiLabel: string
   refreshLabel: string
   onOpenPaymentFlow: () => void
-  onOpenDirectPaymentFlow: () => void
   onRefreshPayment: () => void
   showHelperWaitingText: boolean
   helperWaitingText: string
@@ -55,36 +59,48 @@ export function PaymentSection(props: PaymentSectionProps) {
             paddingTop: 12,
           }}
         >
-          <Text text={props.paymentsTitle} preset="subheading" />
-          <Text text={props.paymentsHint} size="xs" style={{ color: theme.colors.textDim }} />
+          <Text text={props.settlePaymentTitle} preset="subheading" />
+          <Text text={props.settlePaymentHint} size="xs" style={{ color: theme.colors.textDim }} />
           <Text text={props.amountInrLabel} size="xs" style={{ color: theme.colors.textDim }} />
-          <View style={{ flexDirection: "row", alignItems: "stretch", gap: props.spacingXs }}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                value={props.helperAmountInput}
-                onChangeText={props.onHelperAmountChange}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                status={props.helperAmountError ? "error" : undefined}
-                LeftAccessory={props.PaymentAmountPrefix}
-                inputWrapperStyle={{ minHeight: 48, borderRadius: 10 }}
-                containerStyle={{ marginBottom: 0 }}
-              />
-            </View>
-            <Button
-              text={props.paymentButtonLabel}
-              onPress={props.onOpenScanner}
-              style={{ minWidth: 120, minHeight: 48, justifyContent: "center" }}
-            />
-          </View>
-          <Button
-            text={props.directPaymentLabel}
-            onPress={props.onOpenDirectPaymentFlow}
-            style={{ minHeight: 46, justifyContent: "center" }}
+          <TextField
+            value={props.helperAmountInput}
+            onChangeText={props.onHelperAmountChange}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            status={props.helperAmountError ? "error" : undefined}
+            LeftAccessory={props.PaymentAmountPrefix}
+            inputWrapperStyle={{ minHeight: 48, borderRadius: 10 }}
+            containerStyle={{ marginBottom: 0 }}
           />
           {props.helperAmountError ? (
             <Text text={props.helperAmountError} size="xs" style={{ color: theme.colors.error }} />
           ) : null}
+
+          <View style={{ gap: 2 }}>
+            <Button
+              text={props.requestPaymentLabel}
+              onPress={props.onRequestPayment}
+              style={{ minHeight: 48, justifyContent: "center" }}
+            />
+            <Text
+              text={props.requestPaymentCaption}
+              size="xxs"
+              style={{ color: theme.colors.textDim, textAlign: "center" }}
+            />
+          </View>
+
+          <View style={{ gap: 2 }}>
+            <Button
+              text={props.payRequesterLabel}
+              onPress={props.onPayRequester}
+              style={{ minHeight: 48, justifyContent: "center" }}
+            />
+            <Text
+              text={props.payRequesterCaption}
+              size="xxs"
+              style={{ color: theme.colors.textDim, textAlign: "center" }}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -103,7 +119,16 @@ export function PaymentSection(props: PaymentSectionProps) {
             paddingTop: 12,
           }}
         >
-          <Text text={props.paymentUpdateTitle} preset="subheading" />
+          <Text
+            text={
+              props.canRequesterPay
+                ? props.paymentRequestedTitle
+                : props.showHelperWaitingText
+                  ? props.waitingForPaymentTitle
+                  : props.paymentInProgressTitle
+            }
+            preset="subheading"
+          />
           <Text text={props.paymentStatusText} size="xs" style={{ color: theme.colors.textDim }} />
           {props.paymentAmountText ? <Text text={props.paymentAmountText} size="xs" style={{ color: theme.colors.textDim }} /> : null}
           {props.paymentExpiryText ? <Text text={props.paymentExpiryText} size="xs" style={{ color: theme.colors.textDim }} /> : null}

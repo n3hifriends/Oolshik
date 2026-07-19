@@ -246,22 +246,27 @@ export default function TaskDetailScreen({ navigation }: Props) {
 
       <PaymentSection
         showHelperScanner={payment.canOpenPaymentsScanner}
-        paymentsTitle={t("oolshik:taskDetailScreen.payments")}
-        paymentsHint={t("oolshik:taskDetailScreen.paymentsHint")}
+        settlePaymentTitle={t("oolshik:taskDetailScreen.settlePayment")}
+        settlePaymentHint={t("oolshik:taskDetailScreen.settlePaymentHint")}
         amountInrLabel={t("oolshik:taskDetailScreen.amountInr")}
         helperAmountInput={state.helperPaymentAmountInput}
         helperAmountError={state.helperPaymentAmountError}
         onHelperAmountChange={handlers.onHelperPaymentAmountChange}
-        onOpenScanner={handlers.openPaymentsScanner}
-        paymentButtonLabel={t("oolshik:taskDetailScreen.payments")}
-        directPaymentLabel={t("payment:direct.helperCta")}
+        requestPaymentLabel={t("oolshik:taskDetailScreen.requestPaymentCta")}
+        requestPaymentCaption={t("oolshik:taskDetailScreen.requestPaymentCaption")}
+        payRequesterLabel={t("oolshik:taskDetailScreen.payRequesterCta")}
+        payRequesterCaption={t("oolshik:taskDetailScreen.payRequesterCaption")}
+        onRequestPayment={handlers.onRequestPayment}
+        onPayRequester={handlers.onPayRequester}
         PaymentAmountPrefix={payment.PaymentAmountPrefix}
         showActivePayment={
           (role.isRequester || role.isHelper) &&
           statusInfo.rawStatus === "ASSIGNED" &&
           !!state.activePayment
         }
-        paymentUpdateTitle={t("oolshik:taskDetailScreen.paymentUpdate")}
+        paymentRequestedTitle={t("oolshik:taskDetailScreen.paymentRequestedTitle")}
+        waitingForPaymentTitle={t("oolshik:taskDetailScreen.waitingForPaymentTitle")}
+        paymentInProgressTitle={t("oolshik:taskDetailScreen.paymentInProgressTitle")}
         paymentStatusText={payment.paymentStatusText}
         paymentAmountText={payment.paymentAmountText}
         paymentExpiryText={payment.paymentExpiresText}
@@ -271,7 +276,6 @@ export default function TaskDetailScreen({ navigation }: Props) {
         payWithUpiLabel={t("oolshik:taskDetailScreen.payWithUpi")}
         refreshLabel={t("oolshik:taskDetailScreen.refresh")}
         onOpenPaymentFlow={handlers.openPaymentFlow}
-        onOpenDirectPaymentFlow={handlers.openDirectPaymentFlow}
         onRefreshPayment={handlers.loadActivePayment}
         showHelperWaitingText={derived.paymentRequesterNotified}
         helperWaitingText={t("oolshik:taskDetailScreen.requesterNotifiedForPayment")}
