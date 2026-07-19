@@ -5,7 +5,11 @@
       "Skill(code-review)",
       "Skill(code-review:*)",
       "Bash(awk -F: '{print $1, $2}')",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.get\\('expo',{}\\).items\\(\\) if k in ['name','version','android','ios','slug']}, indent=2\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.get\\('expo',{}\\).items\\(\\) if k in ['name','version','android','ios','slug']}, indent=2\\)\\)\")",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(git status *)",
+      "Bash(echo \"EXIT:$?\")"
     ],
     "additionalDirectories": [
       "/Users/nitinkalokhe/Ni3/spring_boot_proj/oolshik-backend-otp/src/main/java/com/oolshik/backend/payment"

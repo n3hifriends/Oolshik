@@ -7,7 +7,7 @@
       "extends": "production",
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:8082",
+        "EXPO_PUBLIC_API_URL": "https://www.oolshik.in",
         "EXPO_PUBLIC_OOLSHIK_ENV": "local"
       },
       "android": {

@@ -20,6 +20,10 @@
       <action android:name="android.intent.action.VIEW"/>
       <data android:scheme="upi"/>
     </intent>
+    <intent>
+      <action android:name="android.intent.action.VIEW"/>
+      <data android:scheme="geo"/>
+    </intent>
     <package android:name="com.phonepe.app"/>
     <package android:name="com.google.android.apps.nbu.paisa.user"/>
     <package android:name="net.one97.paytm"/>

@@ -95,6 +95,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
               distanceLabel={derived.distanceLabel}
               distanceAwayText={derived.distanceAwayText}
               onOpenMap={handlers.openMap}
+              canOpenMap={derived.canOpenMap}
               mapLabel={t("oolshik:taskDetailScreen.map")}
               openMapA11y={t("oolshik:taskDetailScreen.openMapA11y")}
               statusLabel={statusInfo.statusChip.label}

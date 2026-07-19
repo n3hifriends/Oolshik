@@ -1393,7 +1393,11 @@ ${t("payment:notice.line2")}`,
   }, [coords, current?.id, fetchNearby, status, t])
 
   const openInMaps = useCallback(
-    async (lat: number, lon: number, label = "Task") => {
+    async (
+      lat: number | null | undefined,
+      lon: number | null | undefined,
+      label = "Task",
+    ) => {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
         Alert.alert(
           t("oolshik:taskDetailScreen.locationUnavailableTitle"),
@@ -1423,8 +1427,8 @@ ${t("payment:notice.line2")}`,
           await Linking.openURL(googleWeb)
           return
         }
-      } catch {
-        // fall through to alert
+      } catch (err) {
+        breadcrumb(`task:open_map_failed error=${err instanceof Error ? err.message : String(err)}`)
       }
 
       Alert.alert(
@@ -1748,7 +1752,7 @@ ${t("payment:notice.line2")}`,
       onRevealPhone,
       onCall,
       togglePlay: toggle,
-      openMap: () => openInMaps(current?.latitude || 0, current?.longitude || 0),
+      openMap: () => openInMaps(current?.latitude, current?.longitude),
       onAccept,
       onAuthorize,
       onMarkDone,

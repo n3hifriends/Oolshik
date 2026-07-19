@@ -19,6 +19,7 @@ type TaskSummaryCardProps = {
   distanceLabel: string | null
   distanceAwayText: string
   onOpenMap: () => void
+  canOpenMap: boolean
   mapLabel: string
   openMapA11y: string
   statusLabel: string
@@ -137,6 +138,7 @@ export function TaskSummaryCard(props: TaskSummaryCardProps) {
 
           <Pressable
             onPress={props.onOpenMap}
+            disabled={!props.canOpenMap}
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -149,8 +151,10 @@ export function TaskSummaryCard(props: TaskSummaryCardProps) {
               borderColor: props.primary200,
               maxWidth: 96,
               flexShrink: 1,
+              opacity: props.canOpenMap ? 1 : 0.4,
             }}
             accessibilityRole="button"
+            accessibilityState={{ disabled: !props.canOpenMap }}
             accessibilityLabel={props.openMapA11y}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >

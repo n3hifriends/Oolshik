@@ -135,7 +135,7 @@ function isSpringSecurityForbidden(data: unknown) {
 
 const devHost = Platform.select({
   ios: "http://localhost:8080",
-  android: "http://10.0.2.2:8080",
+  android: "https://www.oolshik.in",
   web: "http://localhost:8080",
 })
 const rawHost = (Config.API_URL && Config.API_URL.trim().length > 0 ? Config.API_URL : devHost)!
@@ -817,8 +817,7 @@ export const OolshikApi = {
   updateMe: (patch: Record<string, unknown>) => api.put<AuthMeResponse>("/auth/me", patch),
   setOnboardingPhase: (phase: OnboardingPhase) =>
     api.put<AuthMeResponse>("/auth/me", { onboardingPhase: phase }),
-  checkZone: (lat: number, lng: number) =>
-    api.post<ZoneCheckResponse>("/zone/check", { lat, lng }),
+  checkZone: (lat: number, lng: number) => api.post<ZoneCheckResponse>("/zone/check", { lat, lng }),
   joinWaitlist: (lat: number, lng: number) =>
     api.post<{ queued: boolean }>("/zone/waitlist", { lat, lng }),
   getPreferredLanguage: () => api.get<{ preferredLanguage?: string }>("/auth/me/language"),

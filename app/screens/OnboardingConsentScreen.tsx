@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react"
-import { View, Pressable, Modal, ScrollView } from "react-native"
+import { View, Pressable, Modal, ScrollView, ActivityIndicator } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -39,9 +39,12 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   )
   const [, setConsentMeta] = useMMKVString("consent.v1.meta", storage)
 
-  const { coords, granted, request } = useForegroundLocation({ autoRequest: false }) as {
+  const { coords, granted, status: locationStatus, request } = useForegroundLocation({
+    autoRequest: false,
+  }) as {
     coords?: { latitude: number; longitude: number } | null
     granted?: boolean
+    status?: "idle" | "loading" | "ready" | "denied" | "error"
     request?: () => void
   }
 
@@ -121,10 +124,13 @@ export default function OnboardingConsentScreen({ navigation }: any) {
     }
   }
 
-  const canContinue = useMemo(
-    () => Boolean(accepted && granted && coords),
-    [accepted, granted, coords],
-  )
+  // A GPS fix (`coords`) is best-effort, not required: the zone-eligibility check
+  // performed on Continue already falls back to "eligible" when `coords` is absent
+  // (see the Continue handler below), so gating the button on `granted` alone keeps
+  // the UI consistent with what actually happens after it's pressed.
+  const canContinue = useMemo(() => Boolean(accepted && granted), [accepted, granted])
+  const isLocating = granted && locationStatus === "loading" && !coords
+  const locationFailed = granted && locationStatus === "error" && !coords
 
   const consentSections = [
     {
@@ -248,11 +254,47 @@ export default function OnboardingConsentScreen({ navigation }: any) {
               }}
             />
           ) : (
-            <Text
-              text={t("oolshik:consent.locationGranted")}
-              size="xs"
-              style={{ color: colors.palette.neutral600 }}
-            />
+            <View style={{ gap: spacing.xxs }}>
+              <Text
+                text={t("oolshik:consent.locationGranted")}
+                size="xs"
+                style={{ color: colors.palette.neutral600 }}
+              />
+              {isLocating ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                  <ActivityIndicator size="small" />
+                  <Text
+                    text={t("oolshik:consent.locating")}
+                    size="xs"
+                    style={{ color: colors.palette.neutral600 }}
+                  />
+                </View>
+              ) : null}
+              {locationFailed ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                  <Text
+                    text={t("oolshik:consent.locationErrorBody")}
+                    size="xs"
+                    style={{ color: colors.palette.neutral600 }}
+                  />
+                  <Pressable
+                    onPress={async () => {
+                      try {
+                        await request?.()
+                      } catch {}
+                    }}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      text={t("oolshik:consent.retryLocation")}
+                      size="xs"
+                      weight="medium"
+                      style={{ color: colors.palette.primary600 }}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
           )
         ) : null}
 
