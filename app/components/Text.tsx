@@ -1,13 +1,13 @@
 import { ReactNode, forwardRef, ForwardedRef } from "react"
 // eslint-disable-next-line no-restricted-imports
 import { StyleProp, Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native"
-import { TOptions } from "i18next"
+import i18n, { TOptions } from "i18next"
 
 import { isRTL, TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
-import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
 import { useAppTheme } from "@/theme/context"
-import { typography } from "@/theme/typography"
+import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
+import { primaryFontFor, typography } from "@/theme/typography"
 
 type Sizes = keyof typeof $sizeStyles
 type Weights = keyof typeof typography.primary
@@ -64,10 +64,11 @@ export const Text = forwardRef(function Text(props: TextProps, ref: ForwardedRef
   const content = i18nText || text || children
 
   const preset: Presets = props.preset ?? "default"
+  const fontWeightStyles = fontWeightStylesFor(i18n.language)
   const $styles: StyleProp<TextStyle> = [
     $rtlStyle,
-    themed($presets[preset]),
-    weight && $fontWeightStyles[weight],
+    themed(presetsFor(fontWeightStyles)[preset]),
+    weight && fontWeightStyles[weight],
     size && $sizeStyles[size],
     $styleOverride,
   ]
@@ -89,28 +90,36 @@ const $sizeStyles = {
   xxs: { fontSize: 12, lineHeight: 18 } satisfies TextStyle,
 }
 
-const $fontWeightStyles = Object.entries(typography.primary).reduce((acc, [weight, fontFamily]) => {
-  return { ...acc, [weight]: { fontFamily } }
-}, {}) as Record<Weights, TextStyle>
-
-const $baseStyle: ThemedStyle<TextStyle> = (theme) => ({
-  ...$sizeStyles.sm,
-  ...$fontWeightStyles.normal,
-  color: theme.colors.text,
-})
-
-const $presets: Record<Presets, ThemedStyleArray<TextStyle>> = {
-  default: [$baseStyle],
-  bold: [$baseStyle, { ...$fontWeightStyles.bold }],
-  heading: [
-    $baseStyle,
-    {
-      ...$sizeStyles.xxl,
-      ...$fontWeightStyles.bold,
-    },
-  ],
-  subheading: [$baseStyle, { ...$sizeStyles.lg, ...$fontWeightStyles.medium }],
-  formLabel: [$baseStyle, { ...$fontWeightStyles.medium }],
-  formHelper: [$baseStyle, { ...$sizeStyles.sm, ...$fontWeightStyles.normal }],
+function fontWeightStylesFor(languageCode?: string | null): Record<Weights, TextStyle> {
+  const family = primaryFontFor(languageCode)
+  return Object.entries(family).reduce((acc, [weight, fontFamily]) => {
+    return { ...acc, [weight]: { fontFamily } }
+  }, {}) as Record<Weights, TextStyle>
 }
+
+function presetsFor(
+  fontWeightStyles: Record<Weights, TextStyle>,
+): Record<Presets, ThemedStyleArray<TextStyle>> {
+  const $baseStyle: ThemedStyle<TextStyle> = (theme) => ({
+    ...$sizeStyles.sm,
+    ...fontWeightStyles.normal,
+    color: theme.colors.text,
+  })
+
+  return {
+    default: [$baseStyle],
+    bold: [$baseStyle, { ...fontWeightStyles.bold }],
+    heading: [
+      $baseStyle,
+      {
+        ...$sizeStyles.xxl,
+        ...fontWeightStyles.bold,
+      },
+    ],
+    subheading: [$baseStyle, { ...$sizeStyles.lg, ...fontWeightStyles.medium }],
+    formLabel: [$baseStyle, { ...fontWeightStyles.medium }],
+    formHelper: [$baseStyle, { ...$sizeStyles.sm, ...fontWeightStyles.normal }],
+  }
+}
+
 const $rtlStyle: TextStyle = isRTL ? { writingDirection: "rtl" } : {}

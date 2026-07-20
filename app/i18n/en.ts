@@ -923,7 +923,7 @@ const en = {
         "Check that the payee name matches who you know from this request. If unsure, do not pay and contact support.",
       collectTitle: "Before you request payment",
       collectLine1:
-        "This sends a payment request to your neighbour — money only moves once they pay from their own UPI app. Oolshik does not process or hold funds.",
+        "This sends a payment request to your neighbour - money only moves once they pay from their own UPI app. Oolshik does not process or hold funds.",
       collectLine2:
         "Make sure the amount is correct before sending. If unsure, cancel and confirm with them first.",
       primaryCta: "Continue",

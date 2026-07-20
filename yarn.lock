@@ -1695,6 +1695,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@expo-google-fonts/noto-sans-devanagari@npm:^0.4.1":
+  version: 0.4.1
+  resolution: "@expo-google-fonts/noto-sans-devanagari@npm:0.4.1"
+  checksum: 10c0/b4b286f8a8563db4ec7c0bb772cf3015b4f25520dd35d8b55a05af34bf23e58077be475eab56179fa2dfb454797a8e6fcc4eaf73d85e35fdc330faf32b4a4958
+  languageName: node
+  linkType: hard
+
 "@expo-google-fonts/space-grotesk@npm:^0.4.0":
   version: 0.4.1
   resolution: "@expo-google-fonts/space-grotesk@npm:0.4.1"
@@ -10640,6 +10647,7 @@ __metadata:
     "@babel/core": "npm:^7.20.0"
     "@babel/preset-env": "npm:^7.20.0"
     "@babel/runtime": "npm:^7.20.0"
+    "@expo-google-fonts/noto-sans-devanagari": "npm:^0.4.1"
     "@expo-google-fonts/space-grotesk": "npm:^0.4.0"
     "@expo/metro-runtime": "npm:~5.0.5"
     "@react-native-community/slider": "npm:4.5.6"

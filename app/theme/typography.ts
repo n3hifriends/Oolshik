@@ -3,6 +3,13 @@
 
 import { Platform } from "react-native"
 import {
+  NotoSansDevanagari_300Light as notoSansDevanagariLight,
+  NotoSansDevanagari_400Regular as notoSansDevanagariRegular,
+  NotoSansDevanagari_500Medium as notoSansDevanagariMedium,
+  NotoSansDevanagari_600SemiBold as notoSansDevanagariSemiBold,
+  NotoSansDevanagari_700Bold as notoSansDevanagariBold,
+} from "@expo-google-fonts/noto-sans-devanagari"
+import {
   SpaceGrotesk_300Light as spaceGroteskLight,
   SpaceGrotesk_400Regular as spaceGroteskRegular,
   SpaceGrotesk_500Medium as spaceGroteskMedium,
@@ -16,6 +23,11 @@ export const customFontsToLoad = {
   spaceGroteskMedium,
   spaceGroteskSemiBold,
   spaceGroteskBold,
+  notoSansDevanagariLight,
+  notoSansDevanagariRegular,
+  notoSansDevanagariMedium,
+  notoSansDevanagariSemiBold,
+  notoSansDevanagariBold,
 }
 
 const fonts = {
@@ -26,6 +38,15 @@ const fonts = {
     medium: "spaceGroteskMedium",
     semiBold: "spaceGroteskSemiBold",
     bold: "spaceGroteskBold",
+  },
+  notoSansDevanagari: {
+    // Space Grotesk has no Devanagari glyphs, so Marathi/Hindi text needs a
+    // script-appropriate font — otherwise Android silently drops the glyphs.
+    light: "notoSansDevanagariLight",
+    normal: "notoSansDevanagariRegular",
+    medium: "notoSansDevanagariMedium",
+    semiBold: "notoSansDevanagariSemiBold",
+    bold: "notoSansDevanagariBold",
   },
   helveticaNeue: {
     // iOS only font.
@@ -68,4 +89,16 @@ export const typography = {
    * Lets get fancy with a monospace font!
    */
   code: Platform.select({ ios: fonts.courier, android: fonts.monospace }),
+}
+
+/**
+ * Picks the primary font family for the given i18n language code.
+ * Devanagari-script locales (mr, hi) need `notoSansDevanagari` since
+ * `spaceGrotesk` has no Devanagari glyphs.
+ */
+export function primaryFontFor(languageCode?: string | null): typeof fonts.spaceGrotesk {
+  return languageCode?.toLowerCase().startsWith("mr") ||
+    languageCode?.toLowerCase().startsWith("hi")
+    ? fonts.notoSansDevanagari
+    : fonts.spaceGrotesk
 }

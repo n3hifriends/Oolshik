@@ -234,6 +234,7 @@ export function useTaskDetailController({
   const [myPaymentProfile, setMyPaymentProfile] = useState<PaymentProfileApiResponse>({
     hasProfile: false,
   })
+  const [myPaymentProfileLoading, setMyPaymentProfileLoading] = useState(true)
 
   const primary = colors.palette.primary500
   const neutral600 = colors.palette.neutral600
@@ -394,23 +395,21 @@ export function useTaskDetailController({
   }, [isHelper, isRequester, taskId])
 
   const loadMyPaymentProfile = useCallback(async () => {
-    if (!isHelper) {
-      setMyPaymentProfile({ hasProfile: false })
-      return
-    }
-
+    setMyPaymentProfileLoading(true)
     try {
       const res = await OolshikApi.getMyPaymentProfile()
       if (res.ok && res.data) {
         setMyPaymentProfile(res.data)
         return
       }
+      setMyPaymentProfile({ hasProfile: false })
     } catch {
       // best-effort
+      setMyPaymentProfile({ hasProfile: false })
+    } finally {
+      setMyPaymentProfileLoading(false)
     }
-
-    setMyPaymentProfile({ hasProfile: false })
-  }, [isHelper])
+  }, [])
 
   const refreshTask = useCallback(async () => {
     if (!taskId || refreshInFlightRef.current) return
@@ -790,6 +789,8 @@ ${t(line2Key)}`,
       if (!current?.id) return
       const requesterName = toFirstName(current.createdByName ?? t("payment:qr.requester"))
 
+      if (collectIntent && myPaymentProfileLoading) return
+
       if (collectIntent && !myPaymentProfile.hasProfile) {
         InteractionManager.runAfterInteractions(() => {
           Alert.alert(
@@ -820,12 +821,21 @@ ${t(line2Key)}`,
         collectIntent,
       })
     },
-    [current, myPaymentProfile.hasProfile, myPaymentProfile.payeeLabel, navigation, t],
+    [
+      current,
+      myPaymentProfile.hasProfile,
+      myPaymentProfile.payeeLabel,
+      myPaymentProfileLoading,
+      navigation,
+      t,
+    ],
   )
 
   const startDirectPayment = useCallback(
     async (payerRole: PaymentPayerRole, amount: number) => {
       if (!current?.id) return
+
+      if (payerRole === "REQUESTER" && myPaymentProfileLoading) return
 
       if (payerRole === "REQUESTER" && !myPaymentProfile.hasProfile) {
         Alert.alert(
@@ -905,7 +915,7 @@ ${t(line2Key)}`,
         Alert.alert(alertCopy.title, alertCopy.body)
       }
     },
-    [current, myPaymentProfile.hasProfile, navigation, t],
+    [current, myPaymentProfile.hasProfile, myPaymentProfileLoading, navigation, t],
   )
 
   const choosePaymentMethod = useCallback(
@@ -1604,6 +1614,7 @@ ${t(line2Key)}`,
       activePayment,
       activePayments,
       paymentLoading,
+      myPaymentProfileLoading,
       offerInput,
       offerSaving,
       offerNotice,

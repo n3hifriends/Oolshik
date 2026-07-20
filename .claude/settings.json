@@ -9,10 +9,41 @@
       "Bash(git check-ignore *)",
       "Bash(echo \"exit code: $?\")",
       "Bash(git status *)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(node -e \"require\\('./node_modules/@react-native-firebase/app/plugin/build'\\)\")",
+      "Bash(npx eas-cli *)",
+      "Bash(find \"$HOME/Library/Application Support/Code/User/History\" -type d -newer \"$HOME/Library/Application Support/Code\" 2>/dev/null | head -1 *)",
+      "Read(//Users/nitinkalokhe/Library/Application Support/Code/User/History/**)",
+      "Bash(git checkout *)",
+      "Bash(cp \"/Users/nitinkalokhe/Library/Application Support/Code/User/History/1d6e37b5/W9bM.gradle\" \"/Users/nitinkalokhe/Ni3/Oolshik/android/app/build.gradle\" *)",
+      "Bash(nvm current *)",
+      "Bash(nvm list *)",
+      "Bash(yarn --version)",
+      "Bash(/opt/homebrew/bin/node -v)",
+      "Bash(/usr/local/bin/node -v)",
+      "Read(//Users/nitinkalokhe/**)",
+      "Bash(env -i HOME=/Users/nitinkalokhe SHELL=/bin/zsh /bin/zsh -i -c 'echo NODE=$\\(which node\\); node -v')",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(echo \"chromium-cli exit=$?\")",
+      "Bash(lsof -ti:8081 -sTCP:LISTEN)",
+      "Bash(lsof -ti:19006 -sTCP:LISTEN)",
+      "Bash(ps -p 41646 -o pid,command)",
+      "Bash(python3 -c ' *)",
+      "Bash(npx eslint *)",
+      "Bash(npx jest *)",
+      "Bash(grep -n \"paymentLoading,\\\\|activePayments,\\\\|^  return {\\\\|state: {\" /Users/nitinkalokhe/Ni3/Oolshik/app/screens/task-detail/hooks/useTaskDetailController.tsx)",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./node_modules/@react-native-firebase/app/package.json'\\).exports, null, 2\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/expo/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@expo/config-plugins/package.json'\\).version\\)\")",
+      "Bash(node -e \"const m = require\\('./node_modules/@react-native-firebase/app'\\); console.log\\(typeof m, typeof m.default\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(grep -v \"^\\\\./node_modules$\")"
     ],
     "additionalDirectories": [
-      "/Users/nitinkalokhe/Ni3/spring_boot_proj/oolshik-backend-otp/src/main/java/com/oolshik/backend/payment"
+      "/Users/nitinkalokhe/Ni3/spring_boot_proj/oolshik-backend-otp/src/main/java/com/oolshik/backend/payment",
+      "/Users/nitinkalokhe/Library/Application Support/Code/User/History/1d6e37b5",
+      "/Users/nitinkalokhe"
     ]
   }
 }

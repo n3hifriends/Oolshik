@@ -185,7 +185,14 @@ export function Button(props: ButtonProps) {
             />
           ) : null}
 
-          <Text tx={tx} text={text} txOptions={txOptions} maxFontSizeMultiplier={1.2} style={$textStyle(state)}>
+          <Text
+            tx={tx}
+            text={text}
+            txOptions={txOptions}
+            weight="medium"
+            maxFontSizeMultiplier={1.2}
+            style={$textStyle(state)}
+          >
             {children}
           </Text>
 
@@ -212,14 +219,17 @@ const $baseViewStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   overflow: "hidden",
 })
 
-const $baseTextStyle: ThemedStyle<TextStyle> = ({ typography }) => ({
+const $baseTextStyle: ThemedStyle<TextStyle> = () => ({
   fontSize: 15,
   lineHeight: 20,
-  fontFamily: typography.primary.medium,
   letterSpacing: 0.2,
   textAlign: "center",
   flexShrink: 1,
   flexGrow: 0,
+  // Flex items default to minWidth: "auto", which refuses to shrink below
+  // content size — that silently defeats flexShrink and stops long labels
+  // from wrapping inside this row layout (facebook/react-native#51306).
+  minWidth: 0,
   zIndex: 2,
 })
 

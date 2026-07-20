@@ -28,6 +28,7 @@ type PaymentSectionProps = {
   paymentAmountText?: string | null
   paymentExpiryText?: string | null
   paymentLoading: boolean
+  myPaymentProfileLoading: boolean
   refreshingPaymentStatusText: string
   canRequesterPay: boolean
   payWithUpiLabel: string
@@ -80,6 +81,7 @@ export function PaymentSection(props: PaymentSectionProps) {
             <Button
               text={props.requestPaymentLabel}
               onPress={props.onRequestPayment}
+              loading={props.myPaymentProfileLoading}
               style={{ minHeight: 48, justifyContent: "center" }}
             />
             <Text
@@ -93,6 +95,7 @@ export function PaymentSection(props: PaymentSectionProps) {
             <Button
               text={props.payRequesterLabel}
               onPress={props.onPayRequester}
+              loading={props.myPaymentProfileLoading}
               style={{ minHeight: 48, justifyContent: "center" }}
             />
             <Text

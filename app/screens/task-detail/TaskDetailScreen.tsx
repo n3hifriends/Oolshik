@@ -271,6 +271,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
         paymentAmountText={payment.paymentAmountText}
         paymentExpiryText={payment.paymentExpiresText}
         paymentLoading={state.paymentLoading}
+        myPaymentProfileLoading={state.myPaymentProfileLoading}
         refreshingPaymentStatusText={t("oolshik:taskDetailScreen.refreshingPaymentStatus")}
         canRequesterPay={role.isRequester && payment.paymentCanAct}
         payWithUpiLabel={t("oolshik:taskDetailScreen.payWithUpi")}
