@@ -514,12 +514,16 @@ export type PaymentRequestApiResponse = {
   validationStatus?: "MATCHED" | "NEEDS_REVIEW" | "MISMATCH" | null
   validationWarnings?: string[]
   canPay?: boolean
+  scannedUpiIntent?: string
   snapshot?: {
     taskId?: string
     payeeVpa?: string | null
     payeeMaskedVpa?: string | null
     payeeName?: string | null
     payeePhoneNumber?: string | null
+    scannedPayeeVpa?: string | null
+    scannedPayeeMaskedVpa?: string | null
+    scannedPayeeName?: string | null
     mcc?: string | null
     merchantId?: string | null
     txnRef?: string | null

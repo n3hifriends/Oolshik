@@ -36,6 +36,9 @@ type PaymentSnapshot = {
   payeeName?: string | null
   payeeVpa?: string | null
   payeeMaskedVpa?: string | null
+  scannedPayeeName?: string | null
+  scannedPayeeVpa?: string | null
+  scannedPayeeMaskedVpa?: string | null
   amountRequested?: number | null
   note?: string | null
   txnRef?: string | null
@@ -52,6 +55,7 @@ type PaymentSnapshot = {
 
 type PaymentRequestPayload = {
   upiIntent?: string
+  scannedUpiIntent?: string
   supportLink?: string
   payerRole?: "REQUESTER" | "HELPER"
   payerName?: string | null
@@ -145,6 +149,10 @@ const mergePaymentPayload = (
   mergedSnapshot.payeeName = next.snapshot.payeeName ?? base.snapshot.payeeName ?? null
   mergedSnapshot.payeeVpa = next.snapshot.payeeVpa ?? base.snapshot.payeeVpa ?? null
   mergedSnapshot.payeeMaskedVpa = next.snapshot.payeeMaskedVpa ?? base.snapshot.payeeMaskedVpa ?? null
+  mergedSnapshot.scannedPayeeVpa = next.snapshot.scannedPayeeVpa ?? base.snapshot.scannedPayeeVpa ?? null
+  mergedSnapshot.scannedPayeeMaskedVpa =
+    next.snapshot.scannedPayeeMaskedVpa ?? base.snapshot.scannedPayeeMaskedVpa ?? null
+  mergedSnapshot.scannedPayeeName = next.snapshot.scannedPayeeName ?? base.snapshot.scannedPayeeName ?? null
   mergedSnapshot.note = next.snapshot.note ?? base.snapshot.note ?? null
   mergedSnapshot.status = next.snapshot.status ?? base.snapshot.status ?? DEFAULT_STATUS
   mergedSnapshot.lastUpdated = next.snapshot.lastUpdated ?? base.snapshot.lastUpdated ?? null
@@ -157,6 +165,7 @@ const mergePaymentPayload = (
 
   return {
     upiIntent: next.upiIntent ?? base.upiIntent,
+    scannedUpiIntent: next.scannedUpiIntent ?? base.scannedUpiIntent,
     supportLink: next.supportLink ?? base.supportLink,
     payerRole: next.payerRole ?? base.payerRole,
     payerName: next.payerName ?? base.payerName ?? null,
@@ -208,6 +217,8 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const [isConfirming, setIsConfirming] = useState(false)
   const [hasLaunchedUpi, setHasLaunchedUpi] = useState(false)
   const [isFallbackExpanded, setIsFallbackExpanded] = useState(false)
+  const [lastLaunchedKind, setLastLaunchedKind] = useState<"profile" | "scanned">("profile")
+  const [launchingKind, setLaunchingKind] = useState<"profile" | "scanned" | null>(null)
   const requestIdRef = useRef(0)
 
   const loadPayment = useCallback(async () => {
@@ -245,13 +256,17 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
     loadPayment()
   }, [loadPayment])
 
-  const handleLaunchUpi = useCallback(async () => {
-    const upiIntent = payment?.upiIntent ?? seedPayment?.upiIntent
+  const handleLaunchUpi = useCallback(async (kind: "profile" | "scanned" = "profile") => {
+    const upiIntent =
+      kind === "scanned"
+        ? payment?.scannedUpiIntent
+        : (payment?.upiIntent ?? seedPayment?.upiIntent)
     if (!upiIntent) {
       Alert.alert(t("payment:pay.unavailableTitle"), t("payment:pay.noUpiBody"))
       return
     }
     setIsLaunchingPayment(true)
+    setLaunchingKind(kind)
     try {
       const identifier =
         paymentRequestId ?? payment?.snapshot.id ?? seedPayment?.snapshot.id ?? taskId
@@ -259,6 +274,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         await OolshikApi.initiatePayment(identifier)
       }
       await Linking.openURL(upiIntent)
+      setLastLaunchedKind(kind)
       setHasLaunchedUpi(true)
       setIsFallbackExpanded(true)
     } catch {
@@ -269,6 +285,7 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
       )
     } finally {
       setIsLaunchingPayment(false)
+      setLaunchingKind(null)
     }
   }, [payment, paymentRequestId, seedPayment, t])
 
@@ -451,6 +468,9 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
   const highlights = snapshot.highlights ?? []
   const disclaimers = snapshot.disclaimers ?? scanPayload.guidelines ?? []
   const displayUpiId = snapshot.payeeMaskedVpa ?? maskUpiId(snapshot.payeeVpa ?? scanPayload.payeeVpa)
+  const displayScannedUpiId = snapshot.scannedPayeeMaskedVpa ?? maskUpiId(snapshot.scannedPayeeVpa)
+  const hasScannedDestination = Boolean(payment.scannedUpiIntent && snapshot.scannedPayeeVpa)
+  const activeFallbackVpa = lastLaunchedKind === "scanned" ? snapshot.scannedPayeeVpa : snapshot.payeeVpa
   const breakdownTotal = breakdown.reduce((sum, item) => sum + (item.amount ?? 0), 0)
   const inlineError = error && payment ? error : null
   const supportLink = payment?.supportLink ?? seedPayment?.supportLink
@@ -719,17 +739,59 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
         {inlineError ? <Text style={styles.errorText}>{inlineError}</Text> : null}
         {currentUserRoleInPayment === "PAYER" ? (
           <View style={styles.actions}>
-            <Button
-              text={isLaunchingPayment
-                ? t("payment:pay.openingUpi")
-                : effectivePayeeName
-                  ? t("payment:pay.payName", { name: effectivePayeeName })
-                  : t("payment:pay.openUpi")}
-              onPress={handleLaunchUpi}
-              style={styles.primaryButton}
-              textStyle={styles.primaryButtonText}
-              disabled={isLaunchingPayment}
-            />
+            {hasScannedDestination ? (
+              <>
+                <Text style={styles.cardSupport} text={t("payment:pay.chooseDestinationHint")} />
+                <View style={styles.destinationCard}>
+                  <Text style={styles.detailTileLabel} text={t("payment:pay.profileDestinationLabel")} />
+                  <Text style={[styles.detailTileValue, styles.monoValue]} text={displayUpiId ?? "—"} />
+                  {effectivePayeeName ? (
+                    <Text style={styles.monoSubtle} text={effectivePayeeName} />
+                  ) : null}
+                  <Button
+                    text={
+                      launchingKind === "profile"
+                        ? t("payment:pay.openingUpi")
+                        : t("payment:pay.payViaProfile")
+                    }
+                    onPress={() => handleLaunchUpi("profile")}
+                    style={styles.primaryButton}
+                    textStyle={styles.primaryButtonText}
+                    disabled={isLaunchingPayment}
+                  />
+                </View>
+                <View style={styles.destinationCard}>
+                  <Text style={styles.detailTileLabel} text={t("payment:pay.scannedDestinationLabel")} />
+                  <Text style={[styles.detailTileValue, styles.monoValue]} text={displayScannedUpiId ?? "—"} />
+                  {snapshot.scannedPayeeName ? (
+                    <Text style={styles.monoSubtle} text={snapshot.scannedPayeeName} />
+                  ) : null}
+                  <Button
+                    text={
+                      launchingKind === "scanned"
+                        ? t("payment:pay.openingUpi")
+                        : t("payment:pay.payViaScanned")
+                    }
+                    onPress={() => handleLaunchUpi("scanned")}
+                    style={styles.secondaryButton}
+                    textStyle={styles.secondaryButtonText}
+                    disabled={isLaunchingPayment}
+                  />
+                </View>
+              </>
+            ) : (
+              <Button
+                text={isLaunchingPayment
+                  ? t("payment:pay.openingUpi")
+                  : effectivePayeeName
+                    ? t("payment:pay.payName", { name: effectivePayeeName })
+                    : t("payment:pay.openUpi")}
+                onPress={() => handleLaunchUpi("profile")}
+                style={styles.primaryButton}
+                textStyle={styles.primaryButtonText}
+                disabled={isLaunchingPayment}
+              />
+            )}
             <Button
               text={isConfirming
                 ? t("payment:pay.markingPaid")
@@ -775,12 +837,12 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
             <View style={styles.fallbackBody}>
               <Text style={styles.fallbackHint} text={t("payment:pay.blockedPanelHint")} />
               <View style={styles.fallbackActions}>
-                {snapshot.payeeVpa ? (
+                {activeFallbackVpa ? (
                   <Pressable
                     style={styles.fallbackAction}
                     onPress={() => {
-                      Clipboard.setString(snapshot.payeeVpa!)
-                      Alert.alert(t("payment:pay.copiedToClipboard"), snapshot.payeeVpa!, [
+                      Clipboard.setString(activeFallbackVpa!)
+                      Alert.alert(t("payment:pay.copiedToClipboard"), activeFallbackVpa!, [
                         { text: t("payment:pay.close"), style: "cancel" },
                         { text: t("payment:pay.openUpi"), style: "default", onPress: handleOpenUpiAppOnly },
                       ])
@@ -817,13 +879,13 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
                 ) : null}
                 <Pressable
                   style={styles.fallbackAction}
-                  onPress={handleLaunchUpi}
+                  onPress={() => handleLaunchUpi(lastLaunchedKind)}
                   disabled={isLaunchingPayment}
                 >
                   <MaterialCommunityIcons name="refresh" size={16} color={theme.colors.palette.primary500} />
                   <Text style={styles.fallbackActionText} text={t("payment:pay.tryAgainUpi")} />
                 </Pressable>
-                {snapshot.payeePhoneNumber ? (
+                {lastLaunchedKind === "profile" && snapshot.payeePhoneNumber ? (
                   <Pressable
                     style={styles.fallbackAction}
                     onPress={() => {
@@ -921,6 +983,8 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
 
   return {
     upiIntent: candidate.upiIntent ?? response?.upiIntent ?? response?.data?.upiIntent,
+    scannedUpiIntent:
+      candidate.scannedUpiIntent ?? response?.scannedUpiIntent ?? response?.data?.scannedUpiIntent,
     supportLink: candidate.supportLink ?? response?.supportLink ?? response?.data?.supportLink,
     payerRole: candidate.payerRole ?? undefined,
     payerName: candidate.payerName ?? null,
@@ -934,6 +998,9 @@ const normalizePaymentResponse = (response: any): PaymentRequestPayload | null =
       highlights,
       payeeMaskedVpa: snapshotData.payeeMaskedVpa ?? null,
       payeePhoneNumber: snapshotData.payeePhoneNumber ?? null,
+      scannedPayeeVpa: snapshotData.scannedPayeeVpa ?? null,
+      scannedPayeeMaskedVpa: snapshotData.scannedPayeeMaskedVpa ?? null,
+      scannedPayeeName: snapshotData.scannedPayeeName ?? null,
       disclaimers: ensureStringArray(disclaimers),
     },
   }
@@ -1270,6 +1337,14 @@ const createStyles = (
     },
     referenceTileInner: {
       gap: 4,
+    },
+    destinationCard: {
+      borderRadius: 16,
+      padding: theme.spacing.sm,
+      gap: 6,
+      backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : theme.colors.palette.neutral200,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     contactLink: {
       color: theme.colors.palette.primary500,

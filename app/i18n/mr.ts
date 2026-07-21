@@ -970,6 +970,12 @@ const mr: Translations = {
       openUpi: "UPI ने भरा",
       payName: "{{name}} ला पैसे द्या",
       openingUpi: "UPI उघडत आहोत…",
+      chooseDestinationHint:
+        "या विनंतीसाठी दोन पेमेंट पर्याय दिले आहेत — भरण्यापूर्वी नाव नक्की तपासा.",
+      profileDestinationLabel: "मदतनीसाचा जतन केलेला UPI आयडी",
+      scannedDestinationLabel: "तुम्ही स्कॅन केलेल्या QR मधून",
+      payViaProfile: "मदतनीसाच्या UPI ने भरा",
+      payViaScanned: "स्कॅन केलेल्या QR ने भरा",
       markPaid: "आधीच भरले म्हणून नोंद करा",
       markingPaid: "नोंदवत आहोत…",
       iPaidName: "{{name}} ला पैसे दिले",

@@ -971,6 +971,12 @@ const en = {
       openUpi: "Pay with UPI",
       openingUpi: "Opening UPI…",
       payName: "Pay {{name}}",
+      chooseDestinationHint:
+        "Two payment destinations were provided for this request — confirm the name before paying.",
+      profileDestinationLabel: "Helper's saved UPI ID",
+      scannedDestinationLabel: "From the QR you scanned",
+      payViaProfile: "Pay via helper's UPI",
+      payViaScanned: "Pay via scanned QR",
       markPaid: "Mark as paid",
       markingPaid: "Marking…",
       iPaidName: "I paid {{name}}",
