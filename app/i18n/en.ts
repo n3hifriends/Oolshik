@@ -441,6 +441,7 @@ const en = {
       locationUnavailableBody: "Coordinates are missing.",
       noMapsTitle: "Maps app not found",
       noMapsBody: "Can't open maps on this device.\n\n{{lat}}, {{lon}}",
+      mapChooserTitle: "Open with",
       onlyRequesterCanComplete: "Only the requester can mark this as complete",
       onlyRequesterCanCompleteTitle: "Not allowed",
       errorCompletingTask: "Couldn't mark as complete",

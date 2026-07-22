@@ -446,6 +446,7 @@ const mr: Translations = {
       locationUnavailableBody: "कोऑर्डिनेट्स उपलब्ध नाहीत.",
       noMapsTitle: "मॅप्स ॲप सापडले नाही",
       noMapsBody: "या डिव्हाइसवर मॅप्स उघडता येत नाही.\n\n{{lat}}, {{lon}}",
+      mapChooserTitle: "यासह उघडा",
       onlyRequesterCanComplete: "हे काम फक्त विनंतीकर्ता पूर्ण म्हणून चिन्हांकित करू शकतो.",
       onlyRequesterCanCompleteTitle: "परवानगी नाही",
       errorCompletingTask: "काम पूर्ण करताना त्रुटी आली",

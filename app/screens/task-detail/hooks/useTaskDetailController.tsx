@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { setRequestContext, clearRequestContext, breadcrumb } from "@/utils/crashReporting"
-import { Alert, InteractionManager, Linking, Platform, View, ActivityIndicator } from "react-native"
+import { Alert, InteractionManager, Linking, View, ActivityIndicator } from "react-native"
 import { useFocusEffect } from "@react-navigation/native"
 import { Text } from "@/components/Text"
 import { Button } from "@/components/Button"
@@ -25,6 +25,12 @@ import type {
 } from "@/navigators/OolshikNavigator"
 import { OolshikApi } from "@/api"
 import { getRemoteFlag } from "@/services/remoteConfig"
+import {
+  getAvailableMapProviders,
+  launchMapProvider,
+  type MapProviderId,
+  type MapProviderOption,
+} from "@/utils/mapNavigation"
 import { getStatusColors } from "@/theme/statusColors"
 import type {
   PaymentProfileApiResponse,
@@ -224,6 +230,13 @@ export function useTaskDetailController({
   const [revealLoading, setRevealLoading] = useState(false)
 
   const [reasonModal, setReasonModal] = useState<ReasonModalState>({ visible: false })
+  const [mapChooser, setMapChooser] = useState<{
+    visible: boolean
+    lat: number
+    lon: number
+    label: string
+    options: MapProviderOption[]
+  }>({ visible: false, lat: 0, lon: 0, label: "", options: [] })
   const [activePayments, setActivePayments] = useState<PaymentRequestApiResponse[]>([])
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [offerInput, setOfferInput] = useState("")
@@ -1369,6 +1382,28 @@ ${t(line2Key)}`,
     }
   }, [coords, current?.id, fetchNearby, status, t])
 
+  const showNoMapsAlert = useCallback(
+    (lat: number, lon: number) => {
+      Alert.alert(
+        t("oolshik:taskDetailScreen.noMapsTitle"),
+        t("oolshik:taskDetailScreen.noMapsBody", { lat, lon }),
+      )
+    },
+    [t],
+  )
+
+  const launchProviderSafely = useCallback(
+    async (id: MapProviderId, lat: number, lon: number, label: string) => {
+      try {
+        await launchMapProvider(id, lat, lon, label)
+      } catch (err) {
+        breadcrumb(`task:open_map_failed error=${err instanceof Error ? err.message : String(err)}`)
+        showNoMapsAlert(lat, lon)
+      }
+    },
+    [showNoMapsAlert],
+  )
+
   const openInMaps = useCallback(
     async (
       lat: number | null | undefined,
@@ -1383,38 +1418,38 @@ ${t(line2Key)}`,
         return
       }
 
-      const safeLabel = encodeURIComponent(label)
-      const appleMaps = `https://maps.apple.com/?ll=${lat},${lon}&q=${safeLabel}`
-      const googleWeb = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}&q=(${safeLabel})`
-      const geo = `geo:${lat},${lon}?q=${lat},${lon}(${safeLabel})`
+      const safeLat = lat as number
+      const safeLon = lon as number
+      const options = await getAvailableMapProviders()
 
-      try {
-        if (Platform.OS === "android" && (await Linking.canOpenURL(geo))) {
-          await Linking.openURL(geo)
-          return
-        }
-
-        const primaryMaps = Platform.OS === "ios" ? appleMaps : googleWeb
-        if (await Linking.canOpenURL(primaryMaps)) {
-          await Linking.openURL(primaryMaps)
-          return
-        }
-
-        if (await Linking.canOpenURL(googleWeb)) {
-          await Linking.openURL(googleWeb)
-          return
-        }
-      } catch (err) {
-        breadcrumb(`task:open_map_failed error=${err instanceof Error ? err.message : String(err)}`)
+      if (options.length === 0) {
+        // Nothing detected as installed — try Google Maps anyway, it falls
+        // back to the web URL internally if the app isn't there.
+        await launchProviderSafely("googleMaps", safeLat, safeLon, label)
+        return
       }
 
-      Alert.alert(
-        t("oolshik:taskDetailScreen.noMapsTitle"),
-        t("oolshik:taskDetailScreen.noMapsBody", { lat, lon }),
-      )
+      if (options.length === 1) {
+        await launchProviderSafely(options[0].id, safeLat, safeLon, label)
+        return
+      }
+
+      setMapChooser({ visible: true, lat: safeLat, lon: safeLon, label, options })
     },
-    [t],
+    [t, launchProviderSafely],
   )
+
+  const selectMapProvider = useCallback(
+    (id: MapProviderId) => {
+      setMapChooser((prev) => ({ ...prev, visible: false }))
+      void launchProviderSafely(id, mapChooser.lat, mapChooser.lon, mapChooser.label)
+    },
+    [launchProviderSafely, mapChooser.lat, mapChooser.lon, mapChooser.label],
+  )
+
+  const closeMapChooser = useCallback(() => {
+    setMapChooser((prev) => ({ ...prev, visible: false }))
+  }, [])
 
   const renderLocationState = useCallback(() => {
     if (status === "loading" || status === "idle") {
@@ -1611,6 +1646,7 @@ ${t(line2Key)}`,
       isRevealed,
       revealLoading,
       reasonModal,
+      mapChooser,
       activePayment,
       activePayments,
       paymentLoading,
@@ -1731,6 +1767,8 @@ ${t(line2Key)}`,
       onCall,
       togglePlay: toggle,
       openMap: () => openInMaps(current?.latitude, current?.longitude),
+      selectMapProvider,
+      closeMapChooser,
       onAccept,
       onAuthorize,
       onMarkDone,

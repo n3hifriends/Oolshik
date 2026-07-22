@@ -367,6 +367,22 @@ export default function TaskDetailScreen({ navigation }: Props) {
       />
 
       <AlertDialog
+        visible={state.mapChooser.visible}
+        title={t("oolshik:taskDetailScreen.mapChooserTitle")}
+        onDismiss={handlers.closeMapChooser}
+        actions={[
+          ...state.mapChooser.options.map((option) => ({
+            text: option.label,
+            onPress: () => handlers.selectMapProvider(option.id),
+          })),
+          {
+            text: t("common:cancel"),
+            onPress: handlers.closeMapChooser,
+          },
+        ]}
+      />
+
+      <AlertDialog
         visible={state.markDoneConfirmVisible}
         title={t("oolshik:taskDetailScreen.markDoneConfirmTitle")}
         message={t("oolshik:taskDetailScreen.markDoneConfirmBody")}
