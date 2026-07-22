@@ -3,6 +3,7 @@ import { Alert, Linking, Modal, Pressable, ScrollView, View } from "react-native
 import { useFocusEffect } from "@react-navigation/native"
 import { useTranslation } from "react-i18next"
 import * as Application from "expo-application"
+import Clipboard from "@react-native-clipboard/clipboard"
 
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -137,6 +138,18 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       Alert.alert(
         t("oolshik:profileScreen.mailOpenFailedTitle"),
         t("oolshik:profileScreen.mailOpenFailedBody", { email: supportEmail }),
+        [
+          { text: t("common:ok") },
+          {
+            text: t("oolshik:profileScreen.copyEmailButton"),
+            onPress: () => {
+              Clipboard.setString(supportEmail)
+              setTimeout(() => {
+                Alert.alert(t("oolshik:profileScreen.emailCopiedConfirmation"), supportEmail)
+              }, 0)
+            },
+          },
+        ],
       )
     }
   }, [t, supportEmail])

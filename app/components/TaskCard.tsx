@@ -154,19 +154,19 @@ export function TaskCard({
         />
       </View>
 
-      {normalizedVoiceUrl || canAccept ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: spacing.xxs,
-            flexShrink: 0,
-          }}
-        >
-          {normalizedVoiceUrl ? (
-            <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} />
-          ) : undefined}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: spacing.xxs,
+          flexShrink: 0,
+        }}
+      >
+        <View style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
+          {normalizedVoiceUrl ? <VoicePlayButton uri={normalizedVoiceUrl} playKey={id} /> : null}
+        </View>
+        <View style={{ minHeight: 32, minWidth: 78 }}>
           {canAccept ? (
             <Button
               text={t("oolshik:taskCard.accept")}
@@ -181,9 +181,9 @@ export function TaskCard({
               }}
               textStyle={{ fontSize: 13, lineHeight: 18 }}
             />
-          ) : undefined}
+          ) : null}
         </View>
-      ) : undefined}
+      </View>
     </View>
   )
 
@@ -247,7 +247,9 @@ export function TaskCard({
             style={{ color: statusFg }}
           />
         </View>
-        <RatingBadge value={avgRating} />
+        <View style={{ minWidth: 64, alignItems: "flex-end" }}>
+          <RatingBadge value={avgRating} />
+        </View>
       </View>
     </View>
   )

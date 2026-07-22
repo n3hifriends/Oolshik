@@ -352,6 +352,8 @@ const mr: Translations = {
       mailSubject: "ऊलशिक सपोर्ट",
       mailOpenFailedTitle: "मेल ॲप उघडता आले नाही",
       mailOpenFailedBody: "{{email}} वर आम्हाला मेल करा",
+      copyEmailButton: "ईमेल कॉपी करा",
+      emailCopiedConfirmation: "कॉपी केले",
       contactWhatsApp: "WhatsApp सपोर्ट",
       whatsappOpenFailedTitle: "WhatsApp उघडता आले नाही",
       whatsappOpenFailedBody: "{{number}} वर WhatsApp करा",

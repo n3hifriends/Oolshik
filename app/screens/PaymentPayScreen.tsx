@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, Alert, Clipboard, Linking, Pressable, StyleSheet, View, ViewStyle } from "react-native"
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View, ViewStyle } from "react-native"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
+import Clipboard from "@react-native-clipboard/clipboard"
 import type {
   OolshikStackScreenProps,
   PaymentScanPayload,

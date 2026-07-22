@@ -345,6 +345,8 @@ const en = {
       mailSubject: "Oolshik Support",
       mailOpenFailedTitle: "Couldn't open mail app",
       mailOpenFailedBody: "Email us at {{email}}",
+      copyEmailButton: "Copy email",
+      emailCopiedConfirmation: "Copied",
       contactWhatsApp: "WhatsApp support",
       whatsappOpenFailedTitle: "Couldn't open WhatsApp",
       whatsappOpenFailedBody: "Message us on WhatsApp at {{number}}",
