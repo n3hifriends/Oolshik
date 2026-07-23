@@ -16,6 +16,7 @@ import { useForegroundLocation } from "@/hooks/useForegroundLocation"
 import { OolshikApi } from "@/api"
 import type { ProfileExtras } from "@/features/profile/types"
 import {
+  clearProfileExtras,
   getProfileExtras,
   updateProfileExtras,
 } from "@/features/profile/storage/profileExtrasStore"
@@ -55,6 +56,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({
     hasProfile: false,
   })
+  const [deletingAccount, setDeletingAccount] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -182,6 +184,38 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     },
     [applyExtras, i18n],
   )
+
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      t("oolshik:profileScreen.deleteAccountTitle"),
+      t("oolshik:profileScreen.deleteAccountBody"),
+      [
+        { text: t("common:cancel"), style: "cancel" },
+        {
+          text: t("oolshik:profileScreen.deleteAccountCta"),
+          style: "destructive",
+          onPress: async () => {
+            setDeletingAccount(true)
+            try {
+              const res = await OolshikApi.deleteAccount()
+              if (res.ok) {
+                clearProfileExtras()
+                logout()
+              } else {
+                Alert.alert(
+                  t("oolshik:profileScreen.deleteAccountFailedTitle"),
+                  t("oolshik:profileScreen.deleteAccountFailedBody"),
+                )
+              }
+            } finally {
+              setDeletingAccount(false)
+            }
+          },
+        },
+      ],
+      { cancelable: true },
+    )
+  }, [logout, t])
 
   useEffect(() => {
     let active = true
@@ -485,8 +519,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             accessibilityLabel={t("oolshik:profileScreen.logoutA11y")}
           />
           <Button
-            text={t("oolshik:profileScreen.deleteAccountSoon")}
-            disabled
+            text={
+              deletingAccount
+                ? t("oolshik:profileScreen.deleteAccountDeleting")
+                : t("oolshik:profileScreen.deleteAccountCta")
+            }
+            onPress={handleDeleteAccount}
+            disabled={deletingAccount}
             style={{ borderRadius: 10, minHeight: 44 }}
             accessibilityLabel={t("oolshik:profileScreen.deleteAccountA11y")}
           />

@@ -2,7 +2,7 @@
   "name": "Oolshik",
   "slug": "Oolshik",
   "scheme": "oolshik",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "orientation": "portrait",
   "userInterfaceStyle": "automatic",
   "icon": "./assets/images/app-icon-all.png",
@@ -13,7 +13,7 @@
   "jsEngine": "hermes",
   "assetBundlePatterns": ["**/*"],
   "android": {
-    "versionCode": 2,
+    "versionCode": 5,
     "googleServicesFile": "./google-services.json",
     "icon": "./assets/images/app-icon-android-legacy.png",
     "package": "com.oolshik.aan",

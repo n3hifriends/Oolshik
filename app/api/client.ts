@@ -819,6 +819,7 @@ export const OolshikApi = {
     api.post("/auth/complete", { displayName, email }),
   me: () => api.get<AuthMeResponse>("/auth/me"),
   updateMe: (patch: Record<string, unknown>) => api.put<AuthMeResponse>("/auth/me", patch),
+  deleteAccount: () => api.delete("/auth/me"),
   setOnboardingPhase: (phase: OnboardingPhase) =>
     api.put<AuthMeResponse>("/auth/me", { onboardingPhase: phase }),
   checkZone: (lat: number, lng: number) => api.post<ZoneCheckResponse>("/zone/check", { lat, lng }),
