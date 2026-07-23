@@ -597,6 +597,8 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
 
             <Text
               style={styles.contextTitle}
+              numberOfLines={2}
+              ellipsizeMode="tail"
               text={contextTitle || t("payment:pay.contextFallbackTitle")}
             />
 
@@ -607,7 +609,12 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
                 </View>
                 <View style={styles.requesterCopy}>
                   <Text style={styles.requesterLabel} text={t("payment:pay.requestedBy")} />
-                  <Text style={styles.requesterName} text={requesterName} />
+                  <Text
+                    style={styles.requesterName}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    text={requesterName}
+                  />
                   {taskContext?.createdByPhoneNumber ? (
                     <Pressable
                       onPress={handleCallRequester}
@@ -827,7 +834,12 @@ export const PaymentPayScreen: React.FC<PaymentPayScreenProps> = ({ route, navig
               size={18}
               color={theme.colors.palette.primary500}
             />
-            <Text style={styles.fallbackCardTitle} text={t("payment:pay.blockedPanelTitle")} />
+            <Text
+              style={styles.fallbackCardTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              text={t("payment:pay.blockedPanelTitle")}
+            />
             <MaterialCommunityIcons
               name={isFallbackExpanded ? "chevron-up" : "chevron-down"}
               size={20}

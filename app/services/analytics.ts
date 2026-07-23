@@ -100,6 +100,12 @@ export const AnalyticsEvent = {
   ONBOARDING_INTENT_SELECTED: "onboarding_intent_selected",
   ONBOARDING_FIRST_ACTION: "onboarding_first_action",
   ONBOARDING_GRADUATED: "onboarding_graduated",
+
+  // Feedback prompts (creation / completion) — params carry { event: "creation" | "completion", taskId }
+  FEEDBACK_PROMPT_SHOWN: "feedback_prompt_shown",
+  FEEDBACK_PROMPT_SUBMITTED: "feedback_prompt_submitted",
+  FEEDBACK_PROMPT_SKIPPED: "feedback_prompt_skipped",
+  FEEDBACK_LATER_ALERT_SHOWN: "feedback_later_alert_shown",
 } as const
 
 export type AnalyticsEventName = (typeof AnalyticsEvent)[keyof typeof AnalyticsEvent]

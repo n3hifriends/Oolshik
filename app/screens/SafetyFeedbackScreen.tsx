@@ -41,8 +41,8 @@ export default function SafetyFeedbackScreen({ navigation }: { navigation: any }
     if (loading) return
 
     const trimmed = desc.trim().slice(0, MAX_DESC)
-    if (category === "OTHER" && !trimmed) {
-      Alert.alert(t("oolshik:feedback.addDetailsTitle"), t("oolshik:feedback.addDetails"))
+    if (!trimmed) {
+      Alert.alert(t("oolshik:feedback.addDetailsTitle"), t("oolshik:feedback.addDetailsRequired"))
       return
     }
 
@@ -52,7 +52,7 @@ export default function SafetyFeedbackScreen({ navigation }: { navigation: any }
       contextType: params?.taskId ? "TASK" : "APP",
       contextId: params?.taskId,
       tags: [`category:${category}`],
-      message: trimmed || undefined,
+      message: trimmed,
     })
     setLoading(false)
 
@@ -94,13 +94,13 @@ export default function SafetyFeedbackScreen({ navigation }: { navigation: any }
       </View>
 
       <View style={{ gap: spacing.xs }}>
-        <Text tx="oolshik:feedback.detailsOptional" weight="medium" />
+        <Text tx="oolshik:feedback.detailsRequired" weight="medium" style={{ color: colors.error }} />
         <TextField
           multiline
           numberOfLines={6}
           value={desc}
           onChangeText={(t) => setDesc(t.slice(0, MAX_DESC))}
-          placeholderTx="oolshik:descriptionOptional"
+          placeholderTx="oolshik:descriptionRequired"
           editable={!loading}
           style={{ minHeight: 120 }}
         />

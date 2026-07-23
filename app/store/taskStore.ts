@@ -18,6 +18,10 @@ let nearbyFetchSeq = 0
 // Same pattern for fetchMyTasks — incremented on every call and by clearMyTasks.
 let myFetchSeq = 0
 
+// Prevent a late summary response from a previous session from overwriting the
+// active count for the user who is currently signed in.
+let activeSummaryFetchSeq = 0
+
 // Tracks which user's cache is currently loaded. Set by hydrateForUser, cleared by clearNearby.
 let currentUserId: string | null = null
 
@@ -205,10 +209,13 @@ export const useTaskStore = create<State>((set, get) => ({
     }),
 
   fetchActiveSummary: async () => {
+    const seq = ++activeSummaryFetchSeq
+    const requestUserId = currentUserId
     const res = await OolshikApi.getActiveSummary()
     if (!res.ok || !res.data) throw new Error("Failed to load active requests")
+    if (seq !== activeSummaryFetchSeq || currentUserId !== requestUserId) return
     set({ activeSummary: res.data, cachedActiveCount: res.data.activeCount })
-    if (currentUserId) save(activeCountKey(currentUserId), res.data.activeCount)
+    if (requestUserId) save(activeCountKey(requestUserId), res.data.activeCount)
   },
 
   fetchNearby: async (lat, lon, statuses?: string[]) => {
@@ -262,6 +269,7 @@ export const useTaskStore = create<State>((set, get) => ({
   hydrateForUser: (userId) => {
     if (currentUserId === userId) return
     nearbyFetchSeq++
+    activeSummaryFetchSeq++
     currentUserId = userId
     const cachedCount = load<number>(activeCountKey(userId))
     const cached = load<NearbyCacheEntry>(nearbyKey(userId))
@@ -304,6 +312,7 @@ export const useTaskStore = create<State>((set, get) => ({
 
   clearMyTasks: () => {
     myFetchSeq++
+    activeSummaryFetchSeq++
     if (currentUserId) remove(activeCountKey(currentUserId))
     set({ myTasks: [], myTasksLoading: false, myTasksError: null, activeSummary: null, cachedActiveCount: null })
   },

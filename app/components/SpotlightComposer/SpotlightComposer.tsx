@@ -74,8 +74,14 @@ type ComposerSubmitPayload = {
   }
 }
 
+type ComposerSubmitResult = {
+  suppressSuccessMessage?: boolean
+}
+
 export interface SpotlightComposerProps {
-  onSubmitTask?: (payload: ComposerSubmitPayload) => Promise<void> | void
+  onSubmitTask?: (
+    payload: ComposerSubmitPayload,
+  ) => Promise<ComposerSubmitResult | void> | ComposerSubmitResult | void
   onBeforeOpen?: (mode: ComposerMode) => Promise<boolean> | boolean
   /** Set false when HomeFeedBottomBar owns the idle mic/pen buttons */
   showIdleFabs?: boolean
@@ -434,7 +440,7 @@ function SpotlightComposer({ onSubmitTask, onBeforeOpen, showIdleFabs = true, mi
     try {
       // Let React paint the submitting UI before network / JS work starts.
       await waitForNextFrame()
-      await onSubmitTask?.({
+      const submitResult = await onSubmitTask?.({
         text: safeText,
         mode: mode ?? "type",
         voiceNote: voiceNote ?? undefined,
@@ -443,11 +449,13 @@ function SpotlightComposer({ onSubmitTask, onBeforeOpen, showIdleFabs = true, mi
       if (elapsed < SUBMIT_LOADER_MIN_MS) {
         await sleep(SUBMIT_LOADER_MIN_MS - elapsed)
       }
-      if (Platform.OS === "android") {
-        const ToastAndroid = require("react-native").ToastAndroid
-        ToastAndroid.show(t("oolshik:composer.submittedBody"), ToastAndroid.SHORT)
-      } else {
-        Alert.alert(t("oolshik:composer.submittedTitle"), t("oolshik:composer.submittedBody"))
+      if (!submitResult?.suppressSuccessMessage) {
+        if (Platform.OS === "android") {
+          const ToastAndroid = require("react-native").ToastAndroid
+          ToastAndroid.show(t("oolshik:composer.submittedBody"), ToastAndroid.SHORT)
+        } else {
+          Alert.alert(t("oolshik:composer.submittedTitle"), t("oolshik:composer.submittedBody"))
+        }
       }
     } catch (error) {
       submitInFlightRef.current = false

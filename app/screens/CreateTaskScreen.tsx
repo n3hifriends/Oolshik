@@ -21,6 +21,13 @@ import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequest
 import { ActiveRequestCapDialog } from "@/components/ActiveRequestCapDialog"
 import { useAppTheme } from "@/theme/context"
 import { useResponsiveLayout } from "@/utils/useResponsiveLayout"
+import { AnalyticsEvent, logEvent } from "@/services/analytics"
+import {
+  hasShownFeedbackPrompt,
+  hasSeenFeedbackLaterAlert,
+  markFeedbackLaterAlertSeen,
+  markFeedbackPromptShown,
+} from "@/features/feedback/storage/taskFeedbackPromptGate"
 
 type Radius = 1 | 2 | 5
 
@@ -52,7 +59,7 @@ export default function CreateTaskScreen({ navigation }: any) {
   const { uri, start, stop, recording, durationSec, countdown, maxSeconds, reset } = useAudioRecorder(10)
   const { coords, status, error: locationError, refresh } = useForegroundLocation()
   const { userId, userName } = useAuth()
-  const { fetchNearby, upsertActiveSummaryTask } = useTaskStore()
+  const { fetchNearby, fetchActiveSummary, upsertActiveSummaryTask } = useTaskStore()
   const activeCapGuard = useActiveRequestCapGuard(navigation)
 
   useFocusEffect(
@@ -241,11 +248,51 @@ export default function CreateTaskScreen({ navigation }: any) {
         status: created.status ?? "PENDING",
         createdAt: created.createdAt ?? payload.createdAt,
       })
+      fetchActiveSummary().catch(() => {})
 
       // fire-and-forget: refresh nearby feed in background
       fetchNearby(coords.latitude, coords.longitude).catch(() => {})
 
+      logEvent(AnalyticsEvent.HELP_REQUEST_CREATED, { taskId: created.id })
+
       navigation.replace("OolshikDetail", { id: created.id })
+
+      if (!hasShownFeedbackPrompt(created.id, "creation")) {
+        markFeedbackPromptShown(created.id, "creation")
+        logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SHOWN, { event: "creation", taskId: created.id })
+        Alert.alert(
+          t("oolshik:feedback.creationPromptTitle"),
+          t("oolshik:feedback.creationPromptBody"),
+          [
+            {
+              text: t("oolshik:feedback.promptSkip"),
+              style: "cancel",
+              onPress: () => {
+                logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SKIPPED, { event: "creation", taskId: created.id })
+                if (!hasSeenFeedbackLaterAlert(userId)) {
+                  markFeedbackLaterAlertSeen(userId)
+                  logEvent(AnalyticsEvent.FEEDBACK_LATER_ALERT_SHOWN, {
+                    event: "creation",
+                    taskId: created.id,
+                  })
+                  Alert.alert(
+                    t("oolshik:feedback.laterAlertTitle"),
+                    t("oolshik:feedback.laterAlertBody"),
+                  )
+                }
+              },
+            },
+            {
+              text: t("oolshik:feedback.promptGiveFeedback"),
+              onPress: () =>
+                navigation.navigate("OolshikFeedbackRating", {
+                  taskId: created.id,
+                  promptEvent: "creation",
+                }),
+            },
+          ],
+        )
+      }
     } catch (e: any) {
       Alert.alert(
         t("task:create.alerts.createFailedTitle"),

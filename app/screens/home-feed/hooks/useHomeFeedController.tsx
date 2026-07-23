@@ -13,6 +13,12 @@ import { kmDistance } from "@/utils/haversine"
 import { TaskCard } from "@/components/TaskCard"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 import { useActiveRequestCapGuard } from "@/features/active-cap/useActiveRequestCapGuard"
+import {
+  hasSeenFeedbackLaterAlert,
+  hasShownFeedbackPrompt,
+  markFeedbackLaterAlertSeen,
+  markFeedbackPromptShown,
+} from "@/features/feedback/storage/taskFeedbackPromptGate"
 import type { AppApiError } from "@/api/apiResult"
 import { logEvent, AnalyticsEvent } from "@/services/analytics"
 import {
@@ -228,6 +234,7 @@ export function useHomeFeedController({
     lastNearbyLoadedAt,
     activeSummary,
     cachedActiveCount,
+    fetchActiveSummary,
   } = useTaskStore()
   const { logout, userId, userName, authEmail, onboardingPhase, setOnboardingPhase } = useAuth()
 
@@ -338,6 +345,7 @@ export function useHomeFeedController({
   }, [])
 
   const helperDefaultsLastLoadRef = useRef(0)
+  const activeSummaryLastLoadRef = useRef(0)
   useFocusEffect(
     useCallback(() => {
       // Skip if we loaded less than 500ms ago — rapid re-focus (e.g. Face ID,
@@ -359,6 +367,15 @@ export function useHomeFeedController({
         active = false
       }
     }, []),
+  )
+
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now()
+      if (now - activeSummaryLastLoadRef.current < 10_000) return
+      activeSummaryLastLoadRef.current = now
+      void fetchActiveSummary().catch(() => {})
+    }, [fetchActiveSummary]),
   )
 
   const availableStatuses = useMemo(() => {
@@ -835,11 +852,60 @@ export function useHomeFeedController({
           throw new Error(result.message || t("oolshik:homeScreen.tryAgain"))
         }
 
+        const createdTaskId = String(result.data.id)
+        fetchActiveSummary().catch(() => {})
         try {
           await fetchNearby(coords.latitude, coords.longitude)
         } catch {
           // best-effort refresh; no need to block success
         }
+
+        logEvent(AnalyticsEvent.HELP_REQUEST_CREATED, { taskId: createdTaskId })
+        let feedbackPromptShown = false
+        if (!hasShownFeedbackPrompt(createdTaskId, "creation")) {
+          feedbackPromptShown = true
+          markFeedbackPromptShown(createdTaskId, "creation")
+          logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SHOWN, {
+            event: "creation",
+            taskId: createdTaskId,
+          })
+          Alert.alert(
+            t("oolshik:feedback.creationPromptTitle"),
+            t("oolshik:feedback.creationPromptBody"),
+            [
+              {
+                text: t("oolshik:feedback.promptSkip"),
+                style: "cancel",
+                onPress: () => {
+                  logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SKIPPED, {
+                    event: "creation",
+                    taskId: createdTaskId,
+                  })
+                  if (!hasSeenFeedbackLaterAlert(userId)) {
+                    markFeedbackLaterAlertSeen(userId)
+                    logEvent(AnalyticsEvent.FEEDBACK_LATER_ALERT_SHOWN, {
+                      event: "creation",
+                      taskId: createdTaskId,
+                    })
+                    Alert.alert(
+                      t("oolshik:feedback.laterAlertTitle"),
+                      t("oolshik:feedback.laterAlertBody"),
+                    )
+                  }
+                },
+              },
+              {
+                text: t("oolshik:feedback.promptGiveFeedback"),
+                onPress: () =>
+                  navigation.navigate("OolshikFeedbackRating", {
+                    taskId: createdTaskId,
+                    promptEvent: "creation",
+                  }),
+              },
+            ],
+          )
+        }
+        return { suppressSuccessMessage: feedbackPromptShown }
       } finally {
         setCreatingTask(false)
       }
@@ -848,6 +914,7 @@ export function useHomeFeedController({
       coords,
       creatingTask,
       fetchNearby,
+      fetchActiveSummary,
       preferredRadiusKm,
       radiusMeters,
       refresh,

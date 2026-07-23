@@ -230,6 +230,13 @@ const $baseTextStyle: ThemedStyle<TextStyle> = () => ({
   // content size — that silently defeats flexShrink and stops long labels
   // from wrapping inside this row layout (facebook/react-native#51306).
   minWidth: 0,
+  // Small measurement buffer: with letterSpacing set, Yoga's text-measure
+  // pass and the native paint pass can diverge slightly on some Android
+  // OEM font-scale skins, clipping the last glyph against this box's
+  // tightly-fit edge (the parent Pressable has overflow: "hidden" to clip
+  // the ripple to its rounded corners). This padding gives the paint pass
+  // slack without visibly shifting centered text.
+  paddingHorizontal: 2,
   zIndex: 2,
 })
 

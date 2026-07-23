@@ -68,6 +68,8 @@ export const Segmented = memo(function Segmented({
     <View style={themed($container)}>
       {TABS.map((tab) => {
         const active = value === tab.key
+        const mineCountText = mineCount > 99 ? "99+" : String(mineCount)
+        const mineCountFontSize = mineCountText.length >= 3 ? 7 : mineCountText.length === 2 ? 8 : 9
         return (
           <Pressable
             key={tab.key}
@@ -95,11 +97,16 @@ export const Segmented = memo(function Segmented({
 
                 <View style={themed(active ? $activeRail : $inactiveRail)} />
 
-                {tab.key === "mine" && !active && mineCount > 0 && (
-                  <View style={themed($mineBadge)}>
+                {tab.key === "mine" && mineCount > 0 && (
+                  <View
+                    style={[
+                      themed($mineBadge),
+                      mineCountText.length >= 3 && themed($mineBadgeWide),
+                    ]}
+                  >
                     <Text
-                      text={String(Math.min(mineCount, 99))}
-                      style={themed($mineBadgeText)}
+                      text={mineCountText}
+                      style={[themed($mineBadgeText), { fontSize: mineCountFontSize }]}
                       maxFontSizeMultiplier={1}
                     />
                   </View>
@@ -224,4 +231,8 @@ const $mineBadgeText: ThemedStyle<TextStyle> = ({ colors }) => ({
   fontSize: 9,
   fontWeight: "700",
   lineHeight: 12,
+})
+
+const $mineBadgeWide: ThemedStyle<ViewStyle> = () => ({
+  minWidth: 22,
 })

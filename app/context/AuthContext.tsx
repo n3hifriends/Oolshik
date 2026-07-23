@@ -123,8 +123,8 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     // ✅ clear Authorization header in the HTTP client
     setLoginTokens(undefined, undefined)
     // ✅ clear nearby cache so the next user never sees this session's tasks
-    useTaskStore.getState().clearNearby()
     useTaskStore.getState().clearMyTasks()
+    useTaskStore.getState().clearNearby()
     // onboardingPhase is NOT cleared here — it is a permanent user-level state, not a
     // session credential. Clearing it caused a false "new user" flash on re-login while
     // the /me backfill was in-flight. The backfill (below) always runs on authToken

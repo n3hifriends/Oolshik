@@ -18,6 +18,13 @@ import {
   saveSubmittedFeedbackSnapshot,
   type SubmittedFeedbackSnapshot,
 } from "@/features/feedback/storage/feedbackQueue"
+import {
+  hasShownFeedbackPrompt,
+  hasSeenFeedbackLaterAlert,
+  markFeedbackLaterAlertSeen,
+  markFeedbackPromptShown,
+} from "@/features/feedback/storage/taskFeedbackPromptGate"
+import { AnalyticsEvent, logEvent } from "@/services/analytics"
 import type {
   PaymentScanPayload,
   PaymentTaskContext,
@@ -181,7 +188,7 @@ export function useTaskDetailController({
   const { theme } = useAppTheme()
   const { spacing, colors } = theme
 
-  const { tasks, accept, fetchNearby, upsertTask } = useTaskStore()
+  const { tasks, accept, fetchNearby, fetchActiveSummary, upsertTask } = useTaskStore()
   const { userId } = useAuth()
 
   const taskFromStore = useMemo(
@@ -1176,6 +1183,50 @@ ${t(line2Key)}`,
         } else {
           setTask((prev) => (prev ? { ...prev, status: "COMPLETED" } : prev))
         }
+        fetchActiveSummary().catch(() => {})
+
+        const completedTaskId = String(current.id)
+        logEvent(AnalyticsEvent.HELP_REQUEST_COMPLETED, { taskId: completedTaskId })
+
+        if (!hasShownFeedbackPrompt(completedTaskId, "completion")) {
+          markFeedbackPromptShown(completedTaskId, "completion")
+          logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SHOWN, { event: "completion", taskId: completedTaskId })
+          Alert.alert(
+            t("oolshik:feedback.completionPromptTitle"),
+            t("oolshik:feedback.completionPromptBody"),
+            [
+              {
+                text: t("oolshik:feedback.promptSkip"),
+                style: "cancel",
+                onPress: () => {
+                  logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SKIPPED, {
+                    event: "completion",
+                    taskId: completedTaskId,
+                  })
+                  if (!hasSeenFeedbackLaterAlert(userId)) {
+                    markFeedbackLaterAlertSeen(userId)
+                    logEvent(AnalyticsEvent.FEEDBACK_LATER_ALERT_SHOWN, {
+                      event: "completion",
+                      taskId: completedTaskId,
+                    })
+                    Alert.alert(
+                      t("oolshik:feedback.laterAlertTitle"),
+                      t("oolshik:feedback.laterAlertBody"),
+                    )
+                  }
+                },
+              },
+              {
+                text: t("oolshik:feedback.promptGiveFeedback"),
+                onPress: () =>
+                  navigation.navigate("OolshikFeedbackRating", {
+                    taskId: completedTaskId,
+                    promptEvent: "completion",
+                  }),
+              },
+            ],
+          )
+        }
         return
       }
 
@@ -1198,7 +1249,7 @@ ${t(line2Key)}`,
       setActionKind(null)
       setActionLoading(false)
     }
-  }, [actionLoading, current?.id, rawStatus, t])
+  }, [actionLoading, current?.id, fetchActiveSummary, navigation, rawStatus, t, userId])
 
   const onSubmitRating = useCallback(async () => {
     if (!current?.id) return
@@ -1309,10 +1360,13 @@ ${t(line2Key)}`,
         if (!res.ok) throw new Error("cancel-failed")
         setTask((prev) => (prev ? { ...prev, status: "CANCELLED" } : prev))
         setRecoveryNotice(t("oolshik:taskDetailScreen.requestCancelledNotice"))
+        fetchActiveSummary().catch(() => {})
       } else if (reasonModal.action === "release") {
         const res = await releaseTask(String(current.id), payload)
         if (!res.ok) throw new Error("release-failed")
         setTask((prev) => (prev ? { ...prev, status: "OPEN", helperId: null } : prev))
+        setActivePayments([])
+        setHelperPaymentAmountInput("")
         setRecoveryNotice(t("oolshik:taskDetailScreen.taskReleasedNotice"))
       } else if (reasonModal.action === "reject") {
         const res = await rejectRequest(String(current.id), payload)
@@ -1351,6 +1405,7 @@ ${t(line2Key)}`,
     coords,
     current?.id,
     fetchNearby,
+    fetchActiveSummary,
     reasonModal.action,
     reasonModal.reasonCode,
     reasonModal.reasonText,

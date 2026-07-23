@@ -43,15 +43,19 @@ export default function BugFeedbackScreen({ navigation }: { navigation: any }) {
 
   const onSubmit = async () => {
     if (loading) return
-    setLoading(true)
     const trimmed = desc.trim().slice(0, MAX_DESC)
+    if (!trimmed) {
+      Alert.alert(t("oolshik:feedback.addDetailsTitle"), t("oolshik:feedback.addDetailsRequired"))
+      return
+    }
 
+    setLoading(true)
     const res = await submitFeedback({
       feedbackType: "BUG",
       contextType: params?.taskId ? "TASK" : "APP",
       contextId: params?.taskId,
       tags: [`category:${category}`],
-      message: trimmed || undefined,
+      message: trimmed,
       includeDeviceInfo,
     })
 
@@ -95,13 +99,13 @@ export default function BugFeedbackScreen({ navigation }: { navigation: any }) {
       </View>
 
       <View style={{ gap: spacing.xs }}>
-        <Text tx="oolshik:feedback.detailsOptional" weight="medium" />
+        <Text tx="oolshik:feedback.detailsRequired" weight="medium" style={{ color: colors.error }} />
         <TextField
           multiline
           numberOfLines={6}
           value={desc}
           onChangeText={(t) => setDesc(t.slice(0, MAX_DESC))}
-          placeholderTx="oolshik:descriptionOptional"
+          placeholderTx="oolshik:descriptionRequired"
           editable={!loading}
           style={{ minHeight: 120 }}
         />

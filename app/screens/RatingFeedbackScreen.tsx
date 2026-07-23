@@ -10,11 +10,15 @@ import { normalizeRating } from "@/components/StarRating/utils"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { submitFeedback } from "@/features/feedback/storage/feedbackQueue"
+import { AnalyticsEvent, logEvent } from "@/services/analytics"
 import { useAppTheme } from "@/theme/context"
 
 const MAX_DESC = 300
 
-type Params = { taskId?: string }
+type Params = {
+  taskId?: string
+  promptEvent?: "creation" | "completion"
+}
 
 export default function RatingFeedbackScreen({ navigation }: { navigation: any }) {
   const { theme } = useAppTheme()
@@ -43,12 +47,17 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
 
   const onSubmit = async () => {
     if (loading) return
+    const trimmed = desc.trim().slice(0, MAX_DESC)
+    if (!trimmed) {
+      Alert.alert(t("oolshik:feedback.addDetailsTitle"), t("oolshik:feedback.addDetailsRequired"))
+      return
+    }
+
     setLoading(true)
 
     // CSAT endpoint is integer today; keep contract while retaining a half-step UI.
     const normalizedRating = normalizeRating(rating, { min: 0, max: 5, step: 0.5 })
     const cleanRating = Math.max(1, Math.min(5, Math.round(normalizedRating)))
-    const trimmed = desc.trim().slice(0, MAX_DESC)
 
     const res = await submitFeedback({
       feedbackType: "CSAT",
@@ -56,19 +65,19 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
       contextId: params?.taskId,
       rating: cleanRating,
       tags,
-      message: trimmed || undefined,
+      message: trimmed,
     })
 
     setLoading(false)
 
-    if (res.ok) {
-      Alert.alert(t("oolshik:feedback.thanks"))
-      navigation.goBack()
-      return
-    }
-
-    if (res.queued) {
-      Alert.alert(t("oolshik:feedback.queued"))
+    if (res.ok || res.queued) {
+      if (params?.taskId && params.promptEvent) {
+        logEvent(AnalyticsEvent.FEEDBACK_PROMPT_SUBMITTED, {
+          event: params.promptEvent,
+          taskId: params.taskId,
+        })
+      }
+      Alert.alert(t(res.ok ? "oolshik:feedback.thanks" : "oolshik:feedback.queued"))
       navigation.goBack()
       return
     }
@@ -124,13 +133,13 @@ export default function RatingFeedbackScreen({ navigation }: { navigation: any }
       </View>
 
       <View style={{ gap: spacing.xs }}>
-        <Text tx="oolshik:feedback.detailsOptional" weight="medium" />
+        <Text tx="oolshik:feedback.detailsRequired" weight="medium" style={{ color: colors.error }} />
         <TextField
           multiline
           numberOfLines={4}
           value={desc}
           onChangeText={(textValue) => setDesc(textValue.slice(0, MAX_DESC))}
-          placeholderTx="oolshik:descriptionOptional"
+          placeholderTx="oolshik:descriptionRequired"
           editable={!loading}
           style={{ minHeight: 100 }}
         />

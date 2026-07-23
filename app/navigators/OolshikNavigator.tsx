@@ -50,7 +50,9 @@ export type OolshikParamList = {
   OolshikFeedbackHub: { taskId?: string; targetUserId?: string } | undefined
   OolshikFeedbackBug: { taskId?: string } | undefined
   OolshikFeedbackFeature: { taskId?: string } | undefined
-  OolshikFeedbackRating: { taskId?: string } | undefined
+  OolshikFeedbackRating:
+    | { taskId?: string; promptEvent?: "creation" | "completion" }
+    | undefined
   OolshikFeedbackSafety: { taskId?: string } | undefined
   PaymentProfile: PaymentProfileParams | undefined
   QrScanner: {
