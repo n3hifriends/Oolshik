@@ -9,6 +9,7 @@ import Config from "@/config"
 import { useRemoteConfig } from "@/services/remoteConfig"
 import { useAuth } from "@/context/AuthContext"
 import { breadcrumb, setAuthContext } from "@/utils/crashReporting"
+import { AnalyticsEvent, logEvent } from "@/services/analytics"
 import {
   getProfileExtras,
   updateProfileExtras,
@@ -408,6 +409,7 @@ export function useLoginScreenController() {
           : null
       const errorKind = isNetworkFailure(response?.problem) ? "network_error" : "backend_auth_failed"
       breadcrumb(`auth:login_failed method=google error=${errorKind}`)
+      logEvent(AnalyticsEvent.GOOGLE_LOGIN_FAILED, { reason: errorKind })
       setAuthContext({ authHasToken: false, authMethodLast: "google", authErrorKindLast: errorKind })
       setGoogleServerMessage(typeof backendMessage === "string" ? backendMessage : null)
       setGoogleFlowState(
@@ -427,6 +429,7 @@ export function useLoginScreenController() {
     } catch {
       if (activeGoogleAttemptRef.current !== attemptId) return
       breadcrumb("auth:login_failed method=google error=token_exchange_failed")
+      logEvent(AnalyticsEvent.GOOGLE_LOGIN_FAILED, { reason: "token_exchange_failed" })
       setAuthContext({ authHasToken: false, authMethodLast: "google", authErrorKindLast: "token_exchange_failed" })
       setGoogleFlowState("token-exchange-failed")
     } finally {
@@ -464,6 +467,11 @@ export function useLoginScreenController() {
       return
     }
     if (response.type !== "success") {
+      // "locked" means a previous prompt session hadn't finished (e.g. a rapid
+      // double-tap) — a client-side concurrency hiccup, not a provider-side failure.
+      const reason = response.type === "locked" ? "locked" : "provider_error"
+      breadcrumb(`auth:login_failed method=google error=${reason}`)
+      logEvent(AnalyticsEvent.GOOGLE_LOGIN_FAILED, { reason })
       activeGoogleAttemptRef.current = null
       setGoogleFlowState("token-exchange-failed")
       setLoading(null)
@@ -475,6 +483,8 @@ export function useLoginScreenController() {
       (typeof response.params?.id_token === "string" ? response.params.id_token : undefined)
 
     if (!idToken) {
+      breadcrumb("auth:login_failed method=google error=missing_id_token")
+      logEvent(AnalyticsEvent.GOOGLE_LOGIN_FAILED, { reason: "missing_id_token" })
       activeGoogleAttemptRef.current = null
       setGoogleFlowState("token-exchange-failed")
       setLoading(null)
@@ -530,6 +540,8 @@ export function useLoginScreenController() {
 
   const onGooglePress = useCallback(async () => {
     if (!googleConfigured) {
+      breadcrumb("auth:login_failed method=google error=not_configured")
+      logEvent(AnalyticsEvent.GOOGLE_LOGIN_FAILED, { reason: "not_configured" })
       setGoogleServerMessage(null)
       setGoogleFlowState("backend-auth-failed")
       return
@@ -555,6 +567,8 @@ export function useLoginScreenController() {
         setGoogleFlowState("user-cancelled")
       }
     } catch {
+      breadcrumb("auth:login_failed method=google error=prompt_failed")
+      logEvent(AnalyticsEvent.GOOGLE_LOGIN_FAILED, { reason: "prompt_failed" })
       setLoading(null)
       setGoogleFlowState("token-exchange-failed")
     }
