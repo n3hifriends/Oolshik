@@ -133,6 +133,13 @@ function isSpringSecurityForbidden(data: unknown) {
   )
 }
 
+// Backend's ApiError shape for a blocked/deleted account (see GlobalExceptionHandler),
+// e.g. {"correlationId":"...","error":"ACCOUNT_DELETED","message":"..."}
+function isAccountLockedError(data: unknown) {
+  if (!isErrorRecord(data)) return false
+  return data.error === "ACCOUNT_BLOCKED" || data.error === "ACCOUNT_DELETED"
+}
+
 const devHost = Platform.select({
   ios: "http://localhost:8080",
   android: "https://www.oolshik.in",
@@ -256,6 +263,14 @@ axiosInstance.interceptors.response.use(
     const url = original?.url || ""
     const headers = (original?.headers || {}) as Record<string, unknown>
     const hadBearerHeader = Boolean(headers.Authorization || headers.authorization || tokens.access)
+
+    // A blocked/deleted account can never succeed a token refresh — force logout immediately,
+    // regardless of which endpoint returned it, instead of leaving a stale "logged in" session.
+    if (status === 403 && isAccountLockedError(error.response?.data)) {
+      tokens.clear()
+      authEvents.emit("logout")
+      return Promise.reject(error)
+    }
 
     const isAuthEndpoint = AUTH_WHITELIST.some((p) => url.includes(p))
     const shouldTryRefresh =

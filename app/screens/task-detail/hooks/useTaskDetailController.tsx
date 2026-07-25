@@ -855,24 +855,31 @@ ${t(line2Key)}`,
     async (payerRole: PaymentPayerRole, amount: number) => {
       if (!current?.id) return
 
-      if (payerRole === "REQUESTER" && myPaymentProfileLoading) return
+      if (payerRole === "REQUESTER" && myPaymentProfileLoading) {
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(t("payment:direct.profileLoadingTitle"), t("payment:direct.profileLoadingBody"))
+        })
+        return
+      }
 
       if (payerRole === "REQUESTER" && !myPaymentProfile.hasProfile) {
-        Alert.alert(
-          t("payment:direct.profileRequiredTitle"),
-          t("payment:direct.profileRequiredBody"),
-          [
-            { text: t("common:cancel"), style: "cancel" },
-            {
-              text: t("payment:direct.addProfileCta"),
-              onPress: () =>
-                navigation.navigate("PaymentProfile", {
-                  entryPoint: "task-payment",
-                  required: true,
-                }),
-            },
-          ],
-        )
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            t("payment:direct.profileRequiredTitle"),
+            t("payment:direct.profileRequiredBody"),
+            [
+              { text: t("common:cancel"), style: "cancel" },
+              {
+                text: t("payment:direct.addProfileCta"),
+                onPress: () =>
+                  navigation.navigate("PaymentProfile", {
+                    entryPoint: "task-payment",
+                    required: true,
+                  }),
+              },
+            ],
+          )
+        })
         return
       }
 
@@ -914,25 +921,29 @@ ${t(line2Key)}`,
           return
         }
 
-        Alert.alert(t("payment:direct.requestedTitle"), t("payment:direct.requestedBody"))
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(t("payment:direct.requestedTitle"), t("payment:direct.requestedBody"))
+        })
       } catch (err) {
         const message = err instanceof Error ? err.message : t("payment:direct.createFailed")
         const alertCopy = resolveDirectPaymentErrorCopy(payerRole, message, t)
-        if (alertCopy.showAddProfileCta) {
-          Alert.alert(alertCopy.title, alertCopy.body, [
-            { text: t("common:cancel"), style: "cancel" },
-            {
-              text: t("payment:direct.addProfileCta"),
-              onPress: () =>
-                navigation.navigate("PaymentProfile", {
-                  entryPoint: "task-payment",
-                  required: true,
-                }),
-            },
-          ])
-          return
-        }
-        Alert.alert(alertCopy.title, alertCopy.body)
+        InteractionManager.runAfterInteractions(() => {
+          if (alertCopy.showAddProfileCta) {
+            Alert.alert(alertCopy.title, alertCopy.body, [
+              { text: t("common:cancel"), style: "cancel" },
+              {
+                text: t("payment:direct.addProfileCta"),
+                onPress: () =>
+                  navigation.navigate("PaymentProfile", {
+                    entryPoint: "task-payment",
+                    required: true,
+                  }),
+              },
+            ])
+            return
+          }
+          Alert.alert(alertCopy.title, alertCopy.body)
+        })
       }
     },
     [current, myPaymentProfile.hasProfile, myPaymentProfileLoading, navigation, t],
@@ -946,15 +957,19 @@ ${t(line2Key)}`,
 
       withPaymentNoticeGate(() => {
         Alert.alert(
-          t("payment:direct.methodTitle"),
-          t("payment:direct.methodBody"),
+          collectIntent ? t("payment:direct.collectMethodTitle") : t("payment:direct.payMethodTitle"),
+          collectIntent ? t("payment:direct.collectMethodBody") : t("payment:direct.payMethodBody"),
           [
             {
-              text: t("payment:direct.scanMethod"),
+              text: collectIntent
+                ? t("payment:direct.collectScanMethod")
+                : t("payment:direct.payScanMethod"),
               onPress: () => launchScanMethod(collectIntent, amount),
             },
             {
-              text: t("payment:direct.directMethod"),
+              text: collectIntent
+                ? t("payment:direct.collectDirectMethod")
+                : t("payment:direct.payDirectMethod"),
               onPress: () => {
                 void startDirectPayment(collectIntent ? "REQUESTER" : "HELPER", amount)
               },
