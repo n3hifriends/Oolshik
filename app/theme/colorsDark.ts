@@ -53,4 +53,10 @@ export const colors = {
   error: palette.angry500,
   errorBackground: palette.angry100,
   surface: "#2C2829",
+  gateInfoBg: "#0C4A6E",
+  gateInfoFg: "#7DD3FC",
+  gateWarningBg: "#78350F",
+  gateWarningFg: "#FDE68A",
+  gateBrandBg: palette.primary100,
+  gateBrandFg: palette.primary600,
 } as const

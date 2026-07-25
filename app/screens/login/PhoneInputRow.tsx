@@ -1,5 +1,6 @@
 import { memo, useState } from "react"
-import { TextInput, View } from "react-native"
+import { Pressable, TextInput, View } from "react-native"
+import { MaterialCommunityIcons } from "@expo/vector-icons"
 
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
@@ -12,6 +13,8 @@ interface PhoneInputRowProps {
   placeholder?: string
   error?: string | null
   hint?: string
+  infoLabel?: string
+  onInfoPress?: () => void
   disabled?: boolean
   keyboardAppearance?: "default" | "light" | "dark"
 }
@@ -116,7 +119,23 @@ export const PhoneInputRow = memo(function PhoneInputRow(props: PhoneInputRowPro
             style={{ color: colors.palette.angry500 }}
           />
         ) : props.hint ? (
-          <Text text={props.hint} size="xs" style={{ color: colors.textDim }} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xxs }}>
+            <Text text={props.hint} size="xs" style={{ color: colors.textDim, flexShrink: 1 }} />
+            {props.onInfoPress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={props.infoLabel ?? props.hint}
+                hitSlop={14}
+                onPress={props.onInfoPress}
+              >
+                <MaterialCommunityIcons
+                  name="information-outline"
+                  size={16}
+                  color={colors.textDim}
+                />
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
     </View>

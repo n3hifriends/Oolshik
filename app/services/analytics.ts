@@ -66,6 +66,15 @@ export const logRemoteConfigActivated = (): void => {
 // Centralising event names prevents string typos across call sites.
 // ---------------------------------------------------------------------------
 
+// "user_initiated" — logout button tap. "session_expired" — forced logout from
+// a failed/expired token. "account_locked" — blocked/deleted account (by an
+// admin). "account_deleted" — the user deleted their own account.
+export type LogoutReason =
+  | "user_initiated"
+  | "session_expired"
+  | "account_locked"
+  | "account_deleted"
+
 export const AnalyticsEvent = {
   // Session
   APP_SESSION_STARTED: "app_session_started",

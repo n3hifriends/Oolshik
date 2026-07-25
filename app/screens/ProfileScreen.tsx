@@ -200,7 +200,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               const res = await OolshikApi.deleteAccount()
               if (res.ok) {
                 clearProfileExtras()
-                logout()
+                logout("account_deleted")
               } else {
                 Alert.alert(
                   t("oolshik:profileScreen.deleteAccountFailedTitle"),
@@ -508,7 +508,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           />
           <Button
             text={t("oolshik:profileScreen.logout")}
-            onPress={logout}
+            onPress={() => logout()}
             style={{
               borderRadius: 10,
               minHeight: 44,

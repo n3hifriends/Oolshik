@@ -268,7 +268,7 @@ axiosInstance.interceptors.response.use(
     // regardless of which endpoint returned it, instead of leaving a stale "logged in" session.
     if (status === 403 && isAccountLockedError(error.response?.data)) {
       tokens.clear()
-      authEvents.emit("logout")
+      authEvents.emit("logout", "account_locked")
       return Promise.reject(error)
     }
 
@@ -286,7 +286,7 @@ axiosInstance.interceptors.response.use(
       // If refresh endpoint itself fails or forbidden → logout hard
       if (isAuthEndpoint && (status === 401 || status === 403)) {
         tokens.clear()
-        authEvents.emit("logout")
+        authEvents.emit("logout", "session_expired")
       }
       // Record API failure context for Crashlytics (not gated on user context — HTTP data is not PII)
       try {
@@ -307,7 +307,7 @@ axiosInstance.interceptors.response.use(
     // avoid infinite loop
     if (original?._retry) {
       tokens.clear()
-      authEvents.emit("logout")
+      authEvents.emit("logout", "session_expired")
       return Promise.reject(error)
     }
 
@@ -347,7 +347,7 @@ axiosInstance.interceptors.response.use(
       isRefreshing = false
       flushSubscribers(null) // fail all queued
       tokens.clear()
-      authEvents.emit("logout")
+      authEvents.emit("logout", "session_expired")
       return Promise.reject(e)
     }
   },
@@ -936,7 +936,7 @@ export function setLoginTokens(accessToken?: string | null, refreshToken?: strin
 // Optional helper: global logout
 export function logoutNow() {
   tokens.clear()
-  authEvents.emit("logout")
+  authEvents.emit("logout", "session_expired")
 }
 
 // To toggle logs at runtime:

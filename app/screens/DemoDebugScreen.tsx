@@ -162,7 +162,7 @@ export const DemoDebugScreen: FC<DemoTabScreenProps<"DemoDebug">> = function Dem
         <Text style={themed($hint)} tx={`demoDebugScreen:${Platform.OS}ReactotronHint` as const} />
       </View>
       <View style={themed($buttonContainer)}>
-        <Button style={themed($button)} tx="common:logOut" onPress={logout} />
+        <Button style={themed($button)} tx="common:logOut" onPress={() => logout()} />
       </View>
       {__DEV__ ? (
         <View style={themed($buttonContainer)}>

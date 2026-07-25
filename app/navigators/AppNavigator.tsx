@@ -5,28 +5,28 @@
  * and a "main" flow which the user will use once logged in.
  */
 import { ComponentProps } from "react"
+import { Platform } from "react-native"
+import * as Application from "expo-application"
+import * as SplashScreen from "expo-splash-screen"
 import {
   NavigationContainer,
   NavigatorScreenParams, // @demo remove-current-line
 } from "@react-navigation/native"
-import * as SplashScreen from "expo-splash-screen"
 import { createNativeStackNavigator, NativeStackScreenProps } from "@react-navigation/native-stack"
-import { Platform } from "react-native"
-import * as Application from "expo-application"
 
 import Config from "@/config"
 import { useAuth } from "@/context/AuthContext" // @demo remove-current-line
+import { OolshikNavigator } from "@/navigators/OolshikNavigator"
 import { ErrorBoundary } from "@/screens/ErrorScreen/ErrorBoundary"
-import { LoginScreen } from "@/screens/LoginScreen" // @demo remove-current-line
-import { HelpRequestsUnavailableScreen } from "@/screens/HelpRequestsUnavailableScreen"
-import { useAppTheme } from "@/theme/context"
-import { useRemoteConfig, getMaintenanceConfig, getVersionConfig } from "@/services/remoteConfig"
-import { MaintenanceScreen } from "@/screens/MaintenanceScreen"
 import { ForceUpdateScreen } from "@/screens/ForceUpdateScreen"
+import { HelpRequestsUnavailableScreen } from "@/screens/HelpRequestsUnavailableScreen"
+import { LoginScreen } from "@/screens/LoginScreen" // @demo remove-current-line
+import { MaintenanceScreen } from "@/screens/MaintenanceScreen"
+import { useRemoteConfig, getMaintenanceConfig, getVersionConfig } from "@/services/remoteConfig"
+import { useAppTheme } from "@/theme/context"
 
 import { DemoNavigator, DemoTabParamList } from "./DemoNavigator" // @demo remove-current-line
 import { navigationRef, useBackButtonHandler } from "./navigationUtilities"
-import { OolshikNavigator } from "@/navigators/OolshikNavigator"
 /**
  * This type allows TypeScript to know what routes are defined in this navigator
  * as well as what properties (if any) they might take when navigating to them.
@@ -41,8 +41,8 @@ export type AppStackParamList = {
   Demo: NavigatorScreenParams<DemoTabParamList> // @demo remove-current-line
   // 🔥 Your screens go here
   QrScanner: undefined
-	PaymentPay: undefined
-	// IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
+  PaymentPay: undefined
+  // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
   Oolshik: undefined
   Maintenance: undefined
   ForceUpdate: undefined
@@ -84,11 +84,28 @@ const AppStack = () => {
 
   const flags = useRemoteConfig()
 
+  // ---------------------------------------------------------------------------
+  // App-gate precedence (each gate fully replaces the stack — no header/back):
+  //   1. Maintenance     — whole app, all users, authenticated or not
+  //   2. Force update    — whole app, below-minimum installed versions
+  //   3. Help unavailable — authenticated users only, single-feature gate
+  // Checked in this order every render; do not reorder without updating the
+  // corresponding screen copy, which assumes this precedence (e.g. the
+  // maintenance screen doesn't mention login state because it can't be reached
+  // without maintenance being off).
+  // ---------------------------------------------------------------------------
+
   // --- Maintenance gate (highest priority — applies to all users) ---
   const maintenance = getMaintenanceConfig()
   if (maintenance.enabled) {
     return (
-      <Stack.Navigator screenOptions={{ headerShown: false, navigationBarColor: colors.background, contentStyle: { backgroundColor: colors.background } }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          navigationBarColor: colors.background,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
       </Stack.Navigator>
     )
@@ -101,7 +118,13 @@ const AppStack = () => {
   const needsUpdate = version.forceUpdateEnabled && isBelowMinVersion(currentVersion, minVersion)
   if (needsUpdate) {
     return (
-      <Stack.Navigator screenOptions={{ headerShown: false, navigationBarColor: colors.background, contentStyle: { backgroundColor: colors.background } }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          navigationBarColor: colors.background,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         <Stack.Screen name="ForceUpdate" component={ForceUpdateScreen} />
       </Stack.Navigator>
     )
@@ -129,7 +152,10 @@ const AppStack = () => {
               options={{ headerShown: false }}
             />
           ) : (
-            <Stack.Screen name="HelpRequestsUnavailable" component={HelpRequestsUnavailableScreen} />
+            <Stack.Screen
+              name="HelpRequestsUnavailable"
+              component={HelpRequestsUnavailableScreen}
+            />
           )}
           {/* @demo remove-block-end */}
           {/* @demo remove-block-start */}
@@ -147,8 +173,9 @@ const AppStack = () => {
   )
 }
 
-export interface NavigationProps
-  extends Partial<ComponentProps<typeof NavigationContainer<AppStackParamList>>> {}
+export interface NavigationProps extends Partial<
+  ComponentProps<typeof NavigationContainer<AppStackParamList>>
+> {}
 
 export const AppNavigator = (props: NavigationProps) => {
   const { navigationTheme } = useAppTheme()
@@ -164,7 +191,12 @@ export const AppNavigator = (props: NavigationProps) => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navigationTheme} {...props} onReady={handleReady}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      {...props}
+      onReady={handleReady}
+    >
       <ErrorBoundary catchErrors={Config.catchErrors}>
         <AppStack />
       </ErrorBoundary>

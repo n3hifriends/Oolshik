@@ -91,4 +91,19 @@ export const colors = {
    * Card / elevated surface background (sits on top of background).
    */
   surface: palette.neutral100,
+  /**
+   * App-gate screens (help unavailable) — informational tone, soft/reassuring.
+   */
+  gateInfoBg: "rgba(14, 165, 233, 0.10)",
+  gateInfoFg: "#0369A1",
+  /**
+   * App-gate screens (maintenance) — planned-work tone, calm not alarming.
+   */
+  gateWarningBg: "#FDE68A",
+  gateWarningFg: "#B45309",
+  /**
+   * App-gate screens (force update) — brand tone, framed as progress not failure.
+   */
+  gateBrandBg: palette.primary100,
+  gateBrandFg: palette.primary600,
 } as const

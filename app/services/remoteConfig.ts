@@ -39,6 +39,8 @@ export interface RemoteConfigFlags {
   // Operational controls
   maintenance_mode_enabled: boolean
   maintenance_message: string
+  // ISO 8601 timestamp. Empty string means no known ETA — screens must degrade gracefully.
+  maintenance_expected_end_at: string
   min_supported_app_version_android: string
   min_supported_app_version_ios: string
   force_update_enabled: boolean
@@ -83,6 +85,7 @@ const DEFAULTS: RemoteConfigFlags = {
 
   maintenance_mode_enabled: false,
   maintenance_message: "",
+  maintenance_expected_end_at: "",
   min_supported_app_version_android: "0.0.0",
   min_supported_app_version_ios: "0.0.0",
   force_update_enabled: false,
@@ -163,18 +166,28 @@ export const initRemoteConfig = async (): Promise<void> => {
 // Use from MaintenanceScreen / ForceUpdateScreen Retry buttons only.
 // Calling initRemoteConfig() from those screens would respect the cached
 // interval and may return cached state, keeping the user trapped.
+//
+// Returns false on network/fetch failure so app-gate screens can render an
+// honest "couldn't check" state instead of silently doing nothing — this
+// used to swallow errors and always resolve, leaving callers with no way to
+// tell a real "still unavailable" apart from "we couldn't check at all".
 // ---------------------------------------------------------------------------
 
-export const forceRefetchRemoteConfig = async (): Promise<void> => {
+export const forceRefetchRemoteConfig = async (): Promise<boolean> => {
+  let succeeded = true
   try {
     await setConfigSettings(rc, { minimumFetchIntervalMillis: 0 })
     await fetchAndActivate(rc)
   } catch (e) {
     console.warn("[RemoteConfig] forceRefetch failed:", e)
+    succeeded = false
   } finally {
-    await setConfigSettings(rc, { minimumFetchIntervalMillis: getConfiguredFetchIntervalMs() }).catch(() => {})
+    await setConfigSettings(rc, {
+      minimumFetchIntervalMillis: getConfiguredFetchIntervalMs(),
+    }).catch(() => {})
     notifyActivationListeners()
   }
+  return succeeded
 }
 
 // ---------------------------------------------------------------------------
@@ -204,8 +217,13 @@ export const getRemoteFlag = <K extends keyof RemoteConfigFlags>(key: K): Remote
 // Typed domain accessors — callers import these, not raw string keys.
 // ---------------------------------------------------------------------------
 
-export const isFeatureEnabled = (key: "feature_help_requests_enabled" | "feature_audio_upload_enabled" | "feature_location_capture_enabled" | "feature_push_registration_enabled"): boolean =>
-  getRemoteFlag(key)
+export const isFeatureEnabled = (
+  key:
+    | "feature_help_requests_enabled"
+    | "feature_audio_upload_enabled"
+    | "feature_location_capture_enabled"
+    | "feature_push_registration_enabled",
+): boolean => getRemoteFlag(key)
 
 export const getAuthConfig = () => ({
   phoneOtpEnabled: getRemoteFlag("auth_phone_otp_enabled"),
@@ -216,6 +234,7 @@ export const getAuthConfig = () => ({
 export const getMaintenanceConfig = () => ({
   enabled: getRemoteFlag("maintenance_mode_enabled"),
   message: getRemoteFlag("maintenance_message"),
+  expectedEndAt: getRemoteFlag("maintenance_expected_end_at"),
 })
 
 export const getVersionConfig = () => ({
@@ -241,16 +260,15 @@ export const getSupportContactConfig = () => ({
 // ---------------------------------------------------------------------------
 
 const buildFlags = (): RemoteConfigFlags =>
-  (Object.keys(DEFAULTS) as Array<keyof RemoteConfigFlags>).reduce(
-    (acc, key) => {
-      acc[key] = getRemoteFlag(key) as never
-      return acc
-    },
-    {} as RemoteConfigFlags,
-  )
+  (Object.keys(DEFAULTS) as Array<keyof RemoteConfigFlags>).reduce((acc, key) => {
+    acc[key] = getRemoteFlag(key) as never
+    return acc
+  }, {} as RemoteConfigFlags)
 
 export const useRemoteConfig = (): RemoteConfigFlags => {
-  const [flags, setFlags] = useState<RemoteConfigFlags>(() => (initialized ? buildFlags() : DEFAULTS))
+  const [flags, setFlags] = useState<RemoteConfigFlags>(() =>
+    initialized ? buildFlags() : DEFAULTS,
+  )
 
   useEffect(() => {
     const refresh = () => setFlags(buildFlags())

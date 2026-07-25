@@ -26,7 +26,7 @@ interface GoogleLoginCardProps {
   onGooglePhoneBlur: () => void
   onGooglePress: () => void
   onPhoneChange: (value: string) => void
-  onPhoneFocus: () => void
+  onPhoneInfoPress: () => void
   onUseMyPhoneNumberPress: () => void
   phone: string
   phoneHintLoading: boolean
@@ -76,10 +76,11 @@ export const GoogleLoginCard = memo(function GoogleLoginCard(props: GoogleLoginC
               value={props.phone}
               onChangeText={props.onPhoneChange}
               onBlur={props.onGooglePhoneBlur}
-              onFocus={props.onPhoneFocus}
               placeholder={t("oolshik:login.phonePlaceholder")}
               error={phoneError}
               hint={t("oolshik:login.phonePaymentBindingNote")}
+              infoLabel={t("oolshik:login.phoneInfoIconLabel")}
+              onInfoPress={props.onPhoneInfoPress}
               disabled={props.isGoogleLoading}
               keyboardAppearance={isDark ? "dark" : "light"}
             />

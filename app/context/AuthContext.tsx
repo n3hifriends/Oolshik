@@ -1,6 +1,6 @@
 import { setLoginTokens, type OnboardingPhase } from "@/api/client"
 import { OolshikApi } from "@/api"
-import { logEvent, AnalyticsEvent } from "@/services/analytics"
+import { logEvent, AnalyticsEvent, type LogoutReason } from "@/services/analytics"
 import { tokens } from "@/auth/tokens"
 import { authEvents } from "@/auth/events"
 import { navigationRef } from "@/navigators/navigationUtilities"
@@ -43,7 +43,7 @@ export type AuthContextType = {
   setUserPhone: (phone?: string) => void
   setOnboardingPhase: (phase: OnboardingPhase) => void
   hydrateOnboardingPhase: (phase: OnboardingPhase) => void
-  logout: () => void
+  logout: (reason?: LogoutReason) => void
   validationError: string
 }
 export const MMKV_AUTH_TOKEN = "auth.token"
@@ -110,7 +110,8 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
     [setOnboardingPhaseMMKV],
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback((reason: LogoutReason = "user_initiated") => {
+    logEvent(AnalyticsEvent.LOGOUT, { reason })
     crashReporting.breadcrumb("auth:logout")
     crashReporting.clearUserId()
     crashReporting.setAuthContext({ authHasToken: false })
@@ -176,8 +177,8 @@ export function AuthProvider({ children }: PropsWithChildren<AuthProviderProps>)
   }, [authToken])
 
   useEffect(() => {
-    const handler = () => {
-      logout()
+    const handler = (reason?: LogoutReason) => {
+      logout(reason ?? "session_expired")
     }
     authEvents.on("logout", handler)
     return () => {

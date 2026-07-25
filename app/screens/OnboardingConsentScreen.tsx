@@ -24,6 +24,7 @@ import {
 import { OolshikApi, type PaymentProfileApiResponse } from "@/api"
 import { getFcmTokenAsync } from "@/utils/pushNotifications"
 import { useAuth } from "@/context/AuthContext"
+import { PermissionsInfoSheet } from "@/screens/onboarding/PermissionsInfoSheet"
 
 const CONSENT_VERSION = "v1"
 
@@ -51,6 +52,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
   const [accepted, setAccepted] = useState(false)
   const [lang, setLang] = useState<"mr" | "en">(toLanguageCode(i18n.language))
   const [showConsent, setShowConsent] = useState(false)
+  const [showPermissionsInfo, setShowPermissionsInfo] = useState(false)
   const [paymentProfile, setPaymentProfile] = useState<PaymentProfileApiResponse>({ hasProfile: false })
   const [showPaymentPrompt, setShowPaymentPrompt] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -211,7 +213,11 @@ export default function OnboardingConsentScreen({ navigation }: any) {
         <Text preset="heading" text={t("oolshik:consent.title")} />
       </View>
 
-      <View style={{ flex: 1, paddingHorizontal: spacing.md, gap: spacing.lg }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.lg }}
+        showsVerticalScrollIndicator={false}
+      >
         <RadioGroup
           value={lang}
           onChange={(v) => {
@@ -326,7 +332,7 @@ export default function OnboardingConsentScreen({ navigation }: any) {
             )}
           </SectionCard>
         ) : null}
-      </View>
+      </ScrollView>
 
       {/* CONSENT MODAL */}
       <Modal visible={showConsent} transparent animationType="fade">
@@ -381,6 +387,47 @@ export default function OnboardingConsentScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      <PermissionsInfoSheet
+        visible={showPermissionsInfo}
+        onDismiss={() => setShowPermissionsInfo(false)}
+      />
+
+      <View style={{ paddingHorizontal: spacing.md, gap: spacing.xxs }}>
+        <Text
+          text={t("oolshik:consent.permissions.title")}
+          weight="medium"
+          size="xs"
+        />
+        <Text
+          text={t("oolshik:consent.permissions.locationSummary")}
+          size="xxs"
+          style={{ color: colors.textDim }}
+        />
+        <Text
+          text={t("oolshik:consent.permissions.notificationsSummary")}
+          size="xxs"
+          style={{ color: colors.textDim }}
+        />
+        <Text
+          text={t("oolshik:consent.permissions.mediaSummary")}
+          size="xxs"
+          style={{ color: colors.textDim }}
+        />
+        <Pressable
+          onPress={() => setShowPermissionsInfo(true)}
+          accessibilityRole="button"
+          hitSlop={{ top: 10, bottom: 10 }}
+          style={{ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }}
+        >
+          <Text
+            text={t("oolshik:consent.permissions.whyWeAsk")}
+            size="xs"
+            weight="medium"
+            style={{ color: colors.palette.primary600, textDecorationLine: "underline" }}
+          />
+        </Pressable>
+      </View>
 
       <View style={{ padding: spacing.md }}>
         <Button

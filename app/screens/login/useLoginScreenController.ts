@@ -107,7 +107,6 @@ export function useLoginScreenController() {
   const lastHandledGoogleResponseRef = useRef<unknown>(null)
   const cancelledAttemptRef = useRef<number | null>(null)
   const pendingGooglePhoneHintRef = useRef<string | undefined>(undefined)
-  const phoneAlertShownRef = useRef(false)
 
   const { setAuthEmail, authEmail, setAuthToken, setUserId, setUserName, setUserPhone, setOnboardingPhase, hydrateOnboardingPhase, validationError } =
     useAuth()
@@ -145,10 +144,6 @@ export function useLoginScreenController() {
       setAuthMode("phone")
     }
   }, [authMode, googleEnabled, phoneOtpEnabled])
-
-  useEffect(() => {
-    phoneAlertShownRef.current = false
-  }, [authMode])
 
   useEffect(() => {
     let active = true
@@ -610,14 +605,10 @@ export function useLoginScreenController() {
     [handleLanguageChange],
   )
 
-  const onPhoneFocus = useCallback(() => {
-    if (phoneAlertShownRef.current) return
-    phoneAlertShownRef.current = true
-    Alert.alert(
-      t("oolshik:login.phoneAlertTitle"),
-      t("oolshik:login.phoneAlertBody"),
-      [{ text: t("oolshik:login.phoneAlertDismiss") }],
-    )
+  const onPhoneInfoPress = useCallback(() => {
+    Alert.alert(t("oolshik:login.phoneAlertTitle"), t("oolshik:login.phoneAlertBody"), [
+      { text: t("oolshik:login.phoneAlertDismiss") },
+    ])
   }, [t])
 
   const handleGooglePhoneBlur = useCallback(() => {
@@ -662,7 +653,7 @@ export function useLoginScreenController() {
     onModeChange: setAuthMode,
     onOtpChange: setOtp,
     onPhoneChange: handlePhoneChange,
-    onPhoneFocus,
+    onPhoneInfoPress,
     onSetAuthEmail: setAuthEmail,
     onUseMyPhoneNumberPress: handleUseMyPhoneNumberPress,
     onVerifyOtp: handleVerifyOtpPress,

@@ -276,11 +276,17 @@ export function useTaskDetailController({
 
   useFocusEffect(
     useCallback(() => {
-      refresh()
+      // Skip while the hook's own mount-time bootstrap is still in flight (idle/loading) —
+      // calling refresh() here too fires a second concurrent requestForegroundPermissionsAsync,
+      // which races the first on fresh installs and can leave the screen stuck on "Getting your
+      // location…" even after the user grants the permission.
+      if (status === "ready" || status === "denied" || status === "error") {
+        refresh()
+      }
       return () => {
         void stop()
       }
-    }, [refresh, stop]),
+    }, [refresh, status, stop]),
   )
 
   const rawStatus = current?.status
@@ -304,15 +310,25 @@ export function useTaskDetailController({
     setSubmittedCsat(getSubmittedFeedbackSnapshot(key))
   }, [current?.id])
 
+  // Tracks the latest taskFromStore without being a dependency of the load effect below:
+  // that effect calls upsertTask, which changes the store's `tasks` reference and would
+  // otherwise recompute taskFromStore and re-trigger the effect on its own write, looping forever.
+  const taskFromStoreRef = useRef(taskFromStore)
+  useEffect(() => {
+    taskFromStoreRef.current = taskFromStore
+  }, [taskFromStore])
+
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
-      setLoading(!taskFromStore)
+      setLoading(!taskFromStoreRef.current)
       try {
         const res = await fetchTaskById(taskId)
         if (!cancelled && res.ok && res.data) {
-          setTask(toTaskDetailTask(res.data))
+          const nextTask = toTaskDetailTask(res.data)
+          setTask(nextTask)
+          if (nextTask) upsertTask(nextTask)
         }
       } catch {
         // Keep current state; avoid leaving the screen in a loading state on transient failures.
@@ -326,7 +342,7 @@ export function useTaskDetailController({
     return () => {
       cancelled = true
     }
-  }, [taskId, taskFromStore])
+  }, [taskId, upsertTask])
 
   useEffect(() => {
     if (!isWaitingForTranscription(current)) return

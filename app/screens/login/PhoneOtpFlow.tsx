@@ -42,7 +42,7 @@ interface PhoneOtpFlowProps {
   onEmailToggle: () => void
   onOtpChange: (value: string) => void
   onPhoneChange: (value: string) => void
-  onPhoneFocus: () => void
+  onPhoneInfoPress: () => void
   onSetAuthEmail: (value?: string) => void
   onUseMyPhoneNumberPress: () => void
   onVerifyOtp: () => void
@@ -136,7 +136,6 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
         <PhoneInputRow
           value={props.phone}
           onChangeText={props.onPhoneChange}
-          onFocus={props.onPhoneFocus}
           placeholder={t("oolshik:login.phonePlaceholder")}
           error={
             props.phoneShouldShowError
@@ -148,6 +147,8 @@ export const PhoneOtpFlow = memo(function PhoneOtpFlow(props: PhoneOtpFlowProps)
               : null
           }
           hint={t("oolshik:login.phonePaymentBindingNote")}
+          infoLabel={t("oolshik:login.phoneInfoIconLabel")}
+          onInfoPress={props.onPhoneInfoPress}
           disabled={props.otpVerified}
           keyboardAppearance={isDark ? "dark" : "light"}
         />

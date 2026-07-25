@@ -64,8 +64,14 @@ export default function CreateTaskScreen({ navigation }: any) {
 
   useFocusEffect(
     React.useCallback(() => {
-      refresh()
-    }, [refresh]),
+      // Skip while the hook's own mount-time bootstrap is still in flight (idle/loading) —
+      // calling refresh() here too fires a second concurrent requestForegroundPermissionsAsync,
+      // which races the first on fresh installs and can leave the screen stuck on "Getting your
+      // location…" even after the user grants the permission.
+      if (status === "ready" || status === "denied" || status === "error") {
+        refresh()
+      }
+    }, [refresh, status]),
   )
 
   useEffect(() => {

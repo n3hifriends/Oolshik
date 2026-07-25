@@ -41,7 +41,7 @@ export const WelcomeScreen: FC<WelcomeScreenProps> = function WelcomeScreen(
   useHeader(
     {
       rightTx: "common:logOut",
-      onRightPress: logout,
+      onRightPress: () => logout(),
     },
     [logout],
   )
