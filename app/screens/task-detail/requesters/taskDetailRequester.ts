@@ -107,8 +107,8 @@ export async function releaseTask(taskId: string, payload: ReasonPayload) {
   }
 }
 
-export async function reassignTask(taskId: string) {
-  const res = (await OolshikApi.reassignTask(taskId)) as ApiLikeResponse<Partial<Task>>
+export async function reassignTask(taskId: string, payload?: ReasonPayload) {
+  const res = (await OolshikApi.reassignTask(taskId, payload)) as ApiLikeResponse<Partial<Task>>
   return {
     ok: !!res?.ok,
     status: res?.status,

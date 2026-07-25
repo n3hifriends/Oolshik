@@ -1352,7 +1352,15 @@ ${t(line2Key)}`,
   }, [])
 
   const onConfirmReason = useCallback(async () => {
-    if (!current?.id || !reasonModal.action || !reasonModal.reasonCode) return
+    if (!current?.id || !reasonModal.action) return
+
+    if (!reasonModal.reasonCode) {
+      Alert.alert(
+        t("oolshik:taskDetailScreen.selectReasonTitle"),
+        t("oolshik:taskDetailScreen.selectReasonBody"),
+      )
+      return
+    }
 
     if (reasonModal.reasonCode === "OTHER" && !reasonModal.reasonText?.trim()) {
       Alert.alert(
@@ -1401,6 +1409,11 @@ ${t(line2Key)}`,
           setTask((prev) => (prev ? { ...prev, status: "REVIEW_REQUIRED" } : prev))
         }
         setRecoveryNotice(t("oolshik:taskDetailScreen.issueReportedNotice"))
+      } else if (reasonModal.action === "reassign") {
+        const res = await reassignTask(String(current.id), payload)
+        if (!res.ok) throw new Error("reassign-failed")
+        setTask((prev) => (prev ? { ...prev, status: "OPEN", helperId: null } : prev))
+        setRecoveryNotice(t("oolshik:taskDetailScreen.requestReopenedNotice"))
       }
 
       if (coords && status === "ready") {
@@ -1427,30 +1440,6 @@ ${t(line2Key)}`,
     status,
     t,
   ])
-
-  const onReassign = useCallback(async () => {
-    if (!current?.id) return
-
-    setActionLoading(true)
-    try {
-      const res = await reassignTask(String(current.id))
-      if (!res.ok) throw new Error("reassign-failed")
-
-      setTask((prev) => (prev ? { ...prev, status: "OPEN", helperId: null } : prev))
-      setRecoveryNotice(t("oolshik:taskDetailScreen.requestReopenedNotice"))
-
-      if (coords && status === "ready") {
-        await fetchNearby(coords.latitude, coords.longitude)
-      }
-    } catch {
-      Alert.alert(
-        t("oolshik:taskDetailScreen.reassignFailedTitle"),
-        t("oolshik:taskDetailScreen.reassignFailedBody"),
-      )
-    } finally {
-      setActionLoading(false)
-    }
-  }, [coords, current?.id, fetchNearby, status, t])
 
   const showNoMapsAlert = useCallback(
     (lat: number, lon: number) => {
@@ -1601,6 +1590,19 @@ ${t(line2Key)}`,
     [t],
   )
 
+  const reassignReasons = useMemo(
+    () => [
+      {
+        code: "HELPER_NOT_RESPONDING",
+        label: t("oolshik:taskDetailScreen.reassignReasonNotResponding"),
+      },
+      { code: "TAKING_TOO_LONG", label: t("oolshik:taskDetailScreen.reassignReasonTakingTooLong") },
+      { code: "CHANGED_MIND", label: t("oolshik:taskDetailScreen.reassignReasonChangedMind") },
+      { code: "OTHER", label: t("oolshik:taskDetailScreen.reasonOther") },
+    ],
+    [t],
+  )
+
   const currentReasons =
     reasonModal.action === "release"
       ? releaseReasons
@@ -1608,6 +1610,8 @@ ${t(line2Key)}`,
         ? rejectReasons
         : reasonModal.action === "issue"
           ? issueReasons
+          : reasonModal.action === "reassign"
+            ? reassignReasons
         : cancelReasons
 
   const ratingBadgeValue = normalizedStatus === "COMPLETED" ? otherPartyRating : oppositeAvgRating
@@ -1828,6 +1832,10 @@ ${t(line2Key)}`,
       releaseReasons,
       rejectReasons,
       issueReasons,
+      reassignReasons,
+      confirmDisabled:
+        !reasonModal.reasonCode ||
+        (reasonModal.reasonCode === "OTHER" && !reasonModal.reasonText?.trim()),
     },
     handlers: {
       refreshTask,
@@ -1858,7 +1866,6 @@ ${t(line2Key)}`,
         setReasonModal((prev) => ({ ...prev, reasonText: value }))
       },
       onConfirmReason,
-      onReassign,
       openPaymentFlow,
       onRequestPayment,
       onPayRequester,

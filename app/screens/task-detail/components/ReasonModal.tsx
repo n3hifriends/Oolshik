@@ -26,6 +26,7 @@ type ReasonModalProps = {
   goBackLabel: string
   confirmLabel: string
   actionLoading: boolean
+  confirmDisabled: boolean
   primary: string
   background: string
   neutral100: string
@@ -107,7 +108,8 @@ export function ReasonModalSection(props: ReasonModalProps) {
               <Button
                 text={props.actionLoading ? "..." : props.confirmLabel}
                 onPress={props.onConfirm}
-                style={{ flex: 1 }}
+                disabled={props.confirmDisabled || props.actionLoading}
+                style={{ flex: 1, opacity: props.confirmDisabled ? 0.5 : 1 }}
               />
             </View>
           </Pressable>

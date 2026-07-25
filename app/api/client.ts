@@ -574,6 +574,11 @@ export type UserNotification = {
   body: string
   read: boolean
   createdAt: string
+  broadcastId?: string | null
+  eventType?: string | null
+  taskId?: string | null
+  paymentRequestId?: string | null
+  route?: string | null
 }
 
 export type UnreadCountResponse = {
@@ -786,7 +791,8 @@ export const OolshikApi = {
   releaseTask: (taskId: string, payload?: { reasonCode?: string; reasonText?: string }) =>
     api.post(`/requests/${taskId}/release`, payload ?? {}),
 
-  reassignTask: (taskId: string) => api.post(`/requests/${taskId}/reassign`, {}),
+  reassignTask: (taskId: string, payload?: { reasonCode?: string; reasonText?: string }) =>
+    api.post(`/requests/${taskId}/reassign`, payload ?? {}),
 
   updateTaskOffer: (
     taskId: string,

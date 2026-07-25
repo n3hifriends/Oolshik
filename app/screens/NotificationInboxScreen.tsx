@@ -7,6 +7,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { SectionCard } from "@/components/SectionCard"
 import { OolshikApi, type UserNotification } from "@/api/client"
+import { navigateFromInboxNotification } from "@/utils/pushNotifications"
 import { useAppTheme } from "@/theme/context"
 import type { OolshikStackScreenProps } from "@/navigators/OolshikNavigator"
 
@@ -19,6 +20,12 @@ type State = {
   loading: boolean
   refreshing: boolean
   loadingMore: boolean
+}
+
+type InboxTab = "tasks" | "admin"
+
+function matchesTab(item: UserNotification, tab: InboxTab): boolean {
+  return tab === "admin" ? item.broadcastId != null : item.broadcastId == null
 }
 
 const PAGE_SIZE = 50
@@ -100,7 +107,22 @@ function NotifRow({
   return (
     <View>
       <Pressable
-        onPress={() => onToggleExpanded(item.id)}
+        onPress={() => {
+          // First tap expands to reveal the full text, same as before this row
+          // could deep-link. Only a second tap on an already-expanded row navigates,
+          // so the inline "read more" interaction stays reachable.
+          if (!expanded) {
+            onToggleExpanded(item.id)
+            return
+          }
+          const navigated = navigateFromInboxNotification({
+            route: item.route,
+            type: item.eventType,
+            taskId: item.taskId,
+            paymentRequestId: item.paymentRequestId,
+          })
+          if (!navigated) onToggleExpanded(item.id)
+        }}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         style={{
@@ -240,7 +262,17 @@ function NotifSection({
   )
 }
 
-function EmptyState({ t, primary500, textDim }: { t: (key: string) => string; primary500: string; textDim: string }) {
+function EmptyState({
+  t,
+  primary500,
+  textDim,
+  tab,
+}: {
+  t: (key: string) => string
+  primary500: string
+  textDim: string
+  tab: InboxTab
+}) {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, paddingVertical: 48, gap: 12 }}>
       <MaterialCommunityIcons name="bell-off-outline" size={48} color={textDim} />
@@ -250,7 +282,11 @@ function EmptyState({ t, primary500, textDim }: { t: (key: string) => string; pr
         style={{ color: textDim, textAlign: "center" }}
       />
       <Text
-        text={t("oolshik:notificationInbox.emptyBody")}
+        text={t(
+          tab === "admin"
+            ? "oolshik:notificationInbox.emptyBodyAdmin"
+            : "oolshik:notificationInbox.emptyBodyTasks",
+        )}
         size="xs"
         style={{ color: textDim, textAlign: "center", lineHeight: 20 }}
       />
@@ -275,6 +311,7 @@ export default function NotificationInboxScreen({ navigation }: Props) {
     loadingMore: false,
   })
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+  const [activeTab, setActiveTab] = useState<InboxTab>("tasks")
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((current) => {
@@ -330,7 +367,8 @@ export default function NotificationInboxScreen({ navigation }: Props) {
     }, [load]),
   )
 
-  const groups = groupNotifications(state.items, t)
+  const tabItems = state.items.filter((item) => matchesTab(item, activeTab))
+  const groups = groupNotifications(tabItems, t)
 
   return (
     <Screen
@@ -369,8 +407,44 @@ export default function NotificationInboxScreen({ navigation }: Props) {
         </View>
       )}
 
-      {!state.loading && state.items.length === 0 && (
-        <EmptyState t={t} primary500={palette.primary500} textDim={colors.textDim} />
+      {!state.loading && (
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {(["tasks", "admin"] as InboxTab[]).map((tab) => {
+            const active = activeTab === tab
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => ({
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: active ? palette.primary500 : palette.neutral200,
+                  backgroundColor: active ? palette.primary100 : palette.neutral100,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <Text
+                  text={t(
+                    tab === "tasks"
+                      ? "oolshik:notificationInbox.tabTasks"
+                      : "oolshik:notificationInbox.tabAdmin",
+                  )}
+                  size="xs"
+                  weight={active ? "semiBold" : "normal"}
+                  style={{ color: active ? palette.primary600 : palette.neutral700 }}
+                />
+              </Pressable>
+            )
+          })}
+        </View>
+      )}
+
+      {!state.loading && tabItems.length === 0 && (
+        <EmptyState t={t} primary500={palette.primary500} textDim={colors.textDim} tab={activeTab} />
       )}
 
       {!state.loading && groups.map((group) => (

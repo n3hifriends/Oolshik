@@ -6,7 +6,7 @@ export type TaskDetailTask = Task & {
   helperPhone?: string
 }
 
-export type RecoveryAction = "cancel" | "release" | "reject" | "issue"
+export type RecoveryAction = "cancel" | "release" | "reject" | "issue" | "reassign"
 
 export type ReasonModalState = {
   visible: boolean

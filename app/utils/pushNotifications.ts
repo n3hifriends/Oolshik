@@ -232,20 +232,12 @@ function handleNotificationResponse(resp: Notifications.NotificationResponse) {
   const broadcastId = typeof data?.broadcastId === "string" ? data.broadcastId : ""
 
   let target: PendingNotificationTarget | null = null
-
-  if (route === "TaskDetail" && taskId) {
-    target = { route: "TaskDetail", taskId }
-  } else if (route === "PaymentPay" && taskId) {
-    // PaymentPay screen requires a QR scan payload — navigate to task detail instead,
-    // which surfaces the payment section and lets the user act from there.
-    target = { route: "TaskDetail", taskId, paymentRequestId: paymentRequestId || undefined }
-  } else if (route === "AdminBroadcast") {
+  if (route === "AdminBroadcast") {
     target = { route: "AdminBroadcast", broadcastId: broadcastId || undefined }
   } else if (route === "InAppInbox") {
     target = { route: "InAppInbox" }
-  } else if (type.startsWith("TASK_") && taskId) {
-    // Fallback for legacy payloads that carry type but no route
-    target = { route: "TaskDetail", taskId }
+  } else {
+    target = resolveNotificationTarget({ route, type, taskId, paymentRequestId })
   }
 
   if (!target) {
@@ -257,6 +249,53 @@ function handleNotificationResponse(resp: Notifications.NotificationResponse) {
   pendingTarget = target
   navRetryCount = 0
   flushPendingTarget()
+}
+
+function resolveNotificationTarget(data: {
+  route?: string | null
+  type?: string | null
+  taskId?: string | null
+  paymentRequestId?: string | null
+}): PendingNotificationTarget | null {
+  const route = data.route ?? ""
+  const type = data.type ?? ""
+  const taskId = data.taskId ?? ""
+  const paymentRequestId = data.paymentRequestId ?? ""
+
+  if (route === "TaskDetail" && taskId) {
+    return { route: "TaskDetail", taskId }
+  }
+  if (route === "PaymentPay" && taskId) {
+    // PaymentPay screen requires a QR scan payload — navigate to task detail instead,
+    // which surfaces the payment section and lets the user act from there.
+    return { route: "TaskDetail", taskId, paymentRequestId: paymentRequestId || undefined }
+  }
+  if (type.startsWith("TASK_") && taskId) {
+    // Fallback for legacy payloads that carry type but no route
+    return { route: "TaskDetail", taskId }
+  }
+  return null
+}
+
+/**
+ * Navigates from a tap on an in-app notification inbox row, reusing the same
+ * route-resolution and navigation logic as push-notification taps. Returns
+ * false (and navigates nowhere) for rows with no task/route data, e.g. admin
+ * broadcasts — callers should fall back to their default tap behavior in that case.
+ */
+export function navigateFromInboxNotification(data: {
+  route?: string | null
+  type?: string | null
+  taskId?: string | null
+  paymentRequestId?: string | null
+}): boolean {
+  const target = resolveNotificationTarget(data)
+  if (!target) return false
+
+  pendingTarget = target
+  navRetryCount = 0
+  flushPendingTarget()
+  return true
 }
 
 function flushPendingTarget() {

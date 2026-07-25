@@ -187,7 +187,6 @@ export default function TaskDetailScreen({ navigation }: Props) {
         onMarkDone={handlers.onMarkDone}
         onComplete={handlers.onComplete}
         onOpenReason={handlers.openReasonSheet}
-        onReassign={handlers.onReassign}
         onGoBack={handlers.goBack}
         helperRequestedAuthorizationText={t(
           "oolshik:taskDetailScreen.helperRequestedAuthorization",
@@ -347,13 +346,16 @@ export default function TaskDetailScreen({ navigation }: Props) {
               ? t("oolshik:taskDetailScreen.reasonForReject")
               : state.reasonModal.action === "issue"
                 ? t("oolshik:taskDetailScreen.reasonForIssue")
-                : t("oolshik:taskDetailScreen.reasonForCancel")
+                : state.reasonModal.action === "reassign"
+                  ? t("oolshik:taskDetailScreen.reasonForReassign")
+                  : t("oolshik:taskDetailScreen.reasonForCancel")
         }
         reasons={controller.reasons.currentReasons}
         addShortNotePlaceholder={t("oolshik:taskDetailScreen.addShortNote")}
         goBackLabel={t("oolshik:taskDetailScreen.goBack")}
         confirmLabel={t("oolshik:taskDetailScreen.confirm")}
         actionLoading={state.actionLoading}
+        confirmDisabled={controller.reasons.confirmDisabled}
         primary={primary}
         background={colors.background}
         neutral100={colors.palette.neutral100}

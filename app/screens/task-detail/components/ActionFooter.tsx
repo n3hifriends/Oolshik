@@ -41,7 +41,6 @@ type ActionFooterProps = {
   onMarkDone: () => void
   onComplete: () => void
   onOpenReason: (action: RecoveryAction) => void
-  onReassign: () => void
   onGoBack: () => void
   helperRequestedAuthorizationText: string
   requesterLabelText: string
@@ -327,7 +326,7 @@ export function ActionFooter(props: ActionFooterProps) {
           {props.canReassign ? (
             <Button
               text={props.actionLoading ? "..." : props.reassignHelperLabel}
-              onPress={props.onReassign}
+              onPress={() => props.onOpenReason("reassign")}
               style={{ paddingVertical: props.spacingXs }}
             />
           ) : null}

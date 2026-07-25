@@ -13,13 +13,17 @@ export const BAR_HORIZONTAL = 16
 const BTN_SIZE = 44
 const BTN_GAP = 4
 const ZONE_PAD_LEFT = 10
+const MIC_PILL_WIDTH = 130
+const MIC_PILL_HEIGHT = BAR_HEIGHT - 8
 
 const BRAND_ORANGE = "#FF6B2C"
+const BRAND_ORANGE_PRESSED = "#E85A1F"
 
 // These let HomeFeedScreen calculate animation origin for SpotlightComposer
 // without needing async layout measurement.
-export const BAR_MIC_CENTER_X = BAR_HORIZONTAL + ZONE_PAD_LEFT + BTN_SIZE / 2
-export const BAR_PEN_CENTER_X = BAR_HORIZONTAL + ZONE_PAD_LEFT + BTN_SIZE + BTN_GAP + BTN_SIZE / 2
+export const BAR_MIC_CENTER_X = BAR_HORIZONTAL + ZONE_PAD_LEFT + MIC_PILL_WIDTH / 2
+export const BAR_PEN_CENTER_X =
+  BAR_HORIZONTAL + ZONE_PAD_LEFT + MIC_PILL_WIDTH + BTN_GAP + BTN_SIZE / 2
 
 interface HomeFeedBottomBarProps {
   onVoiceCapture: () => void
@@ -91,16 +95,28 @@ export function HomeFeedBottomBar(props: HomeFeedBottomBarProps) {
         accessibilityRole="button"
         hitSlop={4}
         style={({ pressed }) => ({
-          width: BTN_SIZE,
-          height: BTN_SIZE,
+          width: MIC_PILL_WIDTH,
+          height: MIC_PILL_HEIGHT,
           marginLeft: ZONE_PAD_LEFT,
-          borderRadius: BTN_SIZE / 2,
+          borderRadius: MIC_PILL_HEIGHT / 2,
+          flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: pressed ? iconBgPressed : iconBg,
+          backgroundColor: pressed ? BRAND_ORANGE_PRESSED : BRAND_ORANGE,
         })}
       >
-        <MaterialCommunityIcons name="microphone" size={24} color={BRAND_ORANGE} />
+        <MaterialCommunityIcons name="microphone" size={22} color="#FFFFFF" />
+        <Text
+          text={t("oolshik:composer.speakLabel")}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.1}
+          weight="bold"
+          size="sm"
+          style={{
+            marginLeft: 8,
+            color: "#FFFFFF",
+          }}
+        />
       </Pressable>
 
       {/* Pen button */}
