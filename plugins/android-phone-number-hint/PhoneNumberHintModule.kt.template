@@ -39,7 +39,7 @@ class PhoneNumberHintModule(
       return
     }
 
-    val activity = currentActivity
+    val activity = getCurrentActivity()
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "No active Android activity is available.")
       return
@@ -142,7 +142,7 @@ class PhoneNumberHintModule(
   }
 
   override fun onActivityResult(
-    activity: Activity?,
+    activity: Activity,
     requestCode: Int,
     resultCode: Int,
     data: Intent?,
@@ -174,7 +174,7 @@ class PhoneNumberHintModule(
     }
   }
 
-  override fun onNewIntent(intent: Intent?) = Unit
+  override fun onNewIntent(intent: Intent) = Unit
 
   private fun rejectPendingPromise(code: String, message: String, error: Throwable?) {
     val promise = pendingPromise ?: return

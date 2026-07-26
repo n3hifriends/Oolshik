@@ -1,5 +1,5 @@
 // app/audio/uploadAudio.ts
-import RNFS from "react-native-fs"
+import { File } from "expo-file-system"
 
 import {
   initUpload,
@@ -69,7 +69,7 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
   const mimeType = opts.mimeType ?? "audio/m4a"
   const filename = opts.filename ?? `recording_${Date.now()}.m4a`
   const requestId = buildUploadRequestId(opts.requestId)
-  const filePath = toFilePath(opts.uri)
+  const file = new File(opts.uri)
   let presignFailureMessage: string | null = null
 
   const audioUploadPresigned = getRemoteFlag("audio_upload_use_presigned")
@@ -86,9 +86,7 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
       if (pres.ok && pres.data) {
         presignState = "supported"
         const { uploadUrl, fileUrl, objectKey } = pres.data
-        // Upload file as binary (no base64) using RNFS
-        const data = await RNFS.readFile(filePath, "base64")
-        const bytes = base64ToBytes(data)
+        const bytes = new Uint8Array(await file.arrayBuffer())
         const res = await fetch(uploadUrl, {
           method: "PUT",
           headers: { "Content-Type": mimeType },
@@ -136,8 +134,7 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
 
   // ---- Fallback: server-buffered chunk upload (LOCAL) ----
   // 1) stat
-  const st = await RNFS.stat(filePath)
-  const size = Number(st.size)
+  const size = file.size
   if (!Number.isFinite(size) || size <= 0) {
     breadcrumb("audio:upload_failed kind=file_missing")
     throw new Error("File not found or empty")
@@ -154,10 +151,8 @@ export async function uploadAudioSmart(opts: Opts): Promise<AudioUploadResult> {
   let index = 0
   while (offset < size) {
     const len = Math.min(CHUNK_SIZE, size - offset)
-    // RNFS read with length + position (base64 → bytes)
-    const base64 = await RNFS.read(filePath, len, offset, "base64")
-    const bytes = base64ToBytes(base64)
-    const put = await uploadChunk(uploadId, index, bytes as unknown as Uint8Array)
+    const bytes = new Uint8Array(await file.slice(offset, offset + len).arrayBuffer())
+    const put = await uploadChunk(uploadId, index, bytes)
     if (!put.ok) throw new Error(`Chunk ${index} failed`)
     offset += len
     index++
@@ -189,35 +184,6 @@ function buildUploadRequestId(existing?: string): string {
   if (generatedByCrypto) return generatedByCrypto
 
   return `audio-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-function toFilePath(uri: string): string {
-  return uri.startsWith("file://") ? uri.replace("file://", "") : uri
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  // fast base64 decoder (no atob dependency)
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-  let i = 0
-  const out: number[] = []
-  b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "")
-  while (i < b64.length) {
-    const c1Raw = b64[i++]
-    const c2Raw = b64[i++]
-    const c3Raw = b64[i++]
-    const c4Raw = b64[i++]
-    const e1 = chars.indexOf(c1Raw)
-    const e2 = chars.indexOf(c2Raw)
-    const e3 = c3Raw === "=" ? 64 : chars.indexOf(c3Raw)
-    const e4 = c4Raw === "=" ? 64 : chars.indexOf(c4Raw)
-    const c1 = (e1 << 2) | (e2 >> 4)
-    const c2 = ((e2 & 15) << 4) | (e3 >> 2)
-    const c3 = ((e3 & 3) << 6) | e4
-    out.push(c1)
-    if (e3 !== 64) out.push(c2)
-    if (e4 !== 64) out.push(c3)
-  }
-  return Uint8Array.from(out)
 }
 
 function extractAudioFileId(saved: AudioFileResponse): string {

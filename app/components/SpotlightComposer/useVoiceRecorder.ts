@@ -3,7 +3,7 @@ import { Platform } from "react-native"
 let AudioRecorderPlayerModule: any = null
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mod = require("react-native-audio-recorder-player")
+  const mod = require("react-native-nitro-sound")
   AudioRecorderPlayerModule = mod?.default ?? mod
 } catch {
   AudioRecorderPlayerModule = null

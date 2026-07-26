@@ -10,7 +10,7 @@ const path = require("path")
 
 const PLAY_SERVICES_AUTH_DEPENDENCY =
   '    implementation("com.google.android.gms:play-services-auth:21.4.0")'
-const PACKAGE_REGISTRATION = "            packages.add(PhoneNumberHintPackage())"
+const PACKAGE_REGISTRATION = "              add(PhoneNumberHintPackage())"
 
 async function ensureAndroidSourceFiles(projectRoot: string, packageName: string) {
   const packageDirectory = path.join(
@@ -55,6 +55,12 @@ export const withAndroidPhoneNumberHint: ConfigPlugin = (config) => {
       )
     }
 
+    if (!modConfig.modResults.contents.includes("com.google.android.gms:play-services-auth")) {
+      throw new Error(
+        "withAndroidPhoneNumberHint: expected `dependencies {` block not found in build.gradle — Expo's template may have changed, update this plugin's anchors.",
+      )
+    }
+
     return modConfig
   })
 
@@ -76,8 +82,14 @@ export const withAndroidPhoneNumberHint: ConfigPlugin = (config) => {
 
     if (!contents.includes(PACKAGE_REGISTRATION)) {
       contents = contents.replace(
-        "            // packages.add(MyReactNativePackage())\n",
-        `            // packages.add(MyReactNativePackage())\n${PACKAGE_REGISTRATION}\n`,
+        "              // add(MyReactNativePackage())\n",
+        `              // add(MyReactNativePackage())\n${PACKAGE_REGISTRATION}\n`,
+      )
+    }
+
+    if (!contents.includes(PACKAGE_REGISTRATION)) {
+      throw new Error(
+        "withAndroidPhoneNumberHint: expected `// add(MyReactNativePackage())` marker not found in MainApplication.kt — Expo's template may have changed, update this plugin's anchors.",
       )
     }
 

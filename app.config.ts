@@ -40,10 +40,20 @@ module.exports = ({ config }: ConfigContext): Partial<ExpoConfig> => {
           },
         ],
       },
+      infoPlist: {
+        ...(config.ios?.infoPlist ?? {}),
+        // Needed to check for installed maps apps for turn-by-turn navigation deep links.
+        LSApplicationQueriesSchemes: ["comgooglemaps", "waze", "mappls"],
+      },
     },
     plugins: [
       ...existingPlugins,
       require("./plugins/withAndroidPhoneNumberHint").withAndroidPhoneNumberHint,
+      require("./plugins/withUpiLauncher").withUpiLauncher,
+      require("./plugins/withAndroidQueries").withAndroidQueries,
+      require("./plugins/withReleaseSigning").withReleaseSigning,
+      require("./plugins/withFirebaseMessagingManifestFix").withFirebaseMessagingManifestFix,
+      "expo-web-browser",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "@react-native-firebase/crashlytics",

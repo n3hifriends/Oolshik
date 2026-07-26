@@ -91,6 +91,7 @@ export function useAudioRecorder(maxSeconds = 10) {
       }
       const status = await recording.getStatusAsync().catch(() => null)
       await recording.stopAndUnloadAsync()
+      if (recRef.current === recording) recRef.current = null
       const out = recording.getURI()
       const finalDurationSec = Math.max(durationSec, Math.floor((status?.durationMillis ?? 0) / 1000))
       setUri(out ?? null)
@@ -111,18 +112,14 @@ export function useAudioRecorder(maxSeconds = 10) {
     setUri(null)
     setDurationSec(0)
     setState("idle")
-    try {
-      recRef.current?.stopAndUnloadAsync()
-    } catch {}
+    recRef.current?.stopAndUnloadAsync().catch(() => {})
     recRef.current = null
   }
 
   useEffect(
     () => () => {
       if (tickRef.current) clearInterval(tickRef.current)
-      try {
-        recRef.current?.stopAndUnloadAsync()
-      } catch {}
+      recRef.current?.stopAndUnloadAsync().catch(() => {})
     },
     [],
   )

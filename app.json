@@ -2,7 +2,7 @@
   "name": "Oolshik",
   "slug": "Oolshik",
   "scheme": "oolshik",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "orientation": "portrait",
   "userInterfaceStyle": "automatic",
   "icon": "./assets/images/app-icon-all.png",
@@ -13,17 +13,13 @@
   "jsEngine": "hermes",
   "assetBundlePatterns": ["**/*"],
   "android": {
-    "versionCode": 5,
+    "versionCode": 7,
     "googleServicesFile": "./google-services.json",
     "icon": "./assets/images/app-icon-android-legacy.png",
     "package": "com.oolshik.aan",
     "adaptiveIcon": {
       "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
       "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
-    },
-    "notification": {
-      "icon": "./assets/images/notification-icon.png",
-      "color": "#191015"
     },
     "allowBackup": false,
     "edgeToEdgeEnabled": true,
@@ -62,7 +58,7 @@
       "expo-splash-screen",
       {
         "backgroundColor": "#FF6B2C",
-        "image": "./assets/images/ic_launcher_round.webp",
+        "image": "./assets/images/ic_launcher_round.png",
         "imageWidth": 200,
         "resizeMode": "contain"
       }

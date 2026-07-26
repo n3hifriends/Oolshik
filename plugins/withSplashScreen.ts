@@ -62,7 +62,7 @@ const withCustomStylesXml: ConfigPlugin = (config) =>
       value: "true",
       parent: {
         name: "Theme.App.SplashScreen",
-        parent: "AppTheme",
+        parent: "Theme.SplashScreen",
       },
     })
     return modConfig

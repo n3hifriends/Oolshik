@@ -250,7 +250,7 @@ export default function MyTasksScreen({ navigation }: Props) {
                   </View>
 
                   <View style={styles.cardFooter}>
-                    <View>
+                    <View style={styles.footerStatus}>
                       <Text size="xxs" style={styles.metaLabel} text={t("oolshik:myTasksScreen.statusLabel")} />
                       <Text weight="medium" text={status.label} />
                     </View>
@@ -285,6 +285,7 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
     cardFooter: {
       alignItems: "center",
       flexDirection: "row",
+      flexWrap: "wrap",
       gap: theme.spacing.md,
       justifyContent: "space-between",
       marginTop: theme.spacing.md,
@@ -311,6 +312,9 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       marginLeft: theme.spacing.sm,
       textAlign: "right",
     },
+    footerStatus: {
+      flexShrink: 1,
+    },
     header: {
       marginBottom: theme.spacing.lg,
     },
@@ -332,6 +336,7 @@ const createStyles = (theme: Theme, scaleDisplayText: (size: number) => number) 
       textTransform: "uppercase",
     },
     openButton: {
+      flexShrink: 0,
       minWidth: 132,
     },
     requestCard: {

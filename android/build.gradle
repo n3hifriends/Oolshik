@@ -6,37 +6,16 @@ buildscript {
     mavenCentral()
   }
   dependencies {
-    classpath 'com.google.gms:google-services:4.4.1'
-    classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.6'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.6'
+        classpath 'com.google.gms:google-services:4.4.1'
     classpath('com.android.tools.build:gradle')
     classpath('com.facebook.react:react-native-gradle-plugin')
     classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
   }
 }
 
-def resolveNodeExecutable = {
-  def configured = findProperty("NODE_BINARY") ?: System.getenv("NODE_BINARY")
-  if (configured) return configured
-  return ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"].find { new File(it).exists() } ?: "node"
-}
-
-ext.nodeExecutable = resolveNodeExecutable()
-
-def reactNativeAndroidDir = new File(
-  providers.exec {
-    workingDir(rootDir)
-    commandLine(nodeExecutable, "--print", "require.resolve('react-native/package.json')")
-  }.standardOutput.asText.get().trim(),
-  "../android"
-)
-
 allprojects {
   repositories {
-    maven {
-      // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-      url(reactNativeAndroidDir)
-    }
-
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }

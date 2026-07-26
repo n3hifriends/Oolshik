@@ -1,18 +1,18 @@
 // app/audio/useAudioRecorder.rn.ts
-// Bare React Native path using react-native-audio-recorder-player
+// Bare React Native path using react-native-nitro-sound
 import { useEffect, useRef, useState } from "react"
 import { Platform, PermissionsAndroid, Alert } from "react-native"
-import AudioRecorderPlayer, {
+import Sound, {
   AVEncoderAudioQualityIOSType,
   AudioSourceAndroidType,
   type RecordBackType,
-} from "react-native-audio-recorder-player"
+} from "react-native-nitro-sound"
 
 export type RecordingState = "idle" | "recording" | "paused" | "stopped"
 export type Recording = { path: string; durationMs: number }
 
 export function useAudioRecorder() {
-  const arpRef = useRef(AudioRecorderPlayer)
+  const arpRef = useRef(Sound)
   const [state, setState] = useState<RecordingState>("idle")
   const [path, setPath] = useState<string | null>(null)
   const [durationMs, setDurationMs] = useState(0)
