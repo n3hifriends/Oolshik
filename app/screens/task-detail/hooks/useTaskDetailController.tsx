@@ -489,6 +489,7 @@ export function useTaskDetailController({
   const contactLabel = isRequester
     ? t("oolshik:taskDetailScreen.contactHelperPhone")
     : t("oolshik:taskDetailScreen.contactRequesterPhone")
+  const contactName = isRequester ? current?.helperName || null : null
 
   const hasHelper = !!current?.helperId || !!current?.pendingHelperId
   const canViewContact = isRequester
@@ -1776,6 +1777,7 @@ ${t(line2Key)}`,
     },
     contact: {
       contactLabel,
+      contactName,
       canViewContact,
       displayPhone:
         isRevealed && fullPhone ? String(fullPhone) : maskPhoneNumber(fullPhone || "•••••••••••••"),

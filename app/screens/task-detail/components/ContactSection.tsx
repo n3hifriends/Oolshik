@@ -6,6 +6,7 @@ import { Text } from "@/components/Text"
 type ContactSectionProps = {
   visible: boolean
   title: string
+  displayName?: string | null
   displayPhone: string
   isRevealed: boolean
   revealLoading: boolean
@@ -36,6 +37,13 @@ export function ContactSection(props: ContactSectionProps) {
       }}
     >
       <Text text={props.title} weight="medium" style={{ color: props.neutral700 }} />
+      {props.displayName ? (
+        <Text
+          text={props.isRevealed ? props.displayName : "•••••••"}
+          weight="bold"
+          style={{ color: props.neutral700 }}
+        />
+      ) : null}
       <View style={{ flexDirection: "row", alignItems: "center", gap: props.spacingSm }}>
         <Text text={props.displayPhone} weight="bold" style={{ flex: 1, color: props.neutral700 }} />
         {props.isRevealed ? (

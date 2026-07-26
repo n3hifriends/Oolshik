@@ -138,6 +138,7 @@ export default function TaskDetailScreen({ navigation }: Props) {
             <ContactSection
               visible={contact.canViewContact}
               title={contact.contactLabel}
+              displayName={contact.contactName}
               displayPhone={contact.displayPhone}
               isRevealed={state.isRevealed}
               revealLoading={state.revealLoading}
